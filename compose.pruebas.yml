@@ -1,0 +1,73 @@
+name: helpdesk-verificacion
+
+x-entorno: &entorno
+  APP_ENV: test
+  SECRET_KEY: solo-pruebas-aisladas-no-utilizar-en-produccion-1234567890
+  MONGO_URI: mongodb://mongo:27017/?replicaSet=rs0
+  REDIS_URL: redis://redis:6379/0
+  RATE_LIMIT_PER_MINUTE: "3000"
+  COOKIE_SECURE: "false"
+
+services:
+  mongo:
+    image: mongo:8.0
+    command: [mongod, --replSet, rs0, --bind_ip_all]
+    tmpfs: [/data/db, /data/configdb]
+    healthcheck:
+      test: [CMD, mongosh, --quiet, --eval, "db.adminCommand({ping:1}).ok"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+  mongo-init:
+    image: mongo:8.0
+    depends_on:
+      mongo: {condition: service_healthy}
+    entrypoint: [sh, -c]
+    command:
+      - >-
+        mongosh --host mongo --quiet --eval 'try { rs.status() } catch(e) { rs.initiate({_id:"rs0",members:[{_id:0,host:"mongo:27017"}]}) }';
+        for i in $$(seq 1 60); do
+          if mongosh --host mongo --quiet --eval 'db.hello().isWritablePrimary' | grep -q true; then exit 0; fi;
+          sleep 1;
+        done; exit 1
+  redis:
+    image: redis:7-alpine
+    tmpfs: [/data]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  tests:
+    build: {context: ./backend, target: develop}
+    image: helpdesk-pruebas-api
+    profiles: [suite]
+    depends_on:
+      mongo-init: {condition: service_completed_successfully}
+      redis: {condition: service_healthy}
+    environment:
+      <<: *entorno
+      MONGO_DB: helpdesk_test_suite
+      TEST_MONGO_URI: mongodb://mongo:27017/?replicaSet=rs0
+      TEST_CHATBOT_MONGO: mongodb://mongo:27017/?replicaSet=rs0
+      TEST_REDIS_URL: redis://redis:6379/1
+    tmpfs: ["/data:uid=10001,gid=10001"]
+    volumes: [./backend:/app:ro]
+    command: [python, -m, pytest, -ra, --tb=short, --show-capture=no, -p, "no:cacheprovider"]
+  api:
+    build: {context: ./backend, target: develop}
+    image: helpdesk-pruebas-api
+    profiles: [navegador]
+    depends_on:
+      mongo-init: {condition: service_completed_successfully}
+      redis: {condition: service_healthy}
+    environment:
+      <<: *entorno
+      MONGO_DB: helpdesk_test_navegador
+      REDIS_URL: redis://redis:6379/2
+    ports: ["127.0.0.1:18100:8000"]
+    volumes: [./backend:/app:ro, datos-api:/data]
+    command: [sh, -c, "python -m app.scripts.preparar_pruebas && exec uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+
+volumes:
+  datos-api:

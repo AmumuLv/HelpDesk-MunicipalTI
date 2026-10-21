@@ -1,0 +1,47 @@
+# Proxy inverso único para la API y el frontend.
+#
+# SITE_ADDRESS se define en .env:
+#   - SITE_ADDRESS=http://localhost        -> solo HTTP local (por defecto)
+#   - SITE_ADDRESS=tickets.muni.gob.pe     -> HTTPS automatico con certificado
+#                                             real (Let's Encrypt) si el dominio
+#                                             resuelve a esta maquina.
+#
+# Rutas:
+#   /api/*  /ws/*   -> FastAPI (incluye WebSocket, Caddy gestiona el upgrade)
+#   /healthz        -> sonda del balanceador
+#   /*               -> Nginx del frontend (SPA, index.html fallback)
+
+{$SITE_ADDRESS} {
+	encode zstd gzip
+
+	log {
+		output file /data/access.log {
+			roll_size 10MiB
+			roll_keep 5
+		}
+		format json
+	}
+
+	@api path /api /api/* /ws /ws/*
+	handle @api {
+		reverse_proxy api:8000 {
+			flush_interval -1
+		}
+	}
+
+	handle /healthz {
+		respond "ok" 200
+	}
+
+	handle {
+		reverse_proxy web:80
+	}
+
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+}

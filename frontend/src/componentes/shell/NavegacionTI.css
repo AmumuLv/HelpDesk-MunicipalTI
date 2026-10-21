@@ -1,0 +1,30 @@
+.ti-navegacion{--t-nav:#09152b;--t-nav-profundo:#060f20;--t-nav-texto:#e6ebf5;--t-nav-texto-2:#b0b8c8;color:#e6ebf5;background:radial-gradient(ellipse at 0 0,#1731638a,transparent 47%),linear-gradient(170deg,#0b1830,#0a1325 85%);border-right-color:#7592cb26;box-shadow:5px 0 35px #000f2d14}
+.ti-navegacion>div:first-child{height:64px;background:linear-gradient(110deg,#92b1ed0a,transparent);border-bottom-color:#8395b82e;gap:10px}
+.ti-navegacion>div:first-child p:first-child{letter-spacing:-.025em;font-size:14px;color:#f0f5ff}
+.ti-navegacion>div:first-child p:last-child{font-size:11px;color:#b0b8c8}
+.ti-navegacion>ul{padding:16px 10px;scrollbar-width:thin;scrollbar-color:#42516d transparent}
+.ti-navegacion>ul>li{margin-bottom:5px}
+.ti-navegacion>ul>li>a,.ti-navegacion>ul>li>button{position:relative;min-height:43px;border:1px solid transparent;border-radius:11px;color:#dee3ee;transition:background .18s,border-color .18s,box-shadow .18s}
+.ti-navegacion a:hover,.ti-navegacion button:hover{background-color:#8cabe710;color:#eff4ff}
+.ti-navegacion [data-activo=true]{background:linear-gradient(110deg,#3f6dc728,#8baced0c);border-color:#89a8e335;box-shadow:inset 0 1px 0 #b1c8f40a;color:#d4e3ff}
+.ti-navegacion .ti-nav-icono{color:#91abdd;stroke-width:1.6}
+.ti-navegacion [data-activo=true] .ti-nav-icono{color:#b3cdff;filter:drop-shadow(0 0 5px #5a92ff55)}
+.ti-navegacion li>ul{margin-top:5px;margin-bottom:13px;margin-left:29px;border-left-color:#88a3d82b;padding-left:10px}
+.ti-navegacion li>ul a{position:relative;margin:2px 0;padding:7px 10px;border:1px solid transparent;border-radius:8px;font-size:12px;color:#b0b8c8}
+.ti-navegacion li>ul a[aria-current=page]{background:#6d96e614;color:#bcd1fb;border-color:#8aaae81c;font-weight:600}
+.ti-navegacion li>ul a[aria-current=page]:before{content:'';position:absolute;left:-14px;top:50%;height:5px;width:5px;border-radius:50%;background:#99b9f6;box-shadow:0 0 8px #608feb65;transform:translateY(-50%)}
+.ti-navegacion>div:last-child{border-top-color:#8395b82e;background:#060f203d;padding:10px}
+.ti-navegacion>div:last-child button{border-radius:9px;padding:0 10px;color:#b0b8c8;font-size:12px}
+.ti-navegacion :is(a,button):focus-visible{outline:2px solid #a0bef7;outline-offset:2px}
+.ti-nav-flotante{background:#101c33!important;border-color:#6c8ecf40!important;box-shadow:0 18px 50px #000c2355;color:#e6ebf5}
+.ti-nav-flotante p,.ti-nav-flotante a{color:#e6ebf5;border-color:#6c8ecf30}
+.ti-nav-flotante a:hover{background:#7fa3ea17}
+.ti-nav-flotante a[aria-current=page]{color:#b4ceff;background:#7fa3ea17;border-left-color:#9bb8f0}
+@media(prefers-reduced-motion:reduce){.ti-navegacion a,.ti-navegacion button{transition:none}}
+.ti-barra-superior{--t-nav-texto:#e6ebf5;--t-nav-texto-2:#b0b8c8;background:radial-gradient(ellipse at 70% -130%,#243d6d88,transparent 70%),linear-gradient(110deg,#0b1830,#0a1325);border-bottom-color:#7592cb26;color:#e6ebf5;box-shadow:0 5px 24px #000f2d14!important}
+.ti-barra-superior h1{letter-spacing:-.02em;color:#edf2fd}
+.ti-barra-superior>button,.ti-barra-superior>div>button{color:#d5dded;border-color:#8395b840}
+.ti-barra-superior>button:hover,.ti-barra-superior>div>button:hover{background-color:#8cabe710}
+.ti-navegacion .ti-nav-toggle{position:absolute;right:7px;top:7px;display:grid;place-items:center;width:29px;height:29px;min-height:0;border:1px solid transparent;border-radius:7px;color:#a8b8d6;background:transparent}
+.ti-navegacion .ti-nav-toggle:hover{border-color:#89a8e335;background:#8cabe714;color:#dbe7ff}
+.ti-nav-toggle svg{transition:transform .18s}

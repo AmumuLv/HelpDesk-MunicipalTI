@@ -1,0 +1,23 @@
+.perfil-ti-dialogo{overflow:hidden;border-radius:24px;border-color:#72b4e980;box-shadow:0 28px 90px #061b4052,0 0 0 1px #87d5ff26,0 0 50px #268ce51a;background:radial-gradient(ellipse at 100% 20%,#e6f5ff,transparent 65%),var(--t-panel)}
+.perfil-ti-dialogo>header{position:relative;background:radial-gradient(ellipse at 100% 0,#218fa15e,transparent 70%),linear-gradient(120deg,#122f5e,#0b1b36);border-bottom:1px solid #73c9ee80;padding:24px}
+.perfil-ti-dialogo>header:after{content:'';position:absolute;bottom:-1px;left:24px;width:90px;height:2px;background:linear-gradient(90deg,#75ddff,#69a0ff);box-shadow:0 0 14px #67d5ff80}
+.perfil-ti-dialogo>header h2{color:#f4f9ff;letter-spacing:-.025em}
+.perfil-ti-dialogo>header [id][data-state],.perfil-ti-dialogo>header>div>div{color:#c2d8f1;font-size:13px;line-height:1.6}
+.perfil-ti-dialogo>header>button{color:#d5e9ff;border-radius:12px;background:#ffffff0a;border:1px solid #a6d8ff26;flex-shrink:0}
+.perfil-ti-dialogo>header>button:hover{color:#fff;background:#ffffff1c}
+.perfil-ti-dialogo>.sin-barra{padding:24px}
+.perfil-ti-identidad{display:flex;align-items:center;gap:18px;min-width:0;padding:2px 0 4px}
+.perfil-ti-avatar{flex-shrink:0;padding:7px;border-radius:50%;background:linear-gradient(135deg,#e5f7ff,#e7edff);border:1px solid #83c6ec;box-shadow:0 0 0 5px #5db7f00b,0 5px 18px #2984ce12}
+.perfil-ti-eyebrow{display:inline-flex;align-items:center;gap:5px;color:#2363a5;font-size:10px;font-weight:700;letter-spacing:.14em}
+.perfil-ti-contacto{display:flex;align-items:center;gap:14px;padding:16px;border:1px solid #87bce94d;border-radius:16px;background:linear-gradient(110deg,#eaf5ff99,#f5f9ff80)}
+.perfil-ti-icono{display:flex;align-items:center;justify-content:center;width:44px;height:44px;flex-shrink:0;border-radius:13px;background:#dceeff;color:#2464aa}
+.perfil-ti-especialidad{max-width:100%;overflow-wrap:anywhere;padding:5px 10px;border-radius:9px;background:#e8f2ff;color:#24568d;border:1px solid #78aee529;font-size:12px}
+.perfil-ti-conversacion{display:flex;align-items:flex-start;gap:10px;border-top:1px solid var(--t-borde);padding-top:16px;font-size:13px;line-height:1.7;color:var(--t-texto-secundario,var(--t-texto))}
+.perfil-ti-conversacion>svg{color:#3685bb;margin-top:2px}
+[data-tema=oscuro] .perfil-ti-dialogo{background:radial-gradient(ellipse at 100% 20%,#143a564d,transparent 70%),var(--t-panel);border-color:#467ba980;box-shadow:0 28px 90px #0009,0 0 40px #258fca1a}
+[data-tema=oscuro] .perfil-ti-avatar{background:linear-gradient(135deg,#173c54,#1b2c4c);border-color:#508aa7;box-shadow:0 0 0 5px #5db7f00b}
+[data-tema=oscuro] .perfil-ti-eyebrow{color:#8ecfff}
+[data-tema=oscuro] .perfil-ti-contacto{background:linear-gradient(110deg,#14345180,#14223a80);border-color:#5493be40}
+[data-tema=oscuro] .perfil-ti-icono{background:#1b3b59;color:#8edbff}
+[data-tema=oscuro] .perfil-ti-especialidad{background:#172f4b;color:#b3d7ff;border-color:#477ba636}
+@media(max-width:380px){.perfil-ti-dialogo>header,.perfil-ti-dialogo>.sin-barra{padding:18px}.perfil-ti-identidad{gap:12px}.perfil-ti-avatar{padding:4px}}

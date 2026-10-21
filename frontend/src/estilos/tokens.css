@@ -1,0 +1,596 @@
+/**
+ * Tokens de diseño — Gobierno digital moderno (Municipalidad de Casma).
+ *
+ * Un solo lugar para todo el color, la tipografía, el espaciado, los bordes y
+ * las sombras. Los componentes solo usan nombres de token; nunca escriben un
+ * color suelto (lo verifica `tools/verificar-colores.mjs`).
+ *
+ * Temas: claro y oscuro, ambos corporativos. Se alternan con `data-tema` en la
+ * raíz del documento; los dos redefinen LOS MISMOS tokens, así que ningún
+ * componente necesita saber en qué tema está.
+ *
+ * Roles: `data-rol="administrador|tecnico|usuario"` cambia únicamente el acento
+ * de identidad (dorado, azul, cobre). El color distingue el rol, no concede
+ * acceso: los permisos los decide el backend.
+ */
+
+@import 'tailwindcss';
+@import '@fontsource/atkinson-hyperlegible/400.css';
+@import '@fontsource/atkinson-hyperlegible/700.css';
+
+/* El acceso principal del portal debe conservar contraste en ambos temas,
+   incluso al combinarse con las variantes del botón compartido. */
+a.portal-boton-ayuda,
+a.portal-boton-ayuda:visited {
+  background-color: #b72d3f;
+  border-color: #b72d3f;
+  color: #fff;
+}
+a.portal-boton-ayuda:hover,
+a.portal-boton-ayuda:active {
+  background-color: #982335;
+  border-color: #982335;
+  color: #fff;
+}
+
+.portal-opcion-ayuda { --acento-ayuda: var(--t-info); background: linear-gradient(120deg, color-mix(in srgb, var(--acento-ayuda) 13%, var(--t-panel)), var(--t-panel)); border-color: color-mix(in srgb, var(--acento-ayuda) 55%, var(--t-borde)); box-shadow: inset 3px 0 var(--acento-ayuda), 0 4px 15px color-mix(in srgb, var(--acento-ayuda) 12%, transparent); }
+.portal-opcion-ayuda[data-color="1"] { --acento-ayuda: var(--t-ai); }
+.portal-opcion-ayuda[data-color="2"] { --acento-ayuda: var(--t-info); }
+.portal-opcion-ayuda[data-color="3"] { --acento-ayuda: var(--t-exito); }
+.portal-opcion-ayuda:hover { border-color: var(--borde-seleccion); box-shadow: inset 3px 0 var(--borde-seleccion), 0 5px 22px color-mix(in srgb, var(--acento-ayuda) 22%, transparent); }
+.portal-opcion-ayuda svg { filter: drop-shadow(0 0 5px color-mix(in srgb, currentColor 25%, transparent)); }
+.portal-resultado { background: linear-gradient(115deg, color-mix(in srgb, var(--t-exito) 13%, var(--t-panel)), var(--t-panel)); border-left: 4px solid var(--t-exito); }
+
+
+/* ═══════════════════════════════════════════════════════════
+ * 1. Variables de ejecución por tema
+ * ═══════════════════════════════════════════════════════════ */
+
+:root {
+  color-scheme: light;
+
+  /* Superficies y texto */
+  --t-fondo: #EDF1F7;
+  --borde-seleccion: #D6A007;
+  --t-panel: #FFFFFF;
+  --t-panel-2: #E9EFF7;
+  --t-superficie-elevada: #FFFFFF;
+  --t-muted: #EEF2F8;
+  /* El borde de una caja decorativa va más claro que el de un control: los
+     campos de formulario necesitan contorno firme, una tarjeta no. */
+  --t-borde: #ADBDD1;
+  --t-input: #8194AE;
+  --t-borde-fuerte: #9FAEC3;
+  --t-texto: #162033;
+  --t-texto-2: #40516A;
+
+  /* Navegación institucional */
+  --t-nav: #0F2747;
+  --t-nav-profundo: #0A1B33;
+  --t-nav-texto: #F2F6FB;
+  --t-nav-texto-2: #D2DEEF;
+
+  /* Acción primaria. El azul se oscureció un punto para que el texto blanco
+     encima llegue a 4.5:1 (WCAG AA) en cuerpo de texto normal. */
+  --t-accion: #2A61F2;
+  --t-accion-suave: #E3ECFF;
+  --t-accion-fuerte: #1B3F99;
+  --t-accion-borde: #7EA2F5;
+  /* Texto que va ENCIMA de la acción: blanco en claro, oscuro en oscuro,
+     porque el azul de la acción cambia de luminosidad con el tema. */
+  --t-accion-texto: #FFFFFF;
+
+  /* IA */
+  --t-ai: #0D8A8A;
+  --t-ai-suave: #DDF0F0;
+  --t-ai-fuerte: #0A5F5F;
+  --t-ai-borde: #63B4B4;
+
+  /* Éxito */
+  --t-exito: #178A55;
+  --t-exito-suave: #E0F2E9;
+  --t-exito-fuerte: #0E5C37;
+  --t-exito-borde: #6FB893;
+
+  /* Advertencia */
+  --t-advertencia: #C87900;
+  --t-advertencia-suave: #FBEED8;
+  --t-advertencia-fuerte: #8A5600;
+  --t-advertencia-borde: #DCA64E;
+
+  /* Error */
+  --t-error: #C43D4B;
+  --t-error-suave: #F7E3E5;
+  --t-error-fuerte: #8E2833;
+  --t-error-borde: #D97883;
+
+  /* Informativo (azul de datos, distinto del acento de rol) */
+  --t-info: #2F6BFF;
+  --t-info-suave: #E3ECFF;
+  --t-info-fuerte: #1B3F99;
+  --t-info-borde: #7EA2F5;
+  --t-info-profundo: #14336E;
+  --t-info-profundo-suave: #DDE6FA;
+  --t-info-profundo-fuerte: #10285C;
+
+  /* Acento del rol (tecnico por defecto) */
+  --rol-relleno: #2F6BFF;
+  --rol-suave: #E3ECFF;
+  --rol-fuerte: #1B3F99;
+  --rol-borde: #7EA2F5;
+  --rol-borde-suave: rgba(47, 107, 255, 0.28);
+  --rol-suave-2: rgba(47, 107, 255, 0.10);
+  --rol-brillo: rgba(47, 107, 255, 0.18);
+
+  /* Sombras suaves y azuladas, por niveles. En el tema claro la sombra es la
+     que despega la caja blanca del fondo: por eso el borde puede ser discreto. */
+  --sombra-sm: 0 1px 2px rgba(16, 26, 51, 0.05), 0 2px 4px rgba(16, 26, 51, 0.06);
+  --sombra-md: 0 2px 5px rgba(16, 26, 51, 0.08), 0 8px 22px rgba(16, 26, 51, 0.14);
+  --sombra-lg: 0 8px 20px rgba(16, 26, 51, 0.10), 0 18px 44px rgba(16, 26, 51, 0.14);
+  /* Relieve propio de las cajas pequeñas (indicadores, fichas): dos niveles,
+     sin marco pesado, para que el borde deje de ser lo único que se ve. */
+  --sombra-tarjeta: 0 1px 3px rgba(16, 26, 51, 0.08), 0 5px 14px rgba(16, 26, 51, 0.12);
+  --sombra-nav: 0 1px 0 rgba(15, 39, 71, 0.08), 0 4px 16px rgba(15, 39, 71, 0.08);
+  --sombra-atenuacion: rgba(10, 27, 51, 0.45);
+}
+
+[data-tema='oscuro'] {
+  --borde-seleccion: #F5CE4F;
+  color-scheme: dark;
+
+  --t-fondo: #0F1724;
+  --t-panel: #17212F;
+  --t-panel-2: #1E2A3B;
+  --t-superficie-elevada: #1E2A3B;
+  --t-muted: #1E2A3B;
+  --t-borde: #4B607B;
+  --t-input: #7084A0;
+  --t-borde-fuerte: #4A5C78;
+  --t-texto: #E8EDF5;
+  --t-texto-2: #BFCCDE;
+
+  --t-nav: #0A1220;
+  --t-nav-profundo: #060C16;
+  --t-nav-texto: #E8EDF5;
+  --t-nav-texto-2: #A9B6C8;
+
+  --t-accion: #5D8BFF;
+  --t-accion-suave: #14284F;
+  --t-accion-fuerte: #9DBBFF;
+  --t-accion-borde: #35508A;
+  /* El azul de la acción es claro aquí, así que el texto encima va oscuro. */
+  --t-accion-texto: #0A1220;
+
+  --t-ai: #2AA8A8;
+  --t-ai-suave: #0F2E2E;
+  --t-ai-fuerte: #7FD8D8;
+  --t-ai-borde: #1E6B6B;
+
+  --t-exito: #2BA26B;
+  --t-exito-suave: #0F2A1D;
+  --t-exito-fuerte: #8BD6B0;
+  --t-exito-borde: #1F5C3E;
+
+  --t-advertencia: #D99A2B;
+  --t-advertencia-suave: #33230B;
+  --t-advertencia-fuerte: #F2D27A;
+  --t-advertencia-borde: #6B4B18;
+
+  --t-error: #D95C66;
+  --t-error-suave: #341519;
+  --t-error-fuerte: #F2A1A9;
+  --t-error-borde: #6E2C33;
+
+  --t-info: #5D8BFF;
+  --t-info-suave: #14284F;
+  --t-info-fuerte: #9DBBFF;
+  --t-info-borde: #35508A;
+  --t-info-profundo: #27467F;
+  --t-info-profundo-suave: #12213D;
+  --t-info-profundo-fuerte: #B7CCFF;
+
+  /* Acento del rol en oscuro (tecnico por defecto) */
+  --rol-relleno: #5D8BFF;
+  --rol-suave: #14284F;
+  --rol-fuerte: #9DBBFF;
+  --rol-borde: #35508A;
+  --rol-borde-suave: rgba(93, 139, 255, 0.35);
+  --rol-suave-2: rgba(93, 139, 255, 0.12);
+  --rol-brillo: rgba(93, 139, 255, 0.22);
+
+  --sombra-sm: 0 1px 2px rgba(0, 0, 0, 0.40), 0 1px 3px rgba(0, 0, 0, 0.30);
+  --sombra-md: 0 4px 12px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.35);
+  --sombra-lg: 0 12px 32px rgba(0, 0, 0, 0.55), 0 4px 12px rgba(0, 0, 0, 0.40);
+  /* En oscuro la sombra casi no se ve, así que el relieve lo da también el
+     contraste de la superficie con el fondo, un pelín más claro. */
+  --sombra-tarjeta: 0 1px 2px rgba(0, 0, 0, 0.35), 0 4px 14px rgba(0, 0, 0, 0.42);
+  --sombra-nav: 0 1px 0 rgba(0, 0, 0, 0.35), 0 4px 16px rgba(0, 0, 0, 0.30);
+  --sombra-atenuacion: rgba(0, 0, 0, 0.55);
+}
+
+/* Acento del rol: administrador (dorado) */
+[data-rol='administrador'] {
+  --rol-relleno: #E2B23C;
+  --rol-suave: #FBF1D2;
+  --rol-fuerte: #6B4F00;
+  --rol-borde: #C79A2B;
+  --rol-borde-suave: rgba(226, 178, 60, 0.35);
+  --rol-suave-2: rgba(226, 178, 60, 0.14);
+  --rol-brillo: rgba(226, 178, 60, 0.20);
+}
+[data-tema='oscuro'][data-rol='administrador'] {
+  --rol-relleno: #E2B23C;
+  --rol-suave: #3A2F10;
+  --rol-fuerte: #F2D27A;
+  --rol-borde: #8A6A1B;
+  --rol-borde-suave: rgba(226, 178, 60, 0.40);
+  --rol-suave-2: rgba(226, 178, 60, 0.14);
+  --rol-brillo: rgba(226, 178, 60, 0.25);
+}
+
+/* Acento del rol: usuario (cobre) */
+[data-rol='usuario'] {
+  --rol-relleno: #C2703D;
+  --rol-suave: #F8E7DB;
+  --rol-fuerte: #7A3E17;
+  --rol-borde: #B06A3A;
+  --rol-borde-suave: rgba(194, 112, 61, 0.35);
+  --rol-suave-2: rgba(194, 112, 61, 0.14);
+  --rol-brillo: rgba(194, 112, 61, 0.20);
+}
+[data-tema='oscuro'][data-rol='usuario'] {
+  --rol-relleno: #C2703D;
+  --rol-suave: #3A2314;
+  --rol-fuerte: #EDB48C;
+  --rol-borde: #7A4A28;
+  --rol-borde-suave: rgba(194, 112, 61, 0.40);
+  --rol-suave-2: rgba(194, 112, 61, 0.14);
+  --rol-brillo: rgba(194, 112, 61, 0.25);
+}
+
+/* ═══════════════════════════════════════════════════════════
+ * 2. Paleta de zonas y de iconos
+ * ═══════════════════════════════════════════════════════════
+ *
+ * Estas NO van en `@theme`: se leen siempre como `var(--zona-4)` desde un
+ * `style` en línea, nunca como una clase de Tailwind. Tailwind v4 solo emite las
+ * variables de `@theme` que alguna clase usa, así que aquí nunca llegaron al
+ * navegador: el punto de color de la zona salía transparente y todas las zonas
+ * se veían igual. Como son las mismas en los dos temas, van en `:root`. */
+
+:root {
+  /*
+   * Los seis tonos que usa la municipalidad están repartidos en la rueda de
+   * color con al menos 32° entre vecinos, y los dos que quedan libres van a los
+   * índices altos, que nadie usa.
+   *
+   * Lo que había antes fallaba por dos motivos. Uno era que COMPLEJO llevaba un
+   * ocre apagado que, mezclado con blanco para pintar la pastilla, salía
+   * **arena**: era el único tono terroso de la lista y parecía un tono neutro
+   * por error. Otro era que MERCADO y COMPLEJO eran los dos naranjas y PALACIO
+   * y PISCINA los dos azules, así que había que leer el nombre para saber cuál
+   * era cuál. Aquí ya no hay ningún tono terroso y los seis se distinguen de un
+   * vistazo.
+   *
+   * Los índices los asigna una migración y no se tocan: solo cambia el color al
+   * que apuntan.
+   */
+  --zona-1: #2563eb; /* azul      · PALACIO */
+  --zona-2: #ea580c; /* naranja   · SEGURIDAD CIUDADANA */
+  --zona-3: #16a34a; /* verde     · MERCADO */
+  --zona-4: #7c3aed; /* violeta   · COMPLEJO */
+  --zona-5: #0d9488; /* turquesa  · PISCINA MUNICIPAL */
+  --zona-6: #db2777; /* rosa      · LEYVA */
+  --zona-7: #0891b2; /* cian      · libre */
+  --zona-8: #f59e0b; /* ámbar     · libre */
+
+  /* Un color por tipo de equipo. Son de identidad, no de estado: el mismo equipo
+     tiene el mismo color en Inventario, en la ficha y en la ficha de oficina.
+     Los catorce tipos del catálogo tienen color propio, para que dos equipos
+     distintos no se confundan solo por tener el mismo icono genérico. */
+  --icono-cpu: #2F6BFF;
+  --icono-laptop: #0D8A8A;
+  --icono-monitor: #C87900;
+  --icono-impresora: #C2703D;
+  --icono-router: #35548F;
+  --icono-switch: #5B82BE;
+  --icono-teclado: #178A55;
+  --icono-mouse: #6D5ACF;
+  --icono-tablet: #8A5CF6;
+  --icono-celular: #B5477A;
+  --icono-servidor: #1D7A8C;
+  --icono-ups: #9A6B00;
+  --icono-disco: #55606E;
+  --icono-audio: #7A3FA8;
+  --icono-default: #4D5B70;
+}
+
+/* ═══════════════════════════════════════════════════════════
+ * 3. Tokens que ve Tailwind (`@theme`)
+ * ═══════════════════════════════════════════════════════════ */
+
+@theme {
+  /* Identidad de rol */
+  --color-primary: var(--rol-relleno);
+  --color-primary-foreground: var(--t-accion-texto);
+  --color-primary-boton: var(--t-accion);
+  --color-primary-deep: var(--t-accion-fuerte);
+  --color-primary-soft: var(--rol-suave);
+  --color-primary-strong: var(--rol-fuerte);
+  --color-primary-borde: var(--rol-borde);
+  --color-accent: var(--rol-relleno);
+  --color-accent-foreground: var(--t-texto);
+  --color-accent-soft: var(--rol-suave);
+  --color-accent-strong: var(--rol-fuerte);
+
+  /* Superficies y texto */
+  --color-background: var(--t-fondo);
+  --color-foreground: var(--t-texto);
+  --color-surface: var(--t-panel);
+  --color-surface-elevated: var(--t-superficie-elevada);
+  --color-surface-2: var(--t-panel-2);
+  --color-muted: var(--t-muted);
+  --color-muted-foreground: var(--t-texto-2);
+  --color-secondary: var(--t-panel-2);
+  --color-secondary-foreground: var(--t-texto);
+  --color-border: var(--t-borde);
+  --color-border-fuerte: var(--t-borde-fuerte);
+  --color-input: var(--t-input);
+  --color-ring: var(--rol-relleno);
+
+  /* Navegación institucional */
+  --color-nav: var(--t-nav);
+  --color-nav-deep: var(--t-nav-profundo);
+  --color-nav-foreground: var(--t-nav-texto);
+  --color-nav-muted: var(--t-nav-texto-2);
+
+  /* Acción primaria (botones) */
+  --color-accion: var(--t-accion);
+  --color-accion-soft: var(--t-accion-suave);
+  --color-accion-strong: var(--t-accion-fuerte);
+  --color-accion-borde: var(--t-accion-borde);
+
+  /* Estados */
+  --color-success: var(--t-exito);
+  --color-success-soft: var(--t-exito-suave);
+  --color-success-strong: var(--t-exito-fuerte);
+  --color-success-borde: var(--t-exito-borde);
+  --color-success-boton: var(--t-exito);
+
+  --color-warning: var(--t-advertencia);
+  --color-warning-soft: var(--t-advertencia-suave);
+  --color-warning-strong: var(--t-advertencia-fuerte);
+  --color-warning-borde: var(--t-advertencia-borde);
+
+  --color-destructive: var(--t-error);
+  --color-destructive-soft: var(--t-error-suave);
+  --color-destructive-strong: var(--t-error-fuerte);
+  --color-destructive-borde: var(--t-error-borde);
+
+  --color-info: var(--t-info);
+  --color-info-soft: var(--t-info-suave);
+  --color-info-strong: var(--t-info-fuerte);
+  --color-info-borde: var(--t-info-borde);
+  --color-info-deep: var(--t-info-profundo);
+  --color-info-deep-soft: var(--t-info-profundo-suave);
+  --color-info-deep-strong: var(--t-info-profundo-fuerte);
+
+  /* IA */
+  --color-ai: var(--t-ai);
+  --color-ai-soft: var(--t-ai-suave);
+  --color-ai-strong: var(--t-ai-fuerte);
+  --color-ai-borde: var(--t-ai-borde);
+
+  --color-sla-safe: var(--t-exito);
+  --color-sla-warning: var(--t-advertencia);
+  --color-sla-critical: var(--t-error);
+
+  /* Gráficos */
+  --color-chart-real: #2F6BFF;
+  --color-chart-ai: #0D8A8A;
+  --color-chart-ok: #178A55;
+  --color-chart-warn: #C87900;
+  --color-chart-critical: #C43D4B;
+  --color-chart-neutral: var(--t-texto-2);
+  --color-chart-grid: var(--t-borde);
+
+  /* Radios, sombras, movimiento */
+  --radius-control: 6px;
+  --radius-panel: 8px;
+
+  --shadow-tarjeta: var(--sombra-tarjeta);
+  --shadow-panel: var(--sombra-md);
+  --shadow-popover: var(--sombra-md);
+  --shadow-dialogo: var(--sombra-lg);
+  --shadow-float: var(--sombra-md);
+  --shadow-nav: var(--sombra-nav);
+
+  --font-sans: 'Atkinson Hyperlegible', system-ui, sans-serif;
+  --font-heading: 'Atkinson Hyperlegible', system-ui, sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Mono', monospace;
+
+  --text-2xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.5rem;
+  --text-2xl: 1.875rem;
+  --text-3xl: 2.25rem;
+
+  --transition-ui: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-ui-slow: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  --spacing-control: 40px;
+  --spacing-control-touch: 48px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+ * 3. Estilos base
+ * ═══════════════════════════════════════════════════════════ */
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    scrollbar-gutter: stable;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-size: var(--text-sm);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: var(--font-heading);
+    font-weight: 700;
+    margin: 0;
+  }
+
+  .titulo-pagina {
+    font-family: var(--font-heading);
+    font-size: var(--text-xl);
+    font-weight: 700;
+    line-height: 1.25;
+    letter-spacing: 0.01em;
+  }
+
+  .texto-operativo {
+    font-size: var(--text-sm);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+    border-radius: var(--radius-control);
+  }
+
+  .anillo-foco:focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+  }
+
+  p {
+    margin: 0;
+  }
+
+  .sin-barra::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .sin-barra::-webkit-scrollbar-thumb {
+    background-color: var(--color-border-fuerte);
+    border-radius: 4px;
+  }
+
+  .sin-barra::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  /*
+    La barra horizontal **de verdad**.
+
+    `DataTable` pone debajo de la tabla su propio tirador —una pista redondeada
+    con el pulgar del tamaño de la parte visible— para poder arrastrar hacia las
+    columnas de la derecha. Es el patrón que usa toda la aplicación.
+
+    El problema: por encima de él seguía apareciendo la barra del navegador, y en
+    el inventario se veían **dos barras para lo mismo**: una gris con flechitas y
+    otra azul debajo. En el inventario la tabla tiene muchas columnas y se desborda
+    siempre; en las tablas cortas el desborde no llega y solo se ve una.
+
+    Aquí no se esconde el tirador propio —que es el que está diseñado para esto—,
+    sino el que estorba por duplicar el mismo mando dos veces.
+
+    La rueda y el trackpad siguen desplazando el elemento: `scrollbar-width: none`
+    oculta el dibujo, no el desplazamiento.
+  */
+  .barra-oculta {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .barra-oculta::-webkit-scrollbar {
+    display: none;
+  }
+
+  .solo-lectores {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  @keyframes fila-actualizada {
+    0% { background-color: var(--color-primary-soft); }
+    100% { background-color: transparent; }
+  }
+
+  .fila-actualizada {
+    animation: fila-actualizada 2s ease-out;
+  }
+
+  .panel {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-panel);
+    box-shadow: var(--shadow-panel);
+    position: relative;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@media (hover: hover) {
+  :where(button:not(:disabled), a[href], [role='button'], input:not(:disabled), select:not(:disabled), textarea:not(:disabled)):hover {
+    outline: 2px solid var(--borde-seleccion);
+    outline-offset: 2px;
+  }
+  .panel:hover:not(:has(button:hover, a:hover, input:hover, select:hover, textarea:hover)) {
+    outline: 1px solid var(--borde-seleccion);
+    outline-offset: 1px;
+  }
+  tbody tr:hover {
+    box-shadow: inset 0 0 0 1px var(--borde-seleccion);
+  }
+}
+
+@media print {
+  .no-imprimir {
+    display: none !important;
+  }
+  body {
+    background: white;
+    color: black;
+    font-size: 11pt;
+  }
+  .panel {
+    break-inside: avoid;
+    box-shadow: none;
+    border: 1px solid #ccc;
+  }
+  a[href]::after {
+    content: '';
+  }
+}

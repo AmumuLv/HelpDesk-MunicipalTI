@@ -1,0 +1,34 @@
+/* Identidad azul compartida. Los colores de estado mantienen su significado. */
+:root{--fondo-cabecera:#102545}
+:root[data-tema=oscuro]{--fondo-cabecera:#0a172e}
+[data-tema] .ti-barra-superior,[data-tema] .ti-navegacion>div:first-child{background:var(--fondo-cabecera);border-bottom-color:#7592cb26}
+.boton-destacado{background:linear-gradient(115deg,#f4d787,#dfb348);color:#382807;border:1px solid #c79c36;box-shadow:inset 0 1px 0 #fff7d97a,0 4px 16px #c99d3b25}
+.boton-destacado:hover{background:linear-gradient(115deg,#ffe5a3,#e8be57);border-color:#dbb24a;color:#382807}
+.boton-destacado:active{background:#d9ac3e}
+[data-dato=nombre]{color:var(--t-texto);font-weight:500}
+main a:is([href^='/panel/usuarios/'],[href^='/panel/equipo-ti/'],[href^='/panel/equipos/'],[href^='/panel/zonas/']){color:var(--t-texto)}
+:root,:root[data-rol]{--borde-seleccion:#357eea;--rol-relleno:#886000;--rol-suave:#fff3d6;--rol-fuerte:#795300;--rol-borde:#cfaa53;--rol-borde-suave:#c99d3b4d;--rol-suave-2:#c99d3b1a;--rol-brillo:#c99d3b26;--t-accion:#245edb;--t-accion-suave:#e7f0ff;--t-accion-fuerte:#174aaf;--t-accion-borde:#80a8ec;--t-accion-texto:#fff;--t-ai:#235fb5;--t-ai-suave:#e6efff;--t-ai-fuerte:#1c478d;--t-ai-borde:#86aae3}
+:root[data-tema=oscuro],:root[data-tema=oscuro][data-rol]{--borde-seleccion:#79b9ff;--rol-relleno:#f2ca68;--rol-suave:#302710;--rol-fuerte:#f4d17b;--rol-borde:#8d7134;--rol-borde-suave:#eac3644d;--rol-suave-2:#eac3641a;--rol-brillo:#eac36426;--t-accion:#8abfff;--t-accion-suave:#142d53;--t-accion-fuerte:#b4d7ff;--t-accion-borde:#416caa;--t-accion-texto:#07172e;--t-ai:#8abfff;--t-ai-suave:#132b49;--t-ai-fuerte:#b4d7ff;--t-ai-borde:#416caa}
+.portal-futurista{background:radial-gradient(ellipse at 15% 12%,#428cf510,transparent 60%),var(--t-fondo)}
+.portal-futurista>header{background:radial-gradient(ellipse at 65% -100%,#3267b175,transparent 75%),linear-gradient(110deg,#102f60,#0a1830);border-bottom-color:#82b5fb3b}
+.portal-futurista>header p:first-child{letter-spacing:-.025em}
+[data-tema=oscuro] .ti-navegacion{background:radial-gradient(ellipse at 0 0,#1e438b55,transparent 47%),linear-gradient(170deg,#09162b,#060e1d 85%)}
+[data-tema=oscuro] .ti-barra-superior,[data-tema=oscuro] .portal-futurista>header{background:radial-gradient(ellipse at 65% -100%,#3267b14a,transparent 75%),linear-gradient(110deg,#0b1e3e,#070f20)}
+.portal-futurista nav a[aria-current=page]{box-shadow:inset 0 0 0 1px var(--rol-borde-suave);background:linear-gradient(120deg,var(--rol-suave),var(--t-panel))}
+.portal-futurista nav a[data-destino=inicio] svg{color:#276abf}.portal-futurista nav a[data-destino=tickets] svg{color:#936500}.portal-futurista nav a[data-destino=perfil] svg{color:#7b50b1}
+[data-tema=oscuro] .portal-futurista nav a[data-destino=inicio] svg{color:#83c9ff}[data-tema=oscuro] .portal-futurista nav a[data-destino=tickets] svg{color:#f4ce71}[data-tema=oscuro] .portal-futurista nav a[data-destino=perfil] svg{color:#c6a5fa}
+:root a.portal-boton-ayuda,:root a.portal-boton-ayuda:visited{background:linear-gradient(115deg,#b72d3f,#952438);border-color:#b72d3f;color:#fff;box-shadow:0 6px 22px #b72d3f30}
+:root a.portal-boton-ayuda:hover,:root a.portal-boton-ayuda:active{background:linear-gradient(115deg,#982335,#7c1c2d);border-color:#d4596a;color:#fff}
+.acceso-futurista>div[aria-hidden=true]{background:radial-gradient(ellipse at 72% 8%,#23c8f538,transparent 48%),radial-gradient(ellipse at 4% 90%,#635bce30,transparent 48%),radial-gradient(ellipse at 30% 32%,#2266d92e,transparent 55%),linear-gradient(105deg,#04152ee6 0%,#071e3ac2 38%,#0a224861 72%,#061b354d 100%)}
+.acceso-futurista>section,.acceso-futurista section[aria-label]{text-shadow:0 2px 16px #02132c66}
+.acceso-futurista section[aria-label]>span{background:linear-gradient(120deg,#5ac9fa24,#799cff14);border-color:#9ee6ff5c;box-shadow:inset 0 1px 0 #dbf6ff24,0 0 24px #30b8f010}
+.acceso-tarjeta{position:relative;background:radial-gradient(ellipse at 100% 0,#d7f3ff99,transparent 55%),linear-gradient(145deg,#fff,#f2f6ff);border-color:#a6d6f2c4;border-radius:25px;box-shadow:0 30px 90px #00142d66,0 0 0 1px #abddff38,0 0 50px #1aa7ed1f;backdrop-filter:blur(18px)}
+.acceso-tarjeta:before{content:'';position:absolute;left:15%;right:15%;top:0;height:2px;background:linear-gradient(90deg,transparent,#67b7ff,transparent);box-shadow:0 0 15px #438aff88}
+.acceso-tarjeta h1{color:#17335e;letter-spacing:-.025em}.acceso-tarjeta input{background:#fff;border-color:#a8bedd;border-radius:10px}.acceso-tarjeta input:focus-visible{border-color:#3583ef;box-shadow:0 0 0 3px #4f8ced1a}
+.acceso-tarjeta button[type=submit]{background:linear-gradient(110deg,#2463dc,#1846a7);color:#fff;border:1px solid #4d8deb;box-shadow:0 5px 18px #2167d42e;border-radius:10px}.acceso-tarjeta button[type=submit]:hover{background:linear-gradient(110deg,#1d52bc,#133b8d)}
+[data-tema=oscuro] .acceso-futurista>div[aria-hidden=true]{background:radial-gradient(ellipse at 72% 8%,#18c6f52e,transparent 48%),radial-gradient(ellipse at 4% 90%,#6c5cdb2e,transparent 48%),linear-gradient(105deg,#030e24ed 0%,#081a35d1 38%,#0a224882 72%,#05152e7a 100%)}
+[data-tema=oscuro] .acceso-tarjeta{background:radial-gradient(ellipse at 100% 0,#164b704d,transparent 55%),linear-gradient(145deg,#102441f5,#0a172bf5);border-color:#6dbbd37a;box-shadow:0 30px 90px #0008,0 0 0 1px #4aaaf51a,0 0 50px #208bd326}[data-tema=oscuro] .acceso-tarjeta h1{color:#e2efff}[data-tema=oscuro] .acceso-tarjeta input{background:#0a1a30;border-color:#3b5a83}
+.acceso-futurista>footer{border-top-color:#90b9f038;background:#07182bdb;backdrop-filter:blur(12px)}
+@media(max-width:640px){.acceso-tarjeta{margin-top:45px;margin-bottom:16px}}
+
+main a[href^='/panel/oficinas/']{color:var(--rol-fuerte)}

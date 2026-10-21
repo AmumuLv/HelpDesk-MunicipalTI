@@ -1,0 +1,71 @@
+# Entorno
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+dist/
+*.tsbuildinfo
+npm-debug.log*
+frontend/test-results/
+frontend/playwright-report/
+frontend/forma-api.json
+docs/screenshots/
+
+# Datos locales
+backend/data/
+data/
+*.log
+
+# Sistema operativo y editores
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+.codex-pdf-tools/
+
+# Secretos y configuraciones locales (solo publicar la plantilla)
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Resultados generados de pruebas y revisiones
+test-results/
+playwright-report/
+coverage/
+htmlcov/
+.coverage
+coverage.xml
+docs/capturas/
+docs/muestras-contraste/
+docs/muestras-reportes/
+
+# Adjuntos originales de trabajo: conservar únicamente la muestra sintética
+samples/*
+!samples/inventario-muestra.xlsx
+
+# Datos y copias locales
+uploads/
+exports/
+backups/
+respaldo*/
+*.dump
+*.bson
+*.tmp
+*.helpdesk.zip

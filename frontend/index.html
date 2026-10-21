@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/identidad/escudo-casma.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <script>
+      // Aplica el tema antes de pintar para evitar el parpadeo. La elección del
+      // usuario manda; si no la hay, se sigue la preferencia del sistema.
+      ;(function () {
+        try {
+          var guardado = localStorage.getItem('ma.tema')
+          var tema =
+            guardado === 'claro' || guardado === 'oscuro'
+              ? guardado
+              : window.matchMedia('(prefers-color-scheme: dark)').matches
+                ? 'oscuro'
+                : 'claro'
+          document.documentElement.dataset.tema = tema
+          // `color-scheme` solo entiende «light» y «dark».
+          var meta = document.querySelector('meta[name="color-scheme"]')
+          if (meta) meta.setAttribute('content', tema === 'oscuro' ? 'dark' : 'light')
+        } catch (e) {}
+      })()
+    </script>
+    <meta
+      name="description"
+      content="Mesa de Ayuda TI para municipalidades: inventario, tickets, chat con la persona que reporta y analisis con IA."
+    />
+    <title>Mesa de Ayuda TI</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,27 @@
+# Dependencias
+node_modules/
+.pnp
+.pnp.js
+
+# Compilación
+dist/
+build/
+*.tsbuildinfo
+
+# Entorno
+.env
+.env.local
+.env.*.local
+
+# Registros y cobertura
+logs/
+*.log
+npm-debug.log*
+coverage/
+
+# Editores
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db

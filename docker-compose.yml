@@ -1,0 +1,271 @@
+name: mesa-ayuda
+
+# ─────────────────────────────────────────────────────────────
+#  Un solo comando levanta todo:      docker compose up -d
+#  Servicios disponibles en proxy:    http://localhost
+#  API directa (opcional):            http://localhost:8000/api
+# ─────────────────────────────────────────────────────────────
+
+x-app-env: &app-env
+  APP_ENV: ${APP_ENV:-production}
+  API_PREFIX: ${API_PREFIX:-/api}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  BUSINESS_TIMEZONE: ${BUSINESS_TIMEZONE:-America/Lima}
+  SECRET_KEY: ${SECRET_KEY:?falta SECRET_KEY en .env}
+  JWT_ACCESS_TTL_MINUTES: ${JWT_ACCESS_TTL_MINUTES:-15}
+  JWT_REFRESH_TTL_DAYS: ${JWT_REFRESH_TTL_DAYS:-7}
+  COOKIE_SECURE: ${COOKIE_SECURE:-false}
+  COOKIE_SAMESITE: ${COOKIE_SAMESITE:-lax}
+  ARGON2_TIME_COST: ${ARGON2_TIME_COST:-3}
+  ARGON2_MEMORY_COST: ${ARGON2_MEMORY_COST:-65536}
+  ARGON2_PARALLELISM: ${ARGON2_PARALLELISM:-4}
+  LOGIN_MAX_ATTEMPTS: ${LOGIN_MAX_ATTEMPTS:-5}
+  LOGIN_LOCK_MINUTES: ${LOGIN_LOCK_MINUTES:-15}
+  RATE_LIMIT_PER_MINUTE: ${RATE_LIMIT_PER_MINUTE:-300}
+  LICENSE_ENCRYPTION_KEY: ${LICENSE_ENCRYPTION_KEY:-}
+  MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017/?replicaSet=rs0}
+  MONGO_DB: ${MONGO_DB:-mesa_ayuda}
+  REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+  UPLOAD_DIR: ${UPLOAD_DIR:-/data/uploads}
+  MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-15}
+  CLAMAV_ENABLED: ${CLAMAV_ENABLED:-false}
+  CLAMAV_HOST: ${CLAMAV_HOST:-clamav}
+  CLAMAV_PORT: ${CLAMAV_PORT:-3310}
+  AI_GLOBAL_ENABLED: ${AI_GLOBAL_ENABLED:-true}
+  AI_LEARNING_ENABLED: ${AI_LEARNING_ENABLED:-true}
+  AI_PROVIDER: ${AI_PROVIDER:-openai_compatible}
+  AI_BASE_URL: ${AI_BASE_URL:-http://llm:11434/v1}
+  AI_API_KEY: ${AI_API_KEY:-local}
+  AI_MODEL: ${AI_MODEL:-qwen2.5:7b}
+  AI_TIMEOUT_SECONDS: ${AI_TIMEOUT_SECONDS:-60}
+  AI_MAX_TOKENS: ${AI_MAX_TOKENS:-1200}
+  GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+  GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3-flash-preview}
+  CHATBOT_PROVIDER: ${CHATBOT_PROVIDER:-groq}
+  GROQ_API_KEY: ${GROQ_API_KEY:-}
+  GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-20b}
+  CHATBOT_LIMITE_CONSULTAS_TECNICO: ${CHATBOT_LIMITE_CONSULTAS_TECNICO:-15}
+  AI_RECOMMENDATIONS_ENABLED: ${AI_RECOMMENDATIONS_ENABLED:-true}
+  AI_RECOMMENDATIONS_DEFAULT: ${AI_RECOMMENDATIONS_DEFAULT:-true}
+  EXPORT_DIR: ${EXPORT_DIR:-/data/exports}
+  BACKUP_DIR: ${BACKUP_DIR:-/data/backups}
+  INSTITUTION_NAME: ${INSTITUTION_NAME:-Municipalidad}
+  INSTITUTION_SHORT_NAME: ${INSTITUTION_SHORT_NAME:-Municipalidad}
+  CONTACT_EMAIL: ${CONTACT_EMAIL:-soporte@municipalidad.gob.pe}
+
+x-app-build: &app-build
+  context: ./backend
+  dockerfile: Dockerfile
+  network: ${BUILD_NETWORK:-default}
+
+services:
+  # ── Base de datos: réplica set de un nodo (transacciones) ──
+  mongo:
+    image: mongo:8.0
+    restart: unless-stopped
+    command:
+      - mongod
+      - --replSet
+      - rs0
+      - --bind_ip_all
+      - --port
+      - "27017"
+      - --wiredTigerCacheSizeGB
+      - "0.5"
+    volumes:
+      - mongo-data:/data/db
+      - mongo-config:/data/configdb
+    # Solo para herramientas del propio equipo (MongoDB Compass).
+    # Escucha unicamente en 127.0.0.1, nunca en la red local.
+    # 27018 por defecto: el 27017 suele estar ocupado por un MongoDB local de Windows.
+    ports:
+      - "127.0.0.1:${MONGO_PORT:-27018}:27017"
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand({ ping: 1 }).ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    networks: [red]
+
+  # Inicializa el replica set automáticamente la primera vez
+  mongo-init:
+    image: mongo:8.0
+    restart: "no"
+    depends_on:
+      mongo:
+        condition: service_healthy
+    entrypoint:
+      - /bin/bash
+      - -c
+      - |
+        set -e
+        mongosh --host mongo:27017 --quiet --eval '
+          try {
+            const s = rs.status();
+            if (s.ok === 1) { print("replica set ya inicializado"); quit(0); }
+          } catch (e) { /* no inicializado todavia */ }
+          print("inicializando replica set rs0...");
+          const r = rs.initiate({ _id: "rs0", members: [{ _id: 0, host: "mongo:27017" }] });
+          print(JSON.stringify(r));
+          quit(0);
+        '
+        # Espera a que haya primario antes de terminar
+        for i in $(seq 1 60); do
+          if mongosh --host mongo:27017 --quiet --eval 'db.adminCommand({ hello: 1 }).isWritablePrimary' | grep -q true; then
+            echo "primario listo"; exit 0
+          fi
+          sleep 2
+        done
+        echo "no se pudo confirmar el primario"; exit 1
+    networks: [red]
+
+  # ── Redis: caché, pub/sub, colas, rate limit ───────────────
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--save", "60", "1"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    networks: [red]
+
+  # ── Backend (FastAPI) ──────────────────────────────────────
+  api:
+    build: *app-build
+    restart: unless-stopped
+    env_file: [.env]
+    environment: *app-env
+    depends_on:
+      mongo-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    volumes:
+      - api-data:/data
+    expose: ["8000"]
+    ports:
+      - "${API_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    networks: [red]
+
+  # ── Worker de tareas en segundo plano (ARQ) ─────────────────
+  worker:
+    build: *app-build
+    restart: unless-stopped
+    command: ["arq", "app.worker.main.WorkerSettings"]
+    env_file: [.env]
+    environment: *app-env
+    depends_on:
+      mongo-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    volumes:
+      - api-data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import redis,os;print(redis.from_url(os.environ['REDIS_URL']).ping())"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    networks: [red]
+
+  # ── Frontend compilado (Nginx) ─────────────────────────────
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: prod
+      network: ${BUILD_NETWORK:-default}
+      args:
+        VITE_API_BASE: ${VITE_API_BASE:-/api}
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    expose: ["80"]
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks: [red]
+
+  # ── Proxy inverso (HTTPS opcional con dominio real) ────────
+  proxy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_started
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-http://localhost}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks: [red]
+
+  # ── Antivirus opcional para adjuntos (perfil: antivirus) ───
+  clamav:
+    image: clamav/clamav:1.4
+    profiles: [antivirus]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "clamdcheck.sh", "/etc/clamav"]
+      interval: 60s
+      timeout: 30s
+      retries: 5
+      start_period: 180s
+    networks: [red]
+
+  # ── Respaldo programado de MongoDB (perfil: backup) ────────
+  backup:
+    image: mongo:8.0
+    profiles: [backup]
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017/?replicaSet=rs0}
+      BACKUP_DIR: ${BACKUP_DIR:-/data/backups}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+      BACKUP_CRON_HOUR: ${BACKUP_CRON_HOUR:-2}
+    depends_on:
+      mongo-init:
+        condition: service_completed_successfully
+    volumes:
+      - backup-data:/data/backups
+      - ./deploy/backup.sh:/usr/local/bin/backup.sh:ro
+    entrypoint: ["/bin/bash", "/usr/local/bin/backup.sh"]
+    networks: [red]
+
+volumes:
+  mongo-data:
+  mongo-config:
+  redis-data:
+  api-data:
+  backup-data:
+  caddy-data:
+  caddy-config:
+
+networks:
+  red:
+    driver: bridge
