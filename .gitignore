@@ -56,9 +56,8 @@ docs/capturas/
 docs/muestras-contraste/
 docs/muestras-reportes/
 
-# Adjuntos originales de trabajo: conservar únicamente la muestra sintética
-samples/*
-!samples/inventario-muestra.xlsx
+# Adjuntos originales de trabajo y muestras externas
+samples/
 
 # Datos y copias locales
 uploads/

@@ -1,6 +1,6 @@
 # Plantilla de inventario
 
-Usa `plantilla-inventario.xlsx` de esta carpeta o descarga la plantilla desde Importar inventario. No se necesita un archivo diferente para el inventario anual.
+Descarga la plantilla desde Importar inventario. El sistema la genera vacía cuando la solicitas, sin conservar una muestra de datos en el proyecto. No se necesita un archivo diferente para el inventario anual.
 
 ## Estructura
 

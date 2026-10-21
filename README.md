@@ -2,7 +2,7 @@
 
 **Instalar, actualizar o trasladar a otro equipo:** consulta la [guía de instalación y traslado](docs/INSTALAR_Y_TRASLADAR.md).
 
-Pruebas y preparación del repositorio: [informe de entrega](docs/ENTREGA_GITHUB_PRIVADO.md).
+Archivos y espacio utilizado: [guía de almacenamiento](docs/ALMACENAMIENTO.md).
 
 Inicio rápido en Windows con Git y Docker Desktop:
 
@@ -136,12 +136,11 @@ backend/            API FastAPI, servicios de dominio y worker de tareas
     scripts/        Operaciones de consola (migraciones, salud, humo, demo)
   tests/            Pruebas de integración sobre Docker
 frontend/           Interfaz React 19 + TypeScript + Vite + Tailwind v4
-  src/componentes/  Componentes reutilizables (ver docs/COMPONENTES.md)
+  src/componentes/  Componentes reutilizables de la interfaz
   src/paginas/      Una pantalla por archivo
   src/api/          Cliente HTTP único y servicios del dominio
 deploy/             Caddyfile, configuración de Nginx y script de respaldo
-samples/            Archivo de Excel de muestra para la importación
-docs/               Documentación de la entrega
+docs/               Guías esenciales de instalación, almacenamiento, IA e inventario
 ```
 
 ---
@@ -167,8 +166,7 @@ docker compose exec api python -m app.scripts.diagnostico
 
 ## Cómo decide el sistema
 
-Las reglas que no son obvias están explicadas donde se aplican y resumidas en
-[DECISIONS.md](DECISIONS.md). Las cinco más importantes:
+Las reglas se explican en el código donde se aplican. Las cinco más importantes:
 
 1. **El chat depende del origen del ticket, y lo decide el backend.** Si lo
    reporta una persona (para sí o para un compañero) hay conversación. Si lo
