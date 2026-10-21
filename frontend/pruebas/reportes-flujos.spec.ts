@@ -1,6 +1,36 @@
 import { expect, test } from '@playwright/test'
-import { mkdir } from 'node:fs/promises'
+import { readFile } from 'node:fs/promises'
+import AxeBuilder from '@axe-core/playwright'
 import { entrar } from './utilidades'
+
+for (const tema of ['claro', 'oscuro']) {
+  test(`Reportes es accesible y adaptable en tema ${tema}`, async ({ page }, testInfo) => {
+    await page.addInitScript(tema => localStorage.setItem('ma.tema', tema), tema)
+    await entrar(page, 'administrador')
+    await page.goto('/panel/reportes')
+    await expect(page.getByText('Contenido del archivo', { exact: true })).toBeVisible()
+    for (const tipo of ['tickets', 'inventario', 'carga_equipo', 'analitica', 'auditoria']) {
+      await page.getByLabel('Reporte', { exact: true }).selectOption(tipo)
+      await expect(page.getByLabel('Desde')).toHaveCount(tipo === 'inventario' ? 0 : 1)
+      await expect(page.getByLabel('Zona', { exact: true })).toHaveCount(tipo === 'auditoria' ? 0 : 1)
+    }
+    await page.getByLabel('Reporte', { exact: true }).selectOption('tickets')
+    await page.getByRole('button', { name: 'Hoy', exact: true }).click()
+    const hoy = await page.evaluate(() => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date()))
+    await expect(page.getByLabel('Desde')).toHaveValue(hoy)
+    await expect(page.getByLabel('Hasta')).toHaveValue(hoy)
+    for (const width of [1440, 820, 390]) {
+      await page.setViewportSize({ width, height: 900 })
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true)
+      await expect(page.getByRole('button', { name: 'Generar archivo', exact: true })).toBeEnabled()
+      if (process.env.REVISION_REPORTES_VISUAL === '1' && width !== 820) {
+        await page.screenshot({ path: testInfo.outputPath(`reportes-${tema}-${width}.png`), fullPage: true })
+      }
+    }
+    const accesibilidad = await new AxeBuilder({ page }).analyze()
+    expect(accesibilidad.violations.filter(v => ['serious', 'critical'].includes(v.impact || ''))).toEqual([])
+  })
+}
 
 test('Análisis muestra fechas locales, convierte minutos y alinea los controles', async ({ page }) => {
   await entrar(page, 'administrador')
@@ -28,9 +58,8 @@ test('Reportes genera y descarga PDF, Excel por zonas y carga TI con filtros cor
   await page.goto('/panel/reportes')
   await expect(page.getByRole('button', { name: 'Imprimir', exact: true })).toHaveCount(0)
   await expect(page.getByLabel('Reporte', { exact: true })).toHaveValue('tickets')
-  const muestras = '../docs/muestras-reportes'
-  await mkdir(muestras, { recursive: true })
-  for (const [tipo, formato, nombre] of [['tickets', 'pdf', 'tickets.pdf'], ['inventario', 'excel', 'inventario.xlsx'], ['inventario', 'pdf', 'inventario.pdf'], ['carga_equipo', 'csv', 'carga-ti.csv']] as const) {
+  for (const tipo of ['tickets', 'inventario', 'carga_equipo', 'analitica', 'auditoria']) {
+    for (const formato of ['pdf', 'excel', 'csv']) {
     await page.getByLabel('Reporte', { exact: true }).selectOption(tipo)
     await page.getByLabel('Formato', { exact: true }).selectOption(formato)
     if (tipo === 'inventario') {
@@ -52,7 +81,15 @@ test('Reportes genera y descarga PDF, Excel por zonas y carga TI con filtros cor
     await expect(fila).toHaveCount(1)
     const descarga = page.waitForEvent('download')
     await fila.getByRole('button', { name: 'Descargar', exact: true }).click()
-    await (await descarga).saveAs(`${muestras}/${nombre}`)
+    const descargado = await descarga
+    const ruta = await descargado.path()
+    expect(ruta).toBeTruthy()
+    const contenido = await readFile(ruta!)
+    expect(contenido.length).toBeGreaterThan(formato === 'csv' ? 0 : 100)
+    if (formato === 'pdf') expect(contenido.subarray(0, 4).toString()).toBe('%PDF')
+    else if (formato === 'excel') expect(contenido.subarray(0, 2).toString()).toBe('PK')
+    else expect(contenido.toString('utf8')).toContain(';')
+    }
   }
   await page.getByLabel('Reporte', { exact: true }).selectOption('tickets')
   const acceso = await page.evaluate(() => sessionStorage.getItem('ma.acceso'))
@@ -77,7 +114,6 @@ test('Reportes genera y descarga PDF, Excel por zonas y carga TI con filtros cor
   await page.setViewportSize({ width: 390, height: 844 })
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true)
   await page.evaluate(() => window.scrollTo(0, 0))
-  await page.screenshot({ path: '../docs/capturas/reportes-movil.png', fullPage: true })
 })
 
 test('Auditoría filtra la acción real y traslada el alcance al reporte', async ({ page }) => {

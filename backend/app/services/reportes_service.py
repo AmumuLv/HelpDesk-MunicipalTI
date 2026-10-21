@@ -118,7 +118,9 @@ async def tickets(filtros: dict[str, Any], formato: str, usuario: dict[str, Any]
         if incluir_notas:
             fila['Notas internas'] = '\n'.join(notas[i['_id']])
         filas.append(fila)
-    columnas = list(filas[0]) if filas else ['Ticket', 'Asunto', 'Zona', 'Oficina', 'Tipo de equipo', 'Equipo', 'Código patrimonial', 'Estado', 'Técnico', 'Creado', 'Cerrado', 'Resolución']
+    columnas = ['Ticket', 'Asunto', 'Zona', 'Oficina', 'Tipo de equipo', 'Equipo', 'Código patrimonial', 'Conjunto', 'Estado', 'Prioridad', 'Categoría', 'Problema', 'Persona afectada', 'Reportado por', 'Técnico', 'Creado', 'Cerrado', 'Resolución', 'Resolución (min)', 'Incumplió SLA', 'Satisfacción (1–5)']
+    if incluir_notas:
+        columnas.append('Notas internas')
     if formato != 'pdf':
         return archivo_tabular(filas, columnas, formato, 'Tickets')
     tablas = [{
@@ -167,19 +169,19 @@ async def carga_equipo(filtros: dict[str, Any], formato: str, usuario: dict[str,
     datos = await analitica_service.carga_tecnicos(filtros)
     desde, hasta, _, _ = analitica_service.resolver_periodo(filtros)
     filas = [{
-        'Técnico': t['tecnico'], 'Asignados en el periodo': t['asignados'], 'Cerrados en el periodo': t['resueltos'],
+        'Técnico': t['tecnico'], 'Casos del periodo': t['asignados'], 'Finalizados de esos casos': t['resueltos'],
         'Pendientes actuales': t['carga_actual'], 'Disponibilidad actual': t['disponibilidad'] or 'No aplica',
         'Resolución media': pdf_service._formatear_minutos(t['tiempo_medio_resolucion_min']),
         'Resolución media (min)': t['tiempo_medio_resolucion_min'], 'Horas laborables': t['horas_laborables'],
         'Cerrados por hora': t['tickets_por_hora'],
     } for t in datos['items'] if t['asignados'] or t['carga_actual']]
-    columnas = list(filas[0]) if filas else ['Técnico', 'Asignados en el periodo', 'Cerrados en el periodo', 'Pendientes actuales', 'Resolución media']
+    columnas = ['Técnico', 'Casos del periodo', 'Finalizados de esos casos', 'Pendientes actuales', 'Disponibilidad actual', 'Resolución media', 'Resolución media (min)', 'Horas laborables', 'Cerrados por hora']
     if formato != 'pdf':
         return archivo_tabular(filas, columnas, formato, 'Equipo TI')
-    columnas_pdf = ['Técnico', 'Asignados en el periodo', 'Cerrados en el periodo', 'Pendientes actuales', 'Disponibilidad actual', 'Resolución media']
-    return await pdf_service.informe_consolidado(titulo='Informe del equipo TI', subtitulo='Asignaciones del periodo y carga actual al generar el informe',
-        kpis=[('Personas con actividad', sum(t['tecnico_id'] is not None for t in datos['items'])), ('Tickets del periodo', sum(t['asignados'] for t in datos['items']))],
-        tablas=[{'titulo': 'Carga y atención', 'cabeceras': columnas_pdf, 'filas': [[f[c] for c in columnas_pdf] for f in filas]}],
+    columnas_pdf = ['Técnico', 'Casos del periodo', 'Finalizados de esos casos', 'Pendientes actuales', 'Disponibilidad actual', 'Resolución media']
+    return await pdf_service.informe_consolidado(titulo='Informe del equipo TI', subtitulo='Casos creados en el periodo y carga actual al generar el informe',
+        kpis=[('Técnicos con casos del periodo', sum(t['tecnico_id'] is not None and bool(t['asignados']) for t in datos['items'])), ('Casos del periodo', sum(t['asignados'] for t in datos['items']))],
+        tablas=[{'titulo': 'Carga y atención', 'descripcion': 'Casos creados dentro del periodo, agrupados por el técnico asignado actualmente. Finalizados indica cuántos de esos casos están cerrados al generar el informe; no mide todos los cierres realizados en esas fechas. Los pendientes actuales abarcan todo el historial del técnico, sin limitarse a la zona u oficina elegidas.', 'cabeceras': columnas_pdf, 'filas': [[f[c] for c in columnas_pdf] for f in filas]}],
         filtros_texto=texto_filtros({**filtros, 'desde': desde, 'hasta': hasta}), generado_por=usuario.get('nombre', ''))
 
 

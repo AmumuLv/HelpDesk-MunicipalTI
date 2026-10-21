@@ -164,6 +164,26 @@ docker compose exec api python -m app.scripts.diagnostico
 
 ---
 
+## Reportes disponibles
+
+| Reporte principal | Contenido y alcance |
+| --- | --- |
+| Tickets del periodo | Casos creados en las fechas elegidas, personas, equipos, técnicos y estado actual. |
+| Inventario por zona | Equipos y responsables actuales; hojas de Excel y secciones PDF por zona. |
+| Carga del equipo TI | Casos creados en el periodo por técnico actual, finalizados de esos casos y pendientes actuales de todo su historial. |
+| Resumen de atención | Cuatro indicadores, comparación anterior, oficinas, plazos, problemas frecuentes, técnicos y zonas. |
+| Movimientos importantes | Quién cambió qué y cuándo; cambios relevantes y alertas de seguridad. |
+
+PDF sirve para presentar y leer; Excel y CSV conservan los datos para trabajar.
+El resumen PDF se centra en atención; Excel y CSV también incluyen métricas del
+asistente y familias de equipos con su alcance de doce meses. Los vencidos y los
+casos por vencer se presentan por separado, sin contarlos dos veces.
+
+Las fichas de ticket y equipo, los pendientes de calidad y la verificación de
+inventario se exportan desde sus módulos; no duplican opciones en el menú de
+reportes. Las fichas de ticket se generan solo en PDF. Las muestras de prueba
+no se guardan en la instalación operativa.
+
 ## Cómo decide el sistema
 
 Las reglas se explican en el código donde se aplican. Las cinco más importantes:

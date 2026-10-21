@@ -145,18 +145,20 @@ async def _generar_pendientes(filtros: dict[str, Any], formato: str, usuario: di
                 {
                     "titulo": "Detalle",
                     "cabeceras": ["Equipo", "Tipo", "Oficina", "Responsable", "Faltantes", "Campos"],
+                    "anchos": [20, 9, 15, 17, 7, 32],
                     "filas": [
-                        [p["nombre"], p["tipo"], p["oficina_nombre"], p["responsable_nombre"], p["faltantes"], ", ".join(p["campos_faltantes"])]
+                        [p["nombre"], p["tipo"], p["oficina_nombre"], p["responsable_nombre"], p["faltantes"], ", ".join(pdf_service.etiqueta_campo(c) for c in p["campos_faltantes"])]
                         for p in pendientes
                     ],
                     "vacio": "No hay equipos con datos faltantes.",
                 }
             ],
-            filtros_texto=_texto_filtros(filtros),
+            filtros_texto=reportes_service.texto_filtros(filtros, inventario=True),
             generado_por=usuario.get("nombre", ""),
         )
-    columnas = ["nombre", "tipo", "codigo_patrimonial", "zona_nombre", "oficina_nombre", "responsable_nombre", "porcentaje", "faltantes", "campos_faltantes"]
-    filas = [{columna: (", ".join(p[columna]) if columna == "campos_faltantes" else p.get(columna)) for columna in columnas} for p in pendientes]
+    campos = [('Equipo', 'nombre'), ('Tipo', 'tipo'), ('Código patrimonial', 'codigo_patrimonial'), ('Zona', 'zona_nombre'), ('Oficina', 'oficina_nombre'), ('Responsable', 'responsable_nombre'), ('Datos completos (%)', 'porcentaje'), ('Datos faltantes', 'faltantes'), ('Campos pendientes', 'campos_faltantes')]
+    columnas = [etiqueta for etiqueta, _ in campos]
+    filas = [{etiqueta: ', '.join(pdf_service.etiqueta_campo(c) for c in p[campo]) if campo == 'campos_faltantes' else p.get(campo) for etiqueta, campo in campos} for p in pendientes]
     if formato == "csv":
         return excel_service.a_csv(filas, columnas)
     return excel_service.escribir_tablas({"Pendientes": filas}, {"Pendientes": columnas})
@@ -165,7 +167,9 @@ async def _generar_pendientes(filtros: dict[str, Any], formato: str, usuario: di
 async def _generar_campana(campana_id: ObjectId, formato: str, usuario: dict[str, Any]) -> bytes:
     campana = await campana_service.obtener(campana_id, usuario=usuario)
     datos = await campana_service.items(campana_id, pagina=1, por_pagina=2000)
-    items = datos["items"]
+    items = list(datos["items"])
+    for pagina in range(2, datos['total_paginas'] + 1):
+        items.extend((await campana_service.items(campana_id, pagina=pagina, por_pagina=2000))['items'])
     if formato == "pdf":
         return await pdf_service.cierre_campana(
             campana, resumen=campana.get("resumen") or {}, filas=items, generado_por=usuario.get("nombre", "")
@@ -182,15 +186,13 @@ async def _generar_analitica(filtros: dict[str, Any], formato: str, usuario: dic
     kpis = panel["kpis"]
     if formato == "pdf":
         return await pdf_service.informe_consolidado(
-            titulo="Informe de Analisis IA",
-            subtitulo="Datos reales del sistema",
+            titulo="Resumen de atención de tickets",
+            subtitulo="Casos creados en el periodo y su estado actual. Indicadores calculados con los registros del sistema; no son predicciones de IA.",
             kpis=[
                 ("Tickets analizados", kpis["tickets_analizados"]),
                 ("Tiempo medio", pdf_service._formatear_minutos(kpis["tiempo_medio_resolucion_min"])),
                 ("Cumplimiento SLA", f"{kpis['cumplimiento_sla']}%" if kpis["cumplimiento_sla"] is not None else "-"),
                 ("Satisfacción (de 5)", kpis["satisfaccion_promedio"] if kpis["satisfaccion_promedio"] is not None else "N/A"),
-                ("Riesgos detectados", kpis["riesgos_detectados"]),
-                ("Confianza media", f"{kpis['confianza_media_modelo'] * 100:.1f}%" if kpis['confianza_media_modelo'] is not None else "N/A"),
             ],
             comparacion={
                 "etiquetas": ["Tickets del periodo"],
@@ -200,48 +202,47 @@ async def _generar_analitica(filtros: dict[str, Any], formato: str, usuario: dic
             },
             tablas=[
                 {
-                    "titulo": "Ranking de incidencias por oficina",
-                    "cabeceras": ["Oficina", "Zona", "Tickets", "Por equipo", "Por usuario", "Criticas"],
+                    "titulo": "Incidencias por oficina",
+                    "descripcion": "Se incluyen todas las oficinas con casos, de mayor a menor volumen. Más tickets no significa necesariamente mayor gravedad.",
+                    "cabeceras": ["Oficina", "Zona", "Tickets", "Por equipo", "Por usuario", "Críticos"],
                     "filas": [
                         [i["oficina"], i["zona"], i["total"], i["por_equipo"], i["por_usuario"], i["criticas"]]
-                        for i in panel["ranking_oficinas"]["items"][:20]
+                        for i in panel["ranking_oficinas"]["items"]
                     ],
                     "vacio": "Sin tickets en el periodo.",
                 },
                 {
-                    "titulo": "Riesgo de incumplimiento de SLA por categoria",
-                    "cabeceras": ["Categoria", "Total", "Seguro", "Atencion", "Critico"],
+                    "titulo": "Estado de los plazos por categoría",
+                    "descripcion": "Solo casos abiertos del periodo. Las cinco situaciones son excluyentes: cada caso aparece en una sola columna. Sin plazo significa que no tiene una fecha límite registrada.",
+                    "cabeceras": ["Categoría", "Abiertos", "En tiempo", "Atención", "Por vencer", "Vencidos", "Sin plazo"],
                     "filas": [
-                        [i["nombre"], i["total"], i["seguro"], i["atencion"], i["critico"]]
+                        [i["nombre"], i["total"], i["seguro"], i["atencion"], i['critico'] - i.get('vencidos', 0), i.get('vencidos', 0), i.get('sin_plazo', 0)]
                         for i in panel["riesgo_sla_categoria"]["items"]
                     ],
                 },
                 {
-                    "titulo": "Carga y desempenho por tecnico (normalizado por horas laborables)",
-                    "cabeceras": ["Tecnico", "Asignados", "Resueltos", "Resolucion media", "Ticket/hora", "SLA %"],
+                    "titulo": "Atención por técnico",
+                    "descripcion": "Casos creados en el periodo, según su técnico actual; finalizados es el estado actual de esos casos. No representa el total de cierres realizados dentro de las fechas elegidas.",
+                    "cabeceras": ["Técnico", "Casos del periodo", "Finalizados de esos casos", "Resolución media", "Tickets/hora laboral", "SLA %"],
                     "filas": [
                         [i["tecnico"], i["asignados"], i["resueltos"], pdf_service._formatear_minutos(i["tiempo_medio_resolucion_min"]), i["tickets_por_hora"], i["cumplimiento_sla"]]
                         for i in panel["carga_tecnicos"]["items"]
                     ],
                 },
                 {
-                    "titulo": "Equipos y familias con mayor tasa de falla",
-                    "cabeceras": ["Tipo", "Equipos", "Tickets 12m", "Por equipo", "Con incidencias (12m, %)", "Alcance"],
+                    "titulo": "Problemas más frecuentes",
+                    "cabeceras": ["Categoría", "Equipo", "Tickets", "Tendencia"],
                     "filas": [
-                        [f["tipo"], f["activos"], f["tickets_12m"], f["tickets_por_equipo"], round(f["tasa_falla"] * 100, 1), "Historico"]
-                        for f in panel["familias_equipos"]
+                        [i.get('categoria'), i.get('equipo'), i.get('total'), i.get('tendencia')]
+                        for i in panel['causas']['items']
                     ],
                 },
                 {
-                    "titulo": "Calidad de recomendaciones de IA",
-                    "cabeceras": ["Aplicadas", "Editadas", "Descartadas", "Precision confirmada"],
+                    "titulo": "Distribución por zona",
+                    "cabeceras": ["Zona", "Tickets", "Abiertos"],
                     "filas": [
-                        [
-                            panel["calidad_recomendaciones"]["aplicadas"],
-                            panel["calidad_recomendaciones"]["editadas"],
-                            panel["calidad_recomendaciones"]["descartadas"],
-                            panel["calidad_recomendaciones"]["precision_confirmada"],
-                        ]
+                        [i['zona'], i['total'], i['abiertos']]
+                        for i in panel['ranking_zonas']['items']
                     ],
                 },
             ],
@@ -276,12 +277,12 @@ async def _generar_analitica(filtros: dict[str, Any], formato: str, usuario: dic
     hojas = {'Resumen de atención': resumen,
         'Por oficina': [{'Oficina': i['oficina'], 'Zona': i['zona'], 'Tickets': i['total'], 'Por equipo': i['por_equipo'], 'Por persona': i['por_usuario'], 'Críticos': i['criticas']} for i in panel['ranking_oficinas']['items']],
         'Por zona': [{'Zona': i['zona'], 'Tickets': i['total'], 'Abiertos': i['abiertos']} for i in panel['ranking_zonas']['items']],
-        'Carga de técnicos': [{'Técnico': i['tecnico'], 'Asignados': i['asignados'], 'Resueltos': i['resueltos'], 'Resolución media': pdf_service._formatear_minutos(i.get('tiempo_medio_resolucion_min')), 'Tickets por hora laboral': i['tickets_por_hora'], 'Cumplimiento de plazo (%)': i['cumplimiento_sla'] if i['cumplimiento_sla'] is not None else 'N/A'} for i in panel['carga_tecnicos']['items']],
+        'Carga de técnicos': [{'Técnico': i['tecnico'], 'Casos del periodo': i['asignados'], 'Finalizados de esos casos': i['resueltos'], 'Resolución media': pdf_service._formatear_minutos(i.get('tiempo_medio_resolucion_min')), 'Tickets por hora laboral': i['tickets_por_hora'], 'Cumplimiento de plazo (%)': i['cumplimiento_sla'] if i['cumplimiento_sla'] is not None else 'N/A'} for i in panel['carga_tecnicos']['items']],
     }
-    hojas['Riesgo de plazo'] = [{'Categoría': i.get('nombre'), 'Total': i.get('total'), 'Sin riesgo': i.get('seguro'), 'En atención': i.get('atencion'), 'Críticos': i.get('critico'), 'Vencidos': i.get('vencidos')} for i in panel['riesgo_sla_categoria']['items']]
+    hojas['Riesgo de plazo'] = [{'Categoría': i.get('nombre'), 'Abiertos': i.get('total'), 'En tiempo': i.get('seguro'), 'Atención': i.get('atencion'), 'Por vencer': i['critico'] - i.get('vencidos', 0), 'Vencidos': i.get('vencidos', 0), 'Sin plazo': i.get('sin_plazo', 0)} for i in panel['riesgo_sla_categoria']['items']]
     hojas['Causas frecuentes'] = [{'Categoría': i.get('categoria'), 'Equipo': i.get('equipo'), 'Tickets': i.get('total'), 'Tendencia': i.get('tendencia')} for i in panel['causas']['items']]
     hojas['Familias de equipos'] = [{'Tipo': i.get('tipo'), 'Equipos': i.get('activos'), 'Tickets últimos 12 meses': i.get('tickets_12m'), 'Tickets por equipo': i.get('tickets_por_equipo'), 'Equipos con incidencias (%)': round(i['tasa_falla'] * 100, 1) if i.get('tasa_falla') is not None else 'N/A'} for i in panel['familias_equipos']]
-    titulos = {nombre: list(filas[0]) if filas else {'Por oficina': ['Oficina', 'Zona', 'Tickets', 'Por equipo', 'Por persona', 'Críticos'], 'Por zona': ['Zona', 'Tickets', 'Abiertos'], 'Carga de técnicos': ['Técnico', 'Asignados', 'Resueltos', 'Resolución media', 'Tickets por hora laboral', 'Cumplimiento de plazo (%)'], 'Riesgo de plazo': ['Categoría', 'Total', 'Sin riesgo', 'En atención', 'Críticos', 'Vencidos'], 'Causas frecuentes': ['Categoría', 'Equipo', 'Tickets', 'Tendencia'], 'Familias de equipos': ['Tipo', 'Equipos', 'Tickets últimos 12 meses', 'Tickets por equipo', 'Equipos con incidencias (%)']}[nombre] for nombre, filas in hojas.items()}
+    titulos = {nombre: list(filas[0]) if filas else {'Por oficina': ['Oficina', 'Zona', 'Tickets', 'Por equipo', 'Por persona', 'Críticos'], 'Por zona': ['Zona', 'Tickets', 'Abiertos'], 'Carga de técnicos': ['Técnico', 'Casos del periodo', 'Finalizados de esos casos', 'Resolución media', 'Tickets por hora laboral', 'Cumplimiento de plazo (%)'], 'Riesgo de plazo': ['Categoría', 'Abiertos', 'En tiempo', 'Atención', 'Por vencer', 'Vencidos', 'Sin plazo'], 'Causas frecuentes': ['Categoría', 'Equipo', 'Tickets', 'Tendencia'], 'Familias de equipos': ['Tipo', 'Equipos', 'Tickets últimos 12 meses', 'Tickets por equipo', 'Equipos con incidencias (%)']}[nombre] for nombre, filas in hojas.items()}
     if formato == 'csv':
         filas = [{'Seccion': seccion, **fila} for seccion, registros in hojas.items() for fila in registros]
         columnas = list(dict.fromkeys(['Seccion'] + [c for columnas in titulos.values() for c in columnas]))
@@ -330,7 +331,7 @@ async def exportar(solicitud: dict[str, Any], *, usuario: dict[str, Any], ip: st
         raise Prohibido("Las notas internas son exclusivas del equipo TI.")
     nombre = _nombre_archivo(tipo if tipo != "ticket_individual" else "ticket", formato)
     registro = await _crear_registro(tipo, formato, nombre, usuario)
-    await get_db()['exportaciones'].update_one({'_id': registro['id']}, {'$set': {'filtros': {k: v.isoformat() if isinstance(v, date) else str(v) if isinstance(v, ObjectId) else v for k, v in filtros.items() if not k.startswith('_')}, 'alcance': reportes_service.texto_filtros(filtros, inventario=tipo == 'inventario')}})
+    await get_db()['exportaciones'].update_one({'_id': registro['id']}, {'$set': {'filtros': {k: v.isoformat() if isinstance(v, date) else str(v) if isinstance(v, ObjectId) else v for k, v in filtros.items() if not k.startswith('_')}, 'alcance': reportes_service.texto_filtros(filtros, inventario=tipo in {'inventario', 'pendientes_calidad', 'equipo'})}})
     try:
         contenido = await _producir(tipo, formato, filtros, solicitud, usuario)
     except Exception as exc:

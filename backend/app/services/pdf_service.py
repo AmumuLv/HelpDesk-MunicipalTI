@@ -56,7 +56,7 @@ CSS_BASE = """
   size: A4;
   margin: 18mm 14mm 16mm 14mm;
   @bottom-left { content: element(datos-pie); font-size: 7pt; color: #5E6B7E; }
-  @bottom-right { content: "Pagina " counter(page) " de " counter(pages); font-size: 8pt; color: #5E6B7E; }
+  @bottom-right { content: "Página " counter(page) " de " counter(pages); font-size: 8pt; color: #5E6B7E; }
 }
 * { box-sizing: border-box; }
 body { font-family: "DejaVu Sans", "Liberation Sans", sans-serif; font-size: 9.5pt; color: #162033; line-height: 1.45; }
@@ -66,17 +66,21 @@ h3 { font-size: 10.5pt; margin: 4mm 0 1.5mm; color: #162033; }
 p { margin: 0 0 2mm; }
 .subtitulo { color: #5E6B7E; font-size: 9pt; margin-bottom: 4mm; }
 .cabecera { border-bottom: 2px solid #173B7A; padding-bottom: 3mm; margin-bottom: 4mm; }
+.identidad { color: #5E6B7E; font-size: 7pt; letter-spacing: 1pt; margin-bottom: 2mm; }
+.alcance { background: #F3F6FC; border-left: 3px solid #173B7A; padding: 3mm; margin-bottom: 4mm; }
+.alcance p:last-child { margin-bottom: 0; }
+.ayuda { color: #5E6B7E; font-size: 8pt; margin-bottom: 3mm; }
 table { width: 100%; table-layout: fixed; border-collapse: collapse; margin-bottom: 4mm; }
 thead { display: table-header-group; }
 td, th { overflow-wrap: anywhere; }
 tbody tr:nth-child(even) { background: #F7F9FC; }
 h2, h3 { break-after: avoid; }
 .zona-inventario + .zona-inventario { break-before: page; }
-th { background: #EAF1FF; color: #173B7A; text-align: left; padding: 2mm 2.5mm; font-size: 8.5pt; border: 1px solid #D9E0EA; }
-td { padding: 1.8mm 2.5mm; border: 1px solid #D9E0EA; font-size: 8.5pt; vertical-align: top; }
+th { background: #EAF1FF; color: #173B7A; text-align: left; padding: 2mm 2.5mm; font-size: 8.5pt; border-bottom: 1.5px solid #173B7A; }
+td { padding: 1.8mm 2.5mm; border-bottom: 1px solid #D9E0EA; font-size: 8.5pt; vertical-align: top; }
 tr { page-break-inside: avoid; }
 .kpis { display: flex; flex-wrap: wrap; gap: 3mm; margin-bottom: 5mm; }
-.kpi { border: 1px solid #D9E0EA; border-radius: 2mm; padding: 2.5mm 3mm; width: 31%; }
+.kpi { border: 1px solid #D9E0EA; border-top: 2px solid #173B7A; border-radius: 2mm; padding: 2.5mm 3mm; width: 31%; }
 .kpi .valor { font-size: 14pt; font-weight: bold; color: #173B7A; }
 .kpi .etiqueta { font-size: 8pt; color: #5E6B7E; }
 .badge { display: inline-block; padding: 0.4mm 2mm; border-radius: 2mm; font-size: 7.5pt; border: 1px solid #D9E0EA; }
@@ -95,6 +99,12 @@ tr { page-break-inside: avoid; }
 .vacio { color: #5E6B7E; font-style: italic; }
 .pie-datos { position: running(datos-pie); font-size: 7pt; color: #5E6B7E; }
 """
+
+
+def etiqueta_campo(nombre: str) -> str:
+    return {'codigo_patrimonial': 'Código patrimonial', 'nombre_equipo': 'Nombre del equipo',
+            'memoria_ram': 'Memoria RAM', 'direccion_ip': 'Dirección IP', 'direccion_mac': 'Dirección MAC',
+            'tamano_pantalla': 'Tamaño de pantalla'}.get(nombre, nombre.replace('_', ' ').capitalize())
 
 
 def _esc(valor: Any) -> str:
@@ -146,10 +156,11 @@ def _pagina(titulo: str, cuerpo: str, *, subtitulo: str = "", pie_extra: str = "
     if horizontal:
         css += '@page { size: A4 landscape; margin: 12mm; } body { font-size: 9pt; } h1 { font-size: 16pt; } .kpi { width: 23%; padding: 2mm; } .kpi .valor { font-size: 12pt; } td, th { font-size: 8pt; padding: 1.5mm 2mm; }'
     html = f"""<!DOCTYPE html>
-<html lang="es"><head><meta charset="utf-8"><style>{css}</style></head>
+<html lang="es"><head><meta charset="utf-8"><title>{_esc(titulo)}</title><style>{css}</style></head>
 <body>
   <div class="pie-datos">Generado el {local_date().strftime('%d/%m/%Y')}{pie_extra}</div>
   <div class="cabecera">
+    <div class="identidad">MESA DE AYUDA · SOPORTE TI</div>
     <h1>{_esc(titulo)}</h1>
     <div class="subtitulo">{_esc(subtitulo)}</div>
   </div>
@@ -295,21 +306,23 @@ async def informe_consolidado(
     comparacion: dict[str, Any] | None = None,
 ) -> bytes:
     institucion = await config_service.nombre_institucion()
-    cuerpo: list[str] = [_kpis(kpis)]
+    cuerpo: list[str] = [f'<div class="alcance"><p><strong>Alcance del informe</strong></p><p>{_esc(subtitulo)}</p><p>{_esc(filtros_texto)}</p></div>', _kpis(kpis)]
     if comparacion:
         filas = [
             [etiqueta, comparacion.get("actual", "-"), comparacion.get("anterior", "-"), comparacion.get("variacion", "-")]
             for etiqueta in comparacion.get("etiquetas", [])
         ]
-        cuerpo.append("<h2>Comparacion con el periodo anterior</h2>")
+        cuerpo.append("<h2>Comparación con el periodo anterior</h2>")
         cuerpo.append(_tabla(["Indicador", "Periodo actual", "Periodo anterior", "Variacion"], filas))
     for bloque in tablas:
         cuerpo.append(f"<h2>{_esc(bloque.get('titulo'))}</h2>")
+        if bloque.get('descripcion'):
+            cuerpo.append(f'<p class="ayuda">{_esc(bloque["descripcion"])}</p>')
         cuerpo.append(_tabla(bloque.get("cabeceras", []), bloque.get("filas", []), vacio=bloque.get("vacio", "Sin datos"), anchos=bloque.get('anchos')))
     return _pagina(
         titulo,
         "".join(cuerpo),
-        subtitulo=f"{institucion} | {subtitulo} | Filtros: {filtros_texto}",
+        subtitulo=institucion,
         pie_extra=f" | Responsable: {_esc(generado_por)}",
         horizontal=True,
     )
@@ -343,7 +356,8 @@ async def ficha_equipo(activo: dict[str, Any], *, generado_por: str) -> bytes:
             valor = "No aplica"
         elif info.get("estado") == "no_disponible":
             valor = "No disponible"
-        filas_campos.append([nombre, valor or "Pendiente", info.get("estado", "pendiente"), info.get("motivo") or "-"])
+        estado = info.get('estado', 'pendiente')
+        filas_campos.append([etiqueta_campo(nombre), valor if valor not in (None, '') else 'Pendiente', {'no_aplica': 'No aplica', 'no_disponible': 'No disponible', 'pendiente': 'Pendiente', 'completo': 'Completo', 'presente': 'Registrado'}.get(estado, estado), info.get('motivo') or '-'])
     prediccion = activo.get("prediccion") or {}
     cuerpo = [
         _kpis(
@@ -374,12 +388,12 @@ async def ficha_equipo(activo: dict[str, Any], *, generado_por: str) -> bytes:
         cuerpo.append("<h2>Detalle tecnico avanzado</h2>")
         filas_avanzadas = []
         for seccion, valor in activo["detalle_avanzado"].items():
-            filas_avanzadas.append([seccion.replace("_", " "), _esc(valor)[:400]])
+            filas_avanzadas.append([seccion.replace("_", " "), valor])
         cuerpo.append(_tabla(["Seccion", "Detalle"], filas_avanzadas))
     return _pagina(
         f"Ficha de equipo: {activo.get('nombre_equipo') or activo.get('tipo')}",
         "".join(cuerpo),
-        subtitulo=f"{institucion} | {activo.get('zona_nombre')} > {activo.get('oficina_nombre')}",
+        subtitulo=f"{institucion} | {activo.get('zona_nombre') or 'Sin zona'} > {activo.get('oficina_nombre') or 'Sin oficina'}",
         pie_extra=f" | Responsable: {_esc(generado_por)}",
     )
 
@@ -402,10 +416,11 @@ async def cierre_campana(campana: dict[str, Any], *, resumen: dict[str, Any], fi
             [
                 ["Campana", campana.get("codigo")],
                 ["Nombre", campana.get("nombre")],
-                ["Anio", campana.get("anio")],
+                ["Año", campana.get("anio")],
                 ["Alcance", campana.get("alcance")],
-                ["Periodo", f"{campana.get('fecha_inicio')} a {campana.get('fecha_fin')}"],
-                ["Cerrada", _formatear_fecha(campana.get("cerrado_en"))],
+                ["Periodo", f"{_formatear_fecha(campana.get('fecha_inicio'))} a {_formatear_fecha(campana.get('fecha_fin'))}"],
+                ["Estado", 'Cerrada' if campana.get('estado') == 'cerrada' else 'En verificación'],
+                ["Fecha de cierre", _formatear_fecha(campana.get("cerrado_en"))],
             ],
         ),
         "<h2>Detalle por equipo</h2>",
@@ -426,7 +441,7 @@ async def cierre_campana(campana: dict[str, Any], *, resumen: dict[str, Any], fi
         ),
     ]
     return _pagina(
-        f"Cierre de campana {campana.get('codigo')}",
+        f"{'Cierre' if campana.get('estado') == 'cerrada' else 'Verificación'} de inventario {campana.get('codigo') or ''}",
         "".join(cuerpo),
         subtitulo=institucion,
         pie_extra=f" | Responsable: {_esc(generado_por)}",
