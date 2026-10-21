@@ -10,6 +10,11 @@ jobs:
       - uses: actions/checkout@v4
       - name: Suite del servidor en servicios aislados
         run: docker compose -f compose.pruebas.yml run --build --rm tests
+      - name: Diagnóstico de servicios si falla la suite
+        if: failure()
+        run: |
+          docker compose -f compose.pruebas.yml ps -a
+          docker compose -f compose.pruebas.yml logs --no-color --tail 150 mongo mongo-init redis
       - name: Retirar servicios de pruebas
         if: always()
         run: docker compose -f compose.pruebas.yml down -v

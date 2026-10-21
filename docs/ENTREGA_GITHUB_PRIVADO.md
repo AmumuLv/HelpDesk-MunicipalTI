@@ -1,6 +1,6 @@
 # Preparación de HelpDesk-MunicipalTI
 
-Repositorio previsto: `AmumuLv/HelpDesk-MunicipalTI`, con visibilidad **privada**.
+Repositorio: [AmumuLv/HelpDesk-MunicipalTI](https://github.com/AmumuLv/HelpDesk-MunicipalTI), con visibilidad **privada** verificada.
 El repositorio local tiene su raíz en esta carpeta; no incluye el resto del
 Escritorio ni su historial Git anterior.
 
