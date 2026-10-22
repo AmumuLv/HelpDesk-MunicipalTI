@@ -22,6 +22,7 @@ import { DisponibilidadConjuntos } from './DisponibilidadConjuntos'
 
 import { Monitor, Sparkles } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 
 import { api } from '../../api/cliente'
@@ -41,6 +42,7 @@ import { Checkbox, Input, Select } from '../base/Campo'
 import { PiePasos, Stepper } from '../base/Stepper'
 import { Nota, Panel } from '../base/Estructura'
 import { useAvisos } from '../../estado/Avisos'
+import { useSesion } from '../../estado/Sesion'
 import { IconoTipoEquipo } from './IconoTipoEquipo'
 
 const PASOS = [
@@ -243,10 +245,12 @@ export function RegistroEquipo({ alGuardar }: { alCerrar: () => void; alGuardar:
   // El endpoint ya devuelve solo los conjuntos activos; no hace falta filtrar más.
   const conjuntosExistentes = useMemo(() => conjuntos.data?.items ?? [], [conjuntos.data])
   const nombreConjuntoElegido = conjuntosExistentes.find((conjunto) => conjunto.id === conjuntoId)?.nombre
+  const ubicacionValida = Boolean(zonaId && oficinaId && (!comoConjunto || conjuntoId || nombreConjunto.trim()))
+  const zonasActivas = (zonas.data?.items ?? []).filter(zona => zona.activa)
 
   return (
     <div className="flex flex-col gap-4">
-      <Stepper pasos={PASOS} actual={paso} alIr={setPaso} />
+      <Stepper pasos={PASOS} actual={paso} alIr={siguiente => { if (siguiente !== 'confirmar' || ubicacionValida) setPaso(siguiente) }} />
 
       {paso === 'equipo' ? (
         <div className="flex flex-col gap-4">
@@ -380,9 +384,12 @@ export function RegistroEquipo({ alGuardar }: { alCerrar: () => void; alGuardar:
 
       {paso === 'ubicacion' ? (
         <div className="flex flex-col gap-4">
+          {zonas.isError ? <Nota tono="peligro" titulo="No pudimos cargar las zonas"><Button tamano="sm" onClick={() => void zonas.refetch()}>Reintentar zonas</Button></Nota> : null}
+          {!zonas.isPending && !zonas.isError && zonasActivas.length === 0 ? <AltaUbicacion tipo="zona" alCrear={id => { setZonaId(id); setOficinaId(''); setResponsableId(''); setConjuntoId(''); setNombreConjunto('') }} /> : null}
           <Select
             etiqueta="Zona"
             requerido
+            disabled={zonas.isPending || zonas.isError}
             value={zonaId}
             onChange={(evento) => {
               setZonaId(evento.target.value)
@@ -391,23 +398,27 @@ export function RegistroEquipo({ alGuardar }: { alCerrar: () => void; alGuardar:
               // equipo en PALACIO con un conjunto de MERCADO y el backend lo
               // rechazaría con «el conjunto pertenece a otra oficina».
               setOficinaId('')
+              setResponsableId('')
               setConjuntoId('')
               setNombreConjunto('')
             }}
             placeholder="Elige la zona"
-            opciones={(zonas.data?.items ?? [])
-              .filter((zona) => zona.activa)
+            opciones={zonasActivas
               .map((zona) => ({ valor: zona.id, etiqueta: `${zona.nombre} · ${zona.total_oficinas} oficinas` }))}
             ayuda="El equipo queda en la zona de la oficina que elijas. La zona sale de la oficina, no al revés."
           />
 
+          {zonaId && oficinas.isError ? <Nota tono="peligro" titulo="No pudimos cargar las oficinas"><Button tamano="sm" onClick={() => void oficinas.refetch()}>Reintentar oficinas</Button></Nota> : null}
+          {zonaId && !oficinas.isFetching && !oficinas.isError && oficinas.data?.items.length === 0 ? <AltaUbicacion key={zonaId} tipo="oficina" zonaId={zonaId} alCrear={id => { setOficinaId(id); setResponsableId(''); setConjuntoId(''); setNombreConjunto('') }} /> : null}
+
           <Select
             etiqueta="Oficina"
             requerido
-            disabled={!zonaId}
+            disabled={!zonaId || oficinas.isFetching || oficinas.isError}
             value={oficinaId}
             onChange={(evento) => {
               setOficinaId(evento.target.value)
+              setResponsableId('')
               setConjuntoId('')
               setNombreConjunto('')
             }}
@@ -611,7 +622,8 @@ export function RegistroEquipo({ alGuardar }: { alCerrar: () => void; alGuardar:
         alEnviar={indicePaso === PASOS.length - 1 ? () => void guardar() : undefined}
         textoEnviar={duplicados.length ? 'Registrar de todos modos' : 'Guardar equipo'}
         enviando={enviando}
-        puedeAdelantar={indicePaso === 0 ? Boolean(tipo) : true}
+        puedeAdelantar={indicePaso === 0 ? Boolean(tipo) : ubicacionValida && !oficinas.isFetching && !oficinas.isError && !zonas.isError}
+        ayuda={indicePaso === 1 && !ubicacionValida ? 'Elige una zona y una oficina; si marcas PC de escritorio, elige o nombra su conjunto.' : undefined}
         puedeEnviar={
           // Marcar «es parte de un conjunto» sin elegir uno ni escribir su nombre
           // no puede pasar: se guardaría un equipo suelto con la casilla marcada,
@@ -621,6 +633,35 @@ export function RegistroEquipo({ alGuardar }: { alCerrar: () => void; alGuardar:
       />
     </div>
   )
+}
+
+function AltaUbicacion({ tipo, zonaId, alCrear }: { tipo: 'zona' | 'oficina'; zonaId?: string; alCrear: (id: string) => void }) {
+  const sesion = useSesion()
+  const consultas = useQueryClient()
+  const avisos = useAvisos()
+  const [nombre, setNombre] = useState('')
+  const [guardando, setGuardando] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const esZona = tipo === 'zona'
+  const crear = async () => {
+    if (guardando || !nombre.trim() || (!esZona && !zonaId)) return
+    setGuardando(true); setError(null)
+    try {
+      const resultado = await api.crear<{ id: string }>(esZona ? '/zonas' : '/oficinas', { nombre: nombre.trim(), ...(!esZona ? { zona_id: zonaId } : {}) })
+      await Promise.all([['zonas'], ['oficinas']].map(queryKey => consultas.invalidateQueries({ queryKey })))
+      alCrear(resultado.id)
+      avisos.exito(esZona ? 'Zona creada' : 'Oficina creada', 'Puedes continuar con el registro del equipo.')
+    } catch (fallo) { setError(fallo instanceof Error ? fallo.message : 'No se pudo crear la ubicación.') }
+    finally { setGuardando(false) }
+  }
+  return <Nota tono="info" titulo={esZona ? 'Primero necesitas una zona' : 'Esta zona todavía no tiene oficinas'}>
+    <p className="mb-3">{esZona ? 'Cada equipo necesita una oficina y cada oficina pertenece a una zona. Puedes crear la primera zona aquí sin perder los datos del equipo.' : 'Crea la primera oficina de esta zona para indicar dónde se encuentra el equipo.'}</p>
+    {sesion.puede('org.editar') ? <div className="flex flex-col gap-2">
+      <Input etiqueta={esZona ? 'Nombre de la nueva zona' : 'Nombre de la nueva oficina'} value={nombre} disabled={guardando} onChange={e => setNombre(e.target.value)} maxLength={120} />
+      <div><Button tamano="sm" variante="destacado" disabled={!nombre.trim()} cargando={guardando} onClick={() => void crear()}>{esZona ? 'Crear zona y continuar' : 'Crear oficina y continuar'}</Button></div>
+      {error ? <p role="alert" className="text-sm text-destructive-strong">{error}</p> : null}
+    </div> : <div className="flex flex-col items-start gap-2"><p>Solicita al administrador que registre {esZona ? 'la zona y la oficina' : 'la oficina'}.</p><Button tamano="sm" onClick={() => void Promise.all([['zonas'], ['oficinas']].map(queryKey => consultas.invalidateQueries({ queryKey })))}>Actualizar ubicaciones</Button></div>}
+  </Nota>
 }
 
 function Dato({ etiqueta, valor }: { etiqueta: string; valor: string }) {

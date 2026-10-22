@@ -17,7 +17,7 @@ for (const rol of ['tecnico', 'administrador']) {
       return tieneFoto ? ruta.fulfill({ contentType: 'image/png', body: imagen }) : ruta.fulfill({ status: 404 })
     })
     await page.goto('/panel/perfil')
-    await expect(page.getByText('Mi foto de perfil', { exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Cambiar la foto', exact: true })).toBeVisible()
     await page.getByLabel('Foto de Ana Prueba', { exact: true }).setInputFiles({ name: 'perfil.png', mimeType: 'image/png', buffer: imagen })
     await expect(page.locator('main img')).toHaveCount(1)
     await expect(page.getByRole('button', { name: 'Cambiar la foto', exact: true })).toBeEnabled()

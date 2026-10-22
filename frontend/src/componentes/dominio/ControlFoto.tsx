@@ -26,12 +26,14 @@ export function ControlFoto({
   nombre,
   alCambiar,
   puedeEditar,
+  discreto = false,
 }: {
   usuarioId: string
   nombre: string
   /** Avisa de si la foto cambió, para que quien la puso recargue su avatar. */
   alCambiar: (tieneFoto: boolean) => void
   puedeEditar: boolean
+  discreto?: boolean
 }) {
   const avisos = useAvisos()
   const consultas = useQueryClient()
@@ -94,17 +96,17 @@ export function ControlFoto({
         }}
       />
       <div className="flex flex-wrap gap-2">
-        <Button variante="secundario" tamano="sm" icono={<Upload size={14} aria-hidden />} cargando={subiendo} onClick={elegir}>
+        <Button variante={discreto ? 'fantasma' : 'secundario'} tamano="sm" icono={discreto ? <Camera size={14} aria-hidden /> : <Upload size={14} aria-hidden />} cargando={subiendo} onClick={elegir} title={`JPG, PNG, WEBP o GIF, hasta ${MAX_FOTO_MB} MB`}>
           Cambiar la foto
         </Button>
         <Button variante="fantasma" tamano="sm" icono={<Trash2 size={14} aria-hidden />} disabled={subiendo} onClick={() => void quitar()}>
           Quitar
         </Button>
       </div>
-      <p className="flex items-center gap-1.5 text-2xs text-muted-foreground">
+      {!discreto ? <p className="flex items-center gap-1.5 text-2xs text-muted-foreground">
         <Camera size={12} aria-hidden className="shrink-0" />
         {`JPG, PNG, WEBP o GIF, hasta ${MAX_FOTO_MB} MB. Se muestra solo a quien tiene cuenta.`}
-      </p>
+      </p> : null}
       {fallo ? <Nota tono="peligro">{fallo}</Nota> : null}
     </div>
   )

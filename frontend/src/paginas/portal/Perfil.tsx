@@ -101,11 +101,10 @@ export function Perfil() {
 
       <Panel titulo="Mis datos" descripcion="Los datos los mantiene el administrador de la institución">
         <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col items-start gap-2">
             <PersonaFila foto={foto} nombre={datos.nombre} detalle={datos.email ?? undefined} tamano="lg" rol={sesion.rol} />
-            {sesion.esTecnico ? <div className="rounded-xl border border-border bg-surface-2/60 p-3">
-              <p className="mb-2 text-sm font-semibold">Mi foto de perfil</p>
-              <ControlFoto usuarioId={datos.id} nombre={datos.nombre} puedeEditar
+            {sesion.esTecnico ? <div className="sm:pl-16">
+              <ControlFoto usuarioId={datos.id} nombre={datos.nombre} puedeEditar discreto
                 alCambiar={() => { void perfil.refetch() }} />
             </div> : null}
           </div>
