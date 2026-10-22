@@ -3,6 +3,34 @@ import AxeBuilder from '@axe-core/playwright'
 
 test.setTimeout(90_000)
 
+for (const rol of ['tecnico', 'administrador']) {
+  test(`${rol} cambia y quita su foto desde Mi perfil sin cambiar de portal`, async ({ page }) => {
+    await portal(page, false, rol)
+    let tieneFoto = false
+    let subidas = 0
+    let borrados = 0
+    const imagen = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jR1sAAAAASUVORK5CYII=', 'base64')
+    await page.route('**/api/mi-perfil', ruta => ruta.fulfill({ json: { id: 'persona', nombre: 'Ana Prueba', email: 'ana@example.invalid', rol, tiene_foto: tieneFoto, equipos_responsable: [] } }))
+    await page.route('**/api/usuarios/persona/foto', ruta => {
+      if (ruta.request().method() === 'POST') { tieneFoto = true; subidas++; return ruta.fulfill({ json: { foto: true, mime: 'image/png' } }) }
+      if (ruta.request().method() === 'DELETE') { tieneFoto = false; borrados++; return ruta.fulfill({ json: { foto: false } }) }
+      return tieneFoto ? ruta.fulfill({ contentType: 'image/png', body: imagen }) : ruta.fulfill({ status: 404 })
+    })
+    await page.goto('/panel/perfil')
+    await expect(page.getByText('Mi foto de perfil', { exact: true })).toBeVisible()
+    await page.getByLabel('Foto de Ana Prueba', { exact: true }).setInputFiles({ name: 'perfil.png', mimeType: 'image/png', buffer: imagen })
+    await expect(page.locator('main img')).toHaveCount(1)
+    await expect(page.getByRole('button', { name: 'Cambiar la foto', exact: true })).toBeEnabled()
+    expect(subidas).toBe(1)
+    await page.getByRole('button', { name: 'Quitar', exact: true }).click()
+    await expect(page.locator('main img')).toHaveCount(0)
+    expect(borrados).toBe(1)
+    await expect(page).toHaveURL(/\/panel\/perfil$/)
+    await page.setViewportSize({ width: 390, height: 844 })
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true)
+  })
+}
+
 test('eliminar una versión anual exige confirmar y conserva los otros años', async ({ page }) => {
   await portal(page, false, 'administrador')
   let items = [2026, 2025].map(anio => ({ id: String(anio), anio, fuente: 'archivo_anual', archivo_nombre: `inventario-${anio}.xlsx`, cerrado_en: `${anio}-10-20T14:00:00Z`, total_items: 1 }))

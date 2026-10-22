@@ -23,6 +23,7 @@ import { ErrorState, Nota, PageHeader, Panel, PantallaFormulario, SkeletonPanel 
 import { EtiquetaIA } from '../../componentes/dominio/Badge'
 import { PersonaFila } from '../../componentes/base/Estructura'
 import { DispositivosCuenta } from '../../componentes/dominio/DispositivosCuenta'
+import { ControlFoto } from '../../componentes/dominio/ControlFoto'
 
 export function Perfil() {
   const sesion = useSesion()
@@ -100,8 +101,13 @@ export function Perfil() {
 
       <Panel titulo="Mis datos" descripcion="Los datos los mantiene el administrador de la institución">
         <div className="flex flex-col gap-4">
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <PersonaFila foto={foto} nombre={datos.nombre} detalle={datos.email ?? undefined} tamano="lg" rol={sesion.rol} />
+            {sesion.esTecnico ? <div className="rounded-xl border border-border bg-surface-2/60 p-3">
+              <p className="mb-2 text-sm font-semibold">Mi foto de perfil</p>
+              <ControlFoto usuarioId={datos.id} nombre={datos.nombre} puedeEditar
+                alCambiar={() => { void perfil.refetch() }} />
+            </div> : null}
           </div>
           <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
             <Campo etiqueta="Oficina" valor={datos.oficina_nombre ?? 'Sin oficina'} />
