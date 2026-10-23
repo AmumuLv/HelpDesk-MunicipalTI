@@ -651,10 +651,11 @@ export function useFeriados() {
   })
 }
 
-export function useExportaciones() {
+export function useExportaciones(habilitado = true) {
   return useQuery({
     queryKey: claves.exportaciones,
     queryFn: () => api.obtener<ExportacionesRespuesta>('/exportaciones'),
+    enabled: habilitado,
     retry: false,
   })
 }

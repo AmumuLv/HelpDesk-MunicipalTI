@@ -31,6 +31,7 @@ test('conexiones distingue celular, tablet y computadora con su navegador', asyn
     { id: 'tablet', agente: 'Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) Version/17.0 Mobile Safari/604.1', inicio: '2026-10-16T12:00:00Z', actual: false },
   ] } }))
   await page.goto('/perfil')
+  await page.getByText('Dispositivos conectados a mi cuenta', { exact: true }).click()
   await expect(page.getByText('Computadora', { exact: true })).toBeVisible()
   await expect(page.getByText('Windows · Edge', { exact: true })).toBeVisible()
   await expect(page.getByText('Celular', { exact: true })).toBeVisible()
@@ -65,18 +66,19 @@ test('fichas de organización paginan todas sus listas sin ocultar registros', a
   await avanzar('Equipos asignados', 'Dispositivo 18')
   await page.getByRole('tab', { name: 'Uso común' }).click()
   await avanzar('Equipos de uso común', 'Dispositivo 12')
-  await avanzar('Tickets abiertos', 'TKT-12 · Incidencia 12')
+  // La tabla actual consulta y pagina 25 tickets en su propia API.
+  await expect(page.getByRole('heading', { name: 'Tickets abiertos', exact: true })).toBeVisible()
   await avanzar('Tendencia de los últimos 30 días', '12 oct 2026')
   await avanzar('Incidencias recurrentes', 'Categoria 12')
   await page.route('**/api/zonas/paginada', route => route.fulfill({ json: { ...base, nombre: 'Zona paginada', color_indice: 0, total_oficinas: 26, oficinas: Array.from({ length: 26 }, (_, i) => ({ id: `oficina-${i}`, nombre: `Oficina ${i + 1}`, total_usuarios: 0, total_equipos: 0 })),
     categorias_frecuentes: equipos.map((_, i) => ({ categoria: `Categoria ${i + 1}`, total: 1 })),
-    equipos_con_mas_fallas: equipos.map((e) => ({ id: e.id, nombre: e.nombre, tickets: 1 })),
+    oficinas_con_mas_fallas: equipos.map((e) => ({ id: e.id, nombre: e.nombre, tickets: 1 })),
   } }))
   await page.goto('/panel/zonas/paginada')
   await expect(page.getByRole('link', { name: 'Oficina 25', exact: true })).toBeVisible()
   await avanzar('Oficinas', 'Oficina 26')
   await avanzar('Categorías frecuentes', 'Categoria 12')
-  await avanzar('Equipos con más fallas', 'Dispositivo 12')
+  await avanzar('Oficinas con más fallas', 'Dispositivo 12')
 })
 
 test('equipos asignados enlaza al perfil del responsable', async ({ page }) => {
@@ -119,7 +121,7 @@ test('Excel anual se registra al primer intento y compara dos años', async ({ p
   await sinDesbordamiento(page, 'archivo anual móvil')
 })
 
-test('pánico en dos pasos, chat, campana y cierre al cambiar contraseña', async ({ page }) => {
+test('reporte en dos pasos, chat, campana y solicitud de cambio de contraseña', async ({ page }) => {
   await entrar(page, 'administrador')
   const correo = `panico.${Date.now()}@demo.local`
   const creado = await page.evaluate(async correo => {
@@ -142,7 +144,7 @@ test('pánico en dos pasos, chat, campana y cierre al cambiar contraseña', asyn
   await page.getByLabel('¿Qué está pasando?').fill('Problema de conexión de prueba\n\nLa conexión dejó de funcionar y necesito ayuda de soporte.')
   await page.getByRole('button', { name: 'Enviar a soporte', exact: true }).click()
   await expect(page).toHaveURL(/\/mis-tickets\/[a-f0-9]+$/)
-  await expect(page.getByRole('heading', { name: 'Problema de conexión de prueba', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /^Problema de conexión de prueba/ })).toBeVisible()
   await page.getByLabel('Escribe un mensaje', { exact: true }).fill('Mensaje inicial desde el usuario')
   await page.getByRole('button', { name: 'Enviar a soporte', exact: true }).click()
   await expect(page.getByText('Mensaje inicial desde el usuario', { exact: true })).toBeVisible()
@@ -155,12 +157,13 @@ test('pánico en dos pasos, chat, campana y cierre al cambiar contraseña', asyn
   await expect(page.getByText('Respuesta de soporte para revisar la campana', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Notificaciones', exact: true })).toBeVisible()
   await page.goto('/perfil')
-  await expect(page.getByRole('heading', { name: 'Dispositivos conectados · 1 / 3', exact: true })).toBeVisible()
-  await page.getByLabel('Contraseña actual').fill('Inicial987!')
-  await page.getByLabel('Nueva contraseña', { exact: true }).fill('Nueva98765!')
-  await page.getByLabel('Repite la nueva contraseña').fill('Nueva98765!')
-  await page.getByRole('button', { name: 'Cambiar contraseña', exact: true }).click()
-  await expect(page).toHaveURL(/\/acceder$/)
+  await page.getByText('Dispositivos conectados a mi cuenta', { exact: true }).click()
+  await expect(page.getByRole('heading', { name: /Dispositivos conectados/ })).toBeVisible()
+  await expect(page.getByLabel('Contraseña actual')).toHaveCount(0)
+  await page.getByRole('link', { name: 'Solicitar cambio de contraseña' }).click()
+  await expect(page).toHaveURL(/solicitud=password/)
+  await expect(page.getByLabel('¿Qué está pasando?')).toHaveValue(/administrador restablezca/)
+
 })
 
 test('fichas de equipos y oficinas y enlace independiente al responsable', async ({ page }) => {

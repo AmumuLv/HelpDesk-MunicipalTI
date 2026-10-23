@@ -35,7 +35,7 @@ export function ZonaBadge({ id, nombre, colorIndice }: { id?: string | null; nom
               borderColor: `color-mix(in srgb, ${color} 62%, transparent)`,
               // El texto lleva el color de la zona mezclado con el del tema: en
               // claro se oscurece y en oscuro se aclara, así siempre contrasta.
-              color: `color-mix(in srgb, ${color} 70%, var(--color-foreground))`,
+              color: `color-mix(in srgb, ${color} 40%, var(--color-foreground))`,
             }
           : {
               backgroundColor: 'var(--color-muted)',

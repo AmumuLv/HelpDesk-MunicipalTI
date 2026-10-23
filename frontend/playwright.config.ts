@@ -34,6 +34,8 @@ export default defineConfig({
   reporter: [['list']],
   use: {
     baseURL: BASE,
+    actionTimeout: 20_000,
+    navigationTimeout: 60_000,
     locale: 'es-PE',
     timezoneId: 'America/Lima',
     trace: 'off',

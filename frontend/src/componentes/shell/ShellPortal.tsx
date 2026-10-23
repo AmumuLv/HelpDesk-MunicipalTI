@@ -85,7 +85,7 @@ export function ShellPortal({ children }: { children: ReactNode }) {
                   className={({ isActive }) =>
                     cn(
                       'relative flex min-h-16 flex-col items-center justify-center gap-1 px-1 py-2 text-xs font-semibold transition-colors',
-                      'focus-visible:outline-none focus-visible:bg-primary-soft',
+                      'focus-visible:outline-2 focus-visible:outline-offset-[-3px] focus-visible:outline-ring focus-visible:bg-primary-soft',
                       isActive ? 'text-primary-strong' : 'text-muted-foreground hover:text-foreground',
                     )
                   }

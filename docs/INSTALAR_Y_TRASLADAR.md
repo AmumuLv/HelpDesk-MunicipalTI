@@ -126,10 +126,33 @@ npx playwright install chromium
 
 En PowerShell configura `$env:PRUEBA_API_URL='http://127.0.0.1:18100'`; en Linux/macOS
 usa `export PRUEBA_API_URL=http://127.0.0.1:18100`. Ejecuta después las suites
-indicadas en el informe de entrega. Las pruebas antiguas de campañas corresponden
-a una pantalla anterior y no representan el archivo anual actual.
+de navegador, excluyendo el registro inicial que necesita una base vacía:
 
-Al terminar, desde la raíz: `docker compose -f compose.pruebas.yml down -v`.
+```bash
+npx playwright test --grep-invert 'primera laptop:|completa y guarda con ubicación existente'
+```
+
+Las pruebas de campañas verifican ahora el archivo anual actual. El recorrido
+comprueba usuarios, técnicos y administradores, incluidos móvil, tableta y
+escritorio. Las respuestas de proveedores externos se simulan; no consume sus
+cuotas. Para repetir toda la revisión, elimina primero la instalación de pruebas
+con el comando siguiente y vuelve a iniciarla: algunas pruebas crean versiones
+anuales con años y nombres fijos.
+
+El registro inicial se comprueba aparte. Con la API de demostración detenida
+(`docker compose -f compose.pruebas.yml stop api`), inicia otra API sobre una
+base de pruebas nueva:
+
+```bash
+docker compose -f compose.pruebas.yml run -d --rm --service-ports --name helpdesk-registro-inicial -e MONGO_DB=helpdesk_test_registro api uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+Desde `frontend`, conservando `PRUEBA_API_URL`, ejecuta
+`npx playwright test pruebas/registro-inicial.spec.ts`. Al terminar, detén ese
+contenedor con `docker stop helpdesk-registro-inicial`.
+
+Al terminar, desde la raíz:
+`docker compose -f compose.pruebas.yml --profile navegador --profile suite down -v`.
 Ese comando solo elimina los servicios efímeros del archivo de pruebas.
 
 ## Publicación y secretos

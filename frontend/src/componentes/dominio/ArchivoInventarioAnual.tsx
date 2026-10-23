@@ -134,7 +134,7 @@ export function ArchivoInventarioAnual() {
         <Paginacion pagina={equipos.data?.pagina ?? 1} totalPaginas={equipos.data?.total_paginas ?? 1} total={equipos.data?.total ?? 0} porPagina={25} alCambiar={setPagina} />
       </>}
     </Panel>
-    <CompararInventarios key={aniosGuardados.join(',')} versiones={lista} />
+    <CompararInventarios versiones={lista} />
     <ConfirmDialog abierto={Boolean(porEliminar)} alCerrar={() => { if (!bloqueoEliminar.current) setPorEliminar(null) }} alConfirmar={() => void eliminar()} titulo="Eliminar versión del inventario" mensaje={<><p>Se eliminará la versión de <strong>{porEliminar?.anio}</strong>: {porEliminar?.archivo_nombre || porEliminar?.codigo_campana}.</p><p className="mt-2">Esta acción no se puede deshacer. Los equipos del inventario actual y las demás versiones se conservan.</p></>} textoConfirmar="Eliminar versión" peligro cargando={eliminando} />
   </div>
 }
@@ -143,8 +143,8 @@ function CompararInventarios({ versiones }: { versiones: Version[] }) {
   const anios = [...new Set(versiones.map((v) => v.anio))].sort((a, b) => a - b)
   const [origen, setOrigen] = useState('')
   const [destino, setDestino] = useState('')
-  const a = origen || String(anios[0] ?? '')
-  const b = destino || String(anios.at(-1) ?? '')
+  const a = anios.includes(Number(origen)) ? origen : String(anios[0] ?? '')
+  const b = anios.includes(Number(destino)) ? destino : String(anios.at(-1) ?? '')
   const [pedido, setPedido] = useState<[string, string] | null>(null)
   const [grupo, setGrupo] = useState('altas')
   const [pagina, setPagina] = useState(1)

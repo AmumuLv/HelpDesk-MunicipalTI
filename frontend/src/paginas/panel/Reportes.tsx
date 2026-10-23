@@ -7,7 +7,7 @@ import { descargarDeLaApi, nombreDeArchivo } from '../../api/descarga'
 import { useExportaciones, useOficinas, useZonas } from '../../api/hooks'
 import { Button } from '../../componentes/base/Button'
 import { Input, Select } from '../../componentes/base/Campo'
-import { EmptyState, ErrorState, Nota, PageHeader, Panel, SkeletonPanel } from '../../componentes/base/Estructura'
+import { EmptyState, ErrorState, NoPermission, Nota, PageHeader, Panel, SkeletonPanel } from '../../componentes/base/Estructura'
 import { fechaHora, fechaNumerica, hoy, sumarDias, tamano } from '../../dominio/formato'
 import { useAvisos } from '../../estado/Avisos'
 import { useSesion } from '../../estado/Sesion'
@@ -26,7 +26,7 @@ export function Reportes() {
   const avisos = useAvisos()
   const sesion = useSesion()
   const [parametros, setParametros] = useSearchParams()
-  const exportaciones = useExportaciones()
+  const exportaciones = useExportaciones(sesion.puede('exportar'))
   const [tipo, setTipo] = useState(REPORTES.some((r) => r.valor === parametros.get('tipo')) ? parametros.get('tipo')! : 'tickets')
   const [formato, setFormato] = useState('excel')
   const [desde, setDesde] = useState(parametros.get('desde') || sumarDias(hoy(), -29))
@@ -68,6 +68,7 @@ export function Reportes() {
     catch (fallo) { avisos.desdeError(fallo) }
     finally { setDescargando(null) }
   }
+  if (!sesion.puede('exportar')) return <NoPermission queIntentas="la generación y descarga de reportes" permiso="exportar" />
   return <>
     <PageHeader titulo="Reportes" descripcion="Cinco informes esenciales para revisar casos, inventario y atención TI." />
     <div className="mb-4 grid gap-3 sm:grid-cols-3">

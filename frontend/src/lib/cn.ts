@@ -168,6 +168,13 @@ function propiedadDe(clase: string): string | null {
   const resto = guion === -1 ? '' : clase.slice(guion + 1)
 
   if (raiz === 'border') return propiedadDeBorde(resto)
+  // El anillo combina grosor, color y separación; ninguna sustituye a las otras.
+  if (raiz === 'ring' || raiz === 'outline') {
+    if (resto.startsWith('offset-')) return `${raiz}:offset-${/^\d+$/.test(resto.slice(7)) ? 'grosor' : 'color'}`
+    if (!resto || /^\d+$/.test(resto)) return `${raiz}:grosor`
+    if (['none', 'hidden', 'solid', 'dashed', 'dotted', 'double', 'inset'].includes(resto)) return `${raiz}:estilo`
+    return `${raiz}:color`
+  }
 
   const tabla = POLIMORFICAS[raiz]
   if (!tabla) return raiz

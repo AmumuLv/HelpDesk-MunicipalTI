@@ -51,13 +51,26 @@ export const RUTAS_POR_ROL: Record<ClaveRol, { ruta: string; nombre: string }[]>
     { ruta: '/panel/conocimiento', nombre: 'panel-conocimiento' },
     { ruta: '/panel/auditoria', nombre: 'panel-auditoria' },
     { ruta: '/panel/configuracion', nombre: 'panel-configuracion' },
+    { ruta: '/panel/perfil', nombre: 'panel-perfil-propio' },
+    { ruta: '/mis-equipos', nombre: 'panel-equipos-propios' },
+    { ruta: '/ayuda', nombre: 'panel-ayuda' },
     { ruta: '/dev/componentes', nombre: 'galeria-componentes' },
   ],
   tecnico: [
     { ruta: '/panel', nombre: 'tecnico-resumen' },
     { ruta: '/panel/tickets', nombre: 'tecnico-bandeja' },
     { ruta: '/panel/mis-asignaciones', nombre: 'tecnico-mis-asignaciones' },
+    { ruta: '/panel/cerrados', nombre: 'tecnico-cerrados' },
     { ruta: '/panel/equipos', nombre: 'tecnico-equipos' },
+    { ruta: '/panel/tickets/nuevo', nombre: 'tecnico-registrar-ticket' },
+    { ruta: '/panel/equipos/calidad', nombre: 'tecnico-calidad' },
+    { ruta: '/panel/organizacion', nombre: 'tecnico-organizacion' },
+    { ruta: '/panel/usuarios', nombre: 'tecnico-usuarios' },
+    { ruta: '/panel/equipo-ti', nombre: 'tecnico-equipo-ti' },
+    { ruta: '/panel/conocimiento', nombre: 'tecnico-conocimiento' },
+    { ruta: '/panel/perfil', nombre: 'tecnico-perfil-propio' },
+    { ruta: '/mis-equipos', nombre: 'tecnico-equipos-propios' },
+    { ruta: '/ayuda', nombre: 'tecnico-ayuda' },
   ],
   usuario: [
     { ruta: '/', nombre: 'portal-inicio' },
@@ -104,6 +117,8 @@ export async function entrar(pagina: Page, rol: ClaveRol): Promise<void> {
   await pagina.getByLabel('Contraseña', { exact: true }).fill(password)
   await pagina.getByRole('button', { name: 'Entrar' }).click()
   await pagina.waitForURL((url) => !url.pathname.includes('/acceder'), { timeout: 30_000 })
+  // Esperar también el destino evita competir con la navegación del login.
+  await expect(pagina.getByRole('heading', { name: rol === 'usuario' ? '¿Algo no funciona?' : 'Resumen', exact: true })).toBeVisible()
   // El portal mantiene consultas en vivo; esperar a que toda la red esté ociosa
   // no representa que el formulario o la sesión estén listos.
   await expect(pagina.locator('main')).toBeVisible()
@@ -146,6 +161,7 @@ export async function sinDesbordamiento(pagina: Page, donde: string): Promise<vo
  * que cualquier control al que se llegue con el teclado muestre dónde está.
  */
 export async function focoVisible(pagina: Page, donde: string): Promise<void> {
+  await pagina.keyboard.press('Tab')
   const controles = pagina.locator(
     'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
   )
@@ -192,7 +208,7 @@ export async function sinViolacionesGraves(pagina: Page, donde: string): Promise
     ['serious', 'critical'].includes(violacion.impact ?? ''),
   )
   const resumen = graves
-    .map((violacion) => `${violacion.id}: ${violacion.nodes.length} nodo(s) — ${violacion.help}`)
+    .map((violacion) => `${violacion.id}: ${violacion.nodes.length} nodo(s) — ${violacion.help}: ${violacion.nodes.map(nodo => `${nodo.target.join(' ')} ${nodo.failureSummary || ''}`).join('; ')}`)
     .join(' | ')
   expect(graves.length, `${donde}: axe-core encontró ${graves.length} violaciones graves → ${resumen}`).toBe(0)
 }

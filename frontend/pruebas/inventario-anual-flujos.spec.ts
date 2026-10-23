@@ -171,7 +171,7 @@ test('chat envía fotos y notas de voz sin texto, y soporte las recibe', async (
   })
   expect(amplitud).toBeGreaterThan(0.001)
   const respuesta = page.waitForResponse(r => r.url().endsWith(`/tickets/${ticket.id}/mensajes`) && r.request().method() === 'POST')
-  await page.getByRole('button', { name: 'Enviar mensaje', exact: true }).click()
+  await page.getByRole('button', { name: 'Enviar a soporte', exact: true }).click()
   const r = await respuesta
   expect(r.status(), await r.text()).toBe(201)
   expect(r.request().postDataJSON().cuerpo).toBe('')

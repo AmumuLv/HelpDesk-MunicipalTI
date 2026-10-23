@@ -13,7 +13,7 @@ import { expect, test } from '@playwright/test'
 async function entrar(page: import('@playwright/test').Page, correo: string) {
   await page.goto('/acceder')
   await page.getByLabel('Correo institucional').fill(correo)
-  await page.getByLabel('Contraseña').fill('Demo12345')
+  await page.getByLabel('Contraseña', { exact: true }).fill('Demo12345')
   await page.getByRole('button', { name: 'Entrar' }).click()
   await page.waitForURL((url) => !url.pathname.includes('/acceder'))
   await page.waitForTimeout(1200)
@@ -43,16 +43,15 @@ test('el usuario reporta un problema para un compañero', async ({ page }) => {
   await page.getByRole('radio', { name: /Con dificultad/ }).check()
 
   // Marca que es de otra persona
-  await page.getByText('Equipo y persona afectada', { exact: false }).click()
-  const cajaCompanero = page.getByRole('checkbox', { name: /Estoy reportando para un compañero/ })
-  await cajaCompanero.check()
-  await page.waitForTimeout(900)
-  await page.getByLabel('Persona que necesita ayuda').selectOption({ index: 1 })
+  await page.getByRole('button', { name: 'Para un compañero', exact: true }).click()
+  await page.getByRole('combobox', { name: 'Persona que necesita ayuda', exact: true }).selectOption({ index: 1 })
+  await expect(page.getByRole('combobox', { name: /equipo|computadora/i })).toHaveCount(0)
 
   await page.getByRole('button', { name: 'Enviar a soporte' }).click()
 
   // Debe llevar al ticket creado, con su código
   await page.waitForURL('**/mis-tickets/**', { timeout: 25_000 })
+  await expect(page.locator('main')).toContainText(/TKT-\d{4}-\d+/)
   const url = page.url()
   const texto = await page.locator('body').innerText()
   console.log(`REPORTE → ${url.replace(/.*\//, '')}`)
@@ -79,7 +78,9 @@ test('el tecnico registra un ticket manual', async ({ page }) => {
 
   await page.getByLabel('Asunto').fill('Prueba automatica: ticket manual')
   await page.getByLabel('Descripción').fill('Registrado por el flujo critico.')
-  await page.waitForTimeout(300)
+  const equipos = page.getByRole('combobox', { name: 'Equipo o computadora afectada', exact: true })
+  await expect.poll(() => equipos.locator('option').count()).toBeGreaterThan(1)
+  await equipos.selectOption({ index: 1 })
 
   await page.getByRole('button', { name: 'Registrar ticket' }).click()
 

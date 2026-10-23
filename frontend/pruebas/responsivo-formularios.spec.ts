@@ -37,7 +37,8 @@ const MAXIMO_FORMULARIO = 1100
 
 /** El contenedor existe, está centrado en su columna y no pasa del ancho máximo. */
 async function contenedorDeFormulario(pagina: Page, donde: string): Promise<void> {
-  const caja = await pagina.locator('[data-pantalla="formulario"]').first().evaluate((elemento) => {
+  const selector = new URL(pagina.url()).pathname === '/reportar' ? 'main div.max-w-3xl' : '[data-pantalla="formulario"]'
+  const caja = await pagina.locator(selector).first().evaluate((elemento) => {
     const propio = elemento.getBoundingClientRect()
     const padre = elemento.parentElement?.getBoundingClientRect()
     return {

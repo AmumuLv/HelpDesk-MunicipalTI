@@ -79,7 +79,7 @@ def respaldar(destino):
     destino.parent.mkdir(parents=True, exist_ok=True)
     temporal_mongo = '/tmp/traslado-' + secrets.token_hex(8) + '.gz'
     with tempfile.TemporaryDirectory(prefix='helpdesk-') as carpeta:
-        base = Path(carpeta)
+        base = Path(carpeta).resolve()
         with sin_escrituras():
             try:
                 docker('exec', mongo, 'mongodump', '--quiet', '--host=127.0.0.1:27017', '--db=' + config['db'], '--gzip', '--archive=' + temporal_mongo)
@@ -113,7 +113,9 @@ def restaurar(origen):
         raise ValueError('La instalación de destino ya contiene datos. La restauración solo admite una instalación nueva y vacía.')
     temporal_mongo = '/tmp/traslado-' + secrets.token_hex(8) + '.gz'
     with tempfile.TemporaryDirectory(prefix='helpdesk-') as carpeta:
-        base = Path(carpeta)
+        # Windows puede devolver el temporal con un nombre corto (8.3).
+        # Comparar ambas rutas resueltas conserva la validación del directorio.
+        base = Path(carpeta).resolve()
         with zipfile.ZipFile(origen) as zip_in:
             manifiesto = json.loads(zip_in.read('manifiesto.json'))
             if manifiesto.get('formato') != 1 or 'mongo.gz' not in manifiesto.get('archivos', {}):

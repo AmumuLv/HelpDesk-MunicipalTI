@@ -17,6 +17,28 @@ import { expect, test, type Page } from '@playwright/test'
 
 import { ROLES, entrar } from './utilidades'
 
+test('un técnico consulta cerrados sin pedir exportaciones y necesita permiso para descargar', async ({ page }) => {
+  await entrar(page, 'tecnico')
+  const consultas: string[] = []
+  page.on('request', peticion => {
+    if (new URL(peticion.url()).pathname === '/api/exportaciones') consultas.push(peticion.method())
+  })
+  await page.goto('/panel/cerrados')
+  await expect(page.getByRole('heading', { name: 'Historial cerrado', exact: true })).toBeVisible()
+  await expect(page.getByRole('table').first()).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Descargas/ })).toHaveCount(0)
+  // Simular solo la delegación de ver reportes: exportar sigue sin concederse.
+  await page.route('**/api/auth/sesion', async ruta => {
+    const respuesta = await ruta.fetch()
+    const sesion = await respuesta.json()
+    await ruta.fulfill({ response: respuesta, json: { ...sesion, permisos: [...sesion.permisos, 'reportes.ver'].filter((p: string) => p !== 'exportar') } })
+  })
+  await page.goto('/panel/reportes')
+  await expect(page.getByText('No tienes acceso a la generación y descarga de reportes', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Generar archivo', exact: true })).toHaveCount(0)
+  expect(consultas).toEqual([])
+})
+
 const CAPTURAS = process.env.PRUEBA_CAPTURAS ?? path.resolve(process.cwd(), '..', 'docs', 'capturas')
 const NOMBRE_PRUEBA = 'Prueba automatica permisos'
 

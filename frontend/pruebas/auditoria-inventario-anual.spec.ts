@@ -100,7 +100,7 @@ test('paginación, búsqueda, versiones anteriores, comparación y todos sus gru
       await sinDesbordamiento(page, `Inventario anual ${tema} ${ancho}`)
     }
   }
-  await expect(page.getByRole('button', { name: /eliminar/i })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Eliminar versión', exact: true })).toBeVisible()
 })
 
 test('comparación se actualiza al registrar una nueva revisión del mismo año', async ({ page }) => {
@@ -114,6 +114,9 @@ test('comparación se actualiza al registrar una nueva revisión del mismo año'
   await cargar(page, '2044', [fila(301), fila(302), fila(303)])
   await page.getByRole('button', { name: 'Comparar años', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Altas (2)', exact: true })).toBeVisible({ timeout: 7000 })
+  await cargar(page, '2046', [fila(401)])
+  await expect(page.getByLabel('Año de origen', { exact: true })).toHaveValue('2043')
+  await expect(page.getByLabel('Año de destino', { exact: true })).toHaveValue('2044')
 })
 
 test('CSV recupera una respuesta perdida y permite corregir su zona sin duplicar', async ({ page }) => {
@@ -128,6 +131,7 @@ test('CSV recupera una respuesta perdida y permite corregir su zona sin duplicar
   }, { times: 1 })
   await page.getByRole('button', { name: 'Registrar inventario anual', exact: true }).click()
   await expect(page.getByRole('table').getByText('Portátil revisión 888', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Registrar inventario anual', exact: true })).toBeDisabled()
   const primera = await page.getByLabel('Año y versión del inventario').inputValue()
   await page.getByLabel('Archivo Excel o CSV').setInputFiles(contenido)
   await page.getByLabel('Zona del CSV', { exact: true }).fill('SEDE CORREGIDA')

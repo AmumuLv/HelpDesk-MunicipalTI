@@ -120,6 +120,20 @@ GitHub Actions ejecuta la suite del servidor, la compilacion, el portal simulado
 y las comprobaciones de publicacion. La guia de traslado explica como preparar
 la API efimera para las pruebas de navegador con datos ficticios.
 
+La revisión funcional del 23/10/2026 comprobó 286 pruebas del servidor y 22
+subpruebas, 135 casos de navegador entre la revisión y sus repeticiones, 41
+pruebas de estilos y 8 de las herramientas de traslado y rutas. Se verificaron
+usuarios, técnicos y administradores: tickets, permisos, perfiles, adjuntos,
+inventario, organización, horarios, conocimiento, reportes y sincronización.
+Incluye 123 recorridos de pantalla en celular, tableta y escritorio.
+
+Se corrigieron el registro de programas en laptops independientes, consultas de
+exportaciones sin permiso, el foco del teclado, el contraste de zonas, la
+conservación de la selección anual y las rutas temporales de Windows al
+restaurar. Las pruebas de navegador usan Chromium, respuestas de IA simuladas y
+micrófono ficticio; no certifican proveedores externos ni todos los navegadores.
+La compilación pasa; lint conserva 16 advertencias previas y ningún error.
+
 
 ---
 

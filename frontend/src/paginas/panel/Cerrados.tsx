@@ -48,7 +48,7 @@ export function Cerrados() {
   const sesion = useSesion()
   const avisos = useAvisos()
   const [parametros, setParametros] = useSearchParams()
-  const exportaciones = useExportaciones()
+  const exportaciones = useExportaciones(sesion.puede('exportar'))
   const pestana = parametros.get('tab') === 'criticos' ? 'criticos' : 'cerrados'
   const setPestana = (valor: string) => { const nuevos = new URLSearchParams(); nuevos.set('tab', valor); setParametros(nuevos) }
   const [mostrarExportaciones, setMostrarExportaciones] = useState(false)
@@ -144,7 +144,7 @@ export function Cerrados() {
             }
           />
 
-          {mostrarExportaciones ? (
+          {mostrarExportaciones && sesion.puede('exportar') ? (
             <Panel
               titulo="Archivos que puedes volver a bajar"
               descripcion="No genera nada nuevo: son archivos que ya creaste en Reportes."

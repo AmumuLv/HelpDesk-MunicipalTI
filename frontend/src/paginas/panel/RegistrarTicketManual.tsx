@@ -133,7 +133,8 @@ export function RegistrarTicketManual() {
     }
   }
 
-  const puedeEnviar = Boolean(personaId && asunto.trim().length >= 4 && (categoriaDePc(categoria) ? conjuntoId && !equipoId : categoria.toLowerCase().includes('formate') ? equipoId : equipoId || conjuntoId))
+  const computadoraIndividual = Boolean(equipoElegido && !equipoElegido.conjunto_id && /^(cpu|laptop|port[aá]til|computadora|pc)$/i.test(equipoElegido.tipo || ''))
+  const puedeEnviar = Boolean(personaId && asunto.trim().length >= 4 && (categoriaDePc(categoria) ? (conjuntoId && !equipoId) || computadoraIndividual : categoria.toLowerCase().includes('formate') ? equipoId : equipoId || conjuntoId))
 
   return (
     <PantallaFormulario>
