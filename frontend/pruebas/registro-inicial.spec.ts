@@ -10,8 +10,10 @@ test.describe.configure({ mode: 'serial' })
 test.beforeEach(async ({ page }) => { page.setDefaultTimeout(20_000) })
 test.beforeAll(async ({ request }) => {
   expect(process.env.PRUEBA_API_URL, 'Se requiere la API aislada en el puerto 18100').toBe('http://127.0.0.1:18100')
-  const estado = await request.get('/api/instalacion')
-  expect(estado.ok()).toBe(true)
+  await expect.poll(async () => {
+    try { return (await request.get('/api/instalacion', { timeout: 5000 })).status() }
+    catch { return 0 }
+  }, { timeout: 60_000, message: 'Esperando la API de la instalacion vacia' }).toBe(200)
   const creada = await request.post('/api/instalacion/administrador', {
     data: { nombre: 'Administrador Demo', email: 'admin@demo.local', password: 'Demo12345' },
   })

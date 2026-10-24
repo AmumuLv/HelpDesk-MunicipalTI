@@ -160,7 +160,7 @@ def main():
     try:
         if args.accion == 'iniciar':
             preparar_entorno()
-            ejecutar('up', '-d', '--build', '--wait', '--wait-timeout', '180')
+            ejecutar('up', '-d', '--build', '--wait', '--wait-timeout', '600')
             print('Sistema iniciado. Abre http://localhost o el puerto configurado en .env.')
         elif args.accion == 'respaldar':
             respaldar(args.archivo)

@@ -49,25 +49,17 @@ La primera vez, entra a http://localhost y la propia aplicación te guía: crear
 cuenta de administrador, importar el Excel de inventario, dar de alta a las
 personas y al equipo de soporte.
 
-### Conectar con MongoDB Compass (opcional)
+### Consultar MongoDB local
 
-El puerto de Mongo se publica únicamente en el propio equipo
-(`127.0.0.1:27018`), nunca en la red local. Se usa 27018 y no 27017 porque ese
-puerto suele estar ocupado por un MongoDB instalado directamente en Windows
-(servicio `MongoDB Server`), que es una base **distinta** y no contiene los datos
-del sistema.
+La base no publica puertos. La API y el worker se conectan por la red interna
+de Docker. Para abrir la consola de la base desde tu equipo:
 
-El réplica set se anuncia con el nombre interno de Docker (`mongo:27017`), que
-Windows no puede resolver, así que la conexión debe ser directa:
+```bash
+docker compose exec mongo mongosh
+```
 
-| Campo de Compass | Valor |
-|---|---|
-| Host | `127.0.0.1:27018` |
-| Direct Connection | activado |
-| Cadena de conexión | `mongodb://127.0.0.1:27018/?directConnection=true` |
-| Base de datos | `mesa_ayuda` |
-
-Para cambiar el puerto sin tocar el archivo, define `MONGO_PORT` en `.env`.
+El acceso directo de Compass necesita un túnel autenticado o una configuración
+administrativa específica; no se habilita en el arranque normal.
 
 ### Datos de demostración (opcional)
 
@@ -83,7 +75,7 @@ los reales.
 
 ```bash
 docker compose --profile backup up -d     # respaldos programados de MongoDB
-docker compose --profile antivirus up -d  # análisis de adjuntos con ClamAV
+docker compose up -d clamav  # incluido en el arranque normal
 ```
 
 ### Desarrollo

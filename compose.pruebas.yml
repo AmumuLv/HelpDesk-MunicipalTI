@@ -1,6 +1,7 @@
 name: helpdesk-verificacion
 
 x-entorno: &entorno
+  CLAMAV_ENABLED: "false"
   APP_ENV: test
   SECRET_KEY: solo-pruebas-aisladas-no-utilizar-en-produccion-1234567890
   MONGO_URI: mongodb://mongo:27017/?replicaSet=rs0
@@ -10,8 +11,9 @@ x-entorno: &entorno
 
 services:
   mongo:
-    image: mongo:8.0
-    command: [mongod, --replSet, rs0, --bind_ip_all, --wiredTigerCacheSizeGB, "0.5"]
+    image: mesa-ayuda-mongo
+    build: {context: ./deploy, dockerfile: Dockerfile.mongo, network: "${BUILD_NETWORK:-default}"}
+    command: [mongod, --replSet, rs0, --noscripting, --bind_ip_all, --wiredTigerCacheSizeGB, "0.5"]
     volumes: [mongo-pruebas:/data/db, config-mongo-pruebas:/data/configdb]
     healthcheck:
       test: [CMD, mongosh, --quiet, --eval, "db.adminCommand({ping:1}).ok"]
@@ -19,7 +21,8 @@ services:
       timeout: 5s
       retries: 30
   mongo-init:
-    image: mongo:8.0
+    image: mesa-ayuda-mongo
+    build: {context: ./deploy, dockerfile: Dockerfile.mongo, network: "${BUILD_NETWORK:-default}"}
     depends_on:
       mongo: {condition: service_healthy}
     entrypoint: [sh, -c]

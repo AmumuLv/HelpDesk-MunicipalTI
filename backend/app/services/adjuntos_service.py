@@ -15,7 +15,7 @@ from starlette.concurrency import run_in_threadpool
 
 from app.core.config import settings
 from app.core.db import get_db
-from app.core.errors import Prohibido, Validacion
+from app.core.errors import DependenciaNoDisponible, Prohibido, Validacion
 from app.core.ids import normalizar_texto
 from app.core.time import utcnow
 
@@ -182,12 +182,12 @@ async def guardar_archivo(
     ambito: str = "ticket",
 ) -> dict[str, Any]:
     nombre, mime = validar(nombre_original, mime_declarado, len(contenido), contenido)
+    if settings.clamav_enabled:
+        await _escanear_con_clamav(contenido)
     duracion_audio = None
     if mime.startswith('audio/'):
         from app.services.audio_service import validar_audio
         duracion_audio = await run_in_threadpool(validar_audio, contenido)
-    if settings.clamav_enabled:
-        await _escanear_con_clamav(contenido)
     from app.services.imagenes_service import optimizar
     if mime in {'image/jpeg', 'image/png'}:
         contenido, mime_guardado = await run_in_threadpool(optimizar, contenido, mime)
@@ -225,24 +225,40 @@ async def guardar_archivo(
 
 
 async def _escanear_con_clamav(contenido: bytes) -> None:
-    """Usa el protocolo INSTREAM de clamd. Si no responde, no bloquea el flujo."""
-    import logging
+    """Escanea sin bloquear el servidor y exige una confirmacion limpia."""
     import socket
 
-    try:
-        with socket.create_connection((settings.clamav_host, settings.clamav_port), timeout=10) as sock:
+    def escanear() -> str:
+        with socket.create_connection((settings.clamav_host, settings.clamav_port), timeout=30) as sock:
             sock.sendall(b"zINSTREAM\0")
-            bloque = 32768
-            for inicio in range(0, len(contenido), bloque):
-                trozo = contenido[inicio : inicio + bloque]
+            for inicio in range(0, len(contenido), 32768):
+                trozo = contenido[inicio : inicio + 32768]
                 sock.sendall(len(trozo).to_bytes(4, "big") + trozo)
             sock.sendall((0).to_bytes(4, "big"))
-            respuesta = sock.recv(1024).decode("utf-8", "replace")
-    except Exception as exc:
-        logging.getLogger(__name__).warning("ClamAV no disponible (%s); se continua sin escaneo", exc)
-        return
-    if "FOUND" in respuesta:
+            respuesta = bytearray()
+            while len(respuesta) < 4096:
+                parte = sock.recv(1024)
+                if not parte:
+                    break
+                respuesta.extend(parte)
+                if b"\0" in parte or b"\n" in parte:
+                    break
+            return respuesta.decode("utf-8", "replace").rstrip("\0\r\n")
+
+    try:
+        respuesta = await run_in_threadpool(escanear)
+    except (OSError, TimeoutError) as exc:
+        raise DependenciaNoDisponible(
+            "No se pudo comprobar el archivo. Intenta subirlo de nuevo en un momento.",
+            codigo="antivirus_no_disponible",
+        ) from exc
+    if respuesta.startswith("stream: ") and respuesta.endswith(" FOUND"):
         raise Prohibido("El archivo fue bloqueado por el antivirus.", codigo="archivo_bloqueado")
+    if respuesta != "stream: OK":
+        raise DependenciaNoDisponible(
+            "El antivirus no pudo comprobar el archivo. Intenta nuevamente.",
+            codigo="antivirus_no_disponible",
+        )
 
 
 async def obtener(adjunto_id: ObjectId) -> dict[str, Any]:

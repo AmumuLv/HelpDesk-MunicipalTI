@@ -68,14 +68,14 @@ class Settings(BaseSettings):
     # ── Archivos ──────────────────────────────────────────────
     upload_dir: str = "/data/uploads"
     max_upload_mb: int = 15
-    clamav_enabled: bool = False
+    clamav_enabled: bool = True
     clamav_host: str = "clamav"
     clamav_port: int = 3310
 
     # ── IA ────────────────────────────────────────────────────
     ai_global_enabled: bool = True
     ai_learning_enabled: bool = True
-    ai_provider: str = "openai_compatible"
+    ai_provider: str = "desactivado"
     ai_base_url: str = "http://llm:11434/v1"
     ai_api_key: str = "local"
     ai_model: str = "qwen2.5:7b"

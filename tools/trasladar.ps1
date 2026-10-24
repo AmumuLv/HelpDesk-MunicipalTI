@@ -43,7 +43,7 @@ if ($Accion -eq 'iniciar') {
         [IO.File]::WriteAllText((Join-Path $raizProyecto '.env'), $texto, [Text.UTF8Encoding]::new($false))
         Write-Host '.env creado con una clave aleatoria; configura el chatbot por separado.'
     }
-    dc up -d --build --wait --wait-timeout 180
+    dc up -d --build --wait --wait-timeout 600
     Write-Host 'Sistema iniciado. Abre http://localhost o http://localhost:8080.'
     exit
 }

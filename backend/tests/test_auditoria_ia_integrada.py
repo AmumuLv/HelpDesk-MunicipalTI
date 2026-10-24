@@ -115,3 +115,12 @@ async def test_tickets_eliminados_no_entrenan_ni_aumentan_indicador(db, monkeypa
     assert riesgo['tickets_historia'] == 1
     assert riesgo['suficiente_datos'] is False
     assert 'no es una probabilidad' in riesgo['aviso'].lower()
+
+
+async def test_estado_local_no_presenta_fallo_de_conexion(monkeypatch):
+    monkeypatch.setattr(ia_provider, 'obtener_proveedor', lambda: ia_provider.ProveedorDesactivado())
+    estado = await ia_provider.estado()
+    assert estado['disponible'] is False
+    assert estado['modelo'] is None
+    assert estado['base_url'] is None
+    assert 'Motor local activo' in estado['motivo']

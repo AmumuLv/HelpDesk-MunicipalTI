@@ -20,7 +20,8 @@ En Windows ejecuta `iniciar.cmd` (también puedes abrirlo con doble clic).
 En Linux/macOS ejecuta `python3 tools/trasladar.py iniciar`.
 
 El comando crea `.env` si falta, genera un `SECRET_KEY` aleatorio, compila las
-imágenes e inicia los servicios. Si `.env` ya existe, lo conserva. Abre
+imágenes e inicia los servicios. El primer arranque puede tardar varios minutos
+mientras compila y carga las firmas del antivirus. Si `.env` ya existe, lo conserva. Abre
 `http://localhost`; también puedes entrar por `http://localhost:8080`.
 La primera instalación permite crear el administrador desde la web. No hay
 cuentas de demostración precargadas en producción.
@@ -32,7 +33,7 @@ El resto del sistema puede iniciar sin esa clave. Después de cambiar el entorno
 docker compose up -d api worker
 ```
 
-Si un puerto está ocupado, configura `WEB_PORT`, `API_PORT` o `MONGO_PORT` en `.env`.
+Si un puerto está ocupado, configura `WEB_PORT` o `API_PORT` en `.env`.
 Los puertos 80 y 443 del proxy se ajustan en `docker-compose.yml` si otro servicio los ocupa.
 Los navegadores de otros equipos necesitan la dirección del servidor y, para
 funciones como el micrófono, HTTPS fuera de localhost.
@@ -179,18 +180,16 @@ el socket en su primer mensaje, sin incluir el token en la URL, y revalida la
 sesión y el acceso antes de enviar eventos. La CSP permite scripts propios y
 mantiene imágenes, audio y temas; los logs del proxy retiran parámetros de token.
 
-La revisión comprobó 62 paquetes Python y la auditoría completa npm sin avisos
-pendientes después de actualizar dependencias. Se aprobaron 89 pruebas del
-servidor (más 4 subpruebas), 16 casos de navegador en cuatro motores/perfiles y
-un recorrido HTTPS con certificado de prueba verificado, cookies Secure/HttpOnly,
-CORS ajeno rechazado, CSRF obligatorio y cierre de WebSocket tras revocar sesión.
-Esto cubre dependencias de aplicación y configuración; no es un escaneo completo
-del sistema operativo ni una certificación de seguridad de una instalación remota.
+La revisión actual de los 61 paquetes Python de ejecución no encontró
+avisos conocidos; la auditoría npm tampoco presentó avisos pendientes.
+Los resultados funcionales y sus límites están en la verificación del
+24/10/2026 al final de esta guía. No constituyen una certificación de seguridad
+de una instalación remota.
 
 Los ensayos se repiten con:
 
 ```bash
-docker compose build api worker web proxy
+docker compose build --pull api worker web proxy mongo clamav
 docker compose -f compose.pruebas.yml --profile seguridad up -d --wait api-seguridad web-seguridad proxy-seguridad
 python tools/verificar_publicacion.py --ejecutar
 python tools/auditar_dependencias.py
@@ -199,8 +198,12 @@ python tools/auditar_dependencias.py
 El perfil seguridad usa datos ficticios y una CA efímera dentro de sus
 contenedores. No instala certificados de confianza en Windows. El navegador de
 la sonda fija la clave pública del certificado previamente validado por Python.
-El antivirus de adjuntos es opcional y no se activó durante estos ensayos;
-la revisión de tipo y tamaño de archivos no sustituye un análisis antimalware.
+ClamAV se inicia con Docker Compose y `CLAMAV_ENABLED=true` activa el análisis
+de adjuntos y fotos. Si no puede comprobar un archivo, la subida se rechaza
+con un error temporal; no se guarda sin revisar. Las firmas se conservan en
+el volumen `clamav-data` y el servicio las actualiza. El antivirus complementa
+los controles de formato, tamaño y permisos; no garantiza detectar todo malware.
+
 
 ### Auditoría de las imágenes Docker
 
@@ -212,11 +215,12 @@ tampoco. Esto no significa que todos los servicios estén libres de vulnerabilid
 
 La imagen del backend mantiene siete avisos altos en bibliotecas Debian
 (`cjson`, `libxml2`, `zlib` y `harfbuzz`) que el escáner señala sin versión
-corregida para esa distribución. La imagen oficial MongoDB 8.0 auditada mantiene
-avisos altos y críticos en componentes incluidos, entre ellos las herramientas
-Go y `js-yaml`. No se deben omitir estos avisos al decidir una publicación en
-Internet: requieren revisar alcance, actualizaciones y mitigaciones. MongoDB y
-Redis permanecen fuera de los puertos públicos de la configuración de publicación.
+corregida para esa distribución. La imagen MongoDB reconstruida con utilidades
+y lector YAML actualizados no presenta alertas altas ni críticas en el escaneo
+actual. ClamAV conserva dos altas en libxml2 y libcurl; la actualización eliminó
+la alerta crítica de Brotli. Estos nueve avisos altos siguen pendientes: el
+análisis de archivos y el aislamiento de redes no sustituyen sus parches.
+MongoDB y Redis no tienen puertos expuestos en la configuración de publicación.
 
 Se actualizó Nginx a 1.30.6 y se retiraron curl y módulos dinámicos que esta web
 no utiliza. El proxy compila Caddy 2.11.7 con Go 1.26.9 y x/net 0.60.0 sobre un
@@ -227,7 +231,7 @@ Las imágenes de desarrollo sí mantienen pip para ejecutar las pruebas.
 Para repetir el análisis de imágenes locales, sin guardar informes:
 
 ```bash
-python tools/auditar_imagenes.py mesa-ayuda-api mesa-ayuda-web mesa-ayuda-proxy redis:7-alpine mongo:8.0
+python tools/auditar_imagenes.py mesa-ayuda-api mesa-ayuda-web mesa-ayuda-proxy redis:7-alpine mesa-ayuda-mongo mesa-ayuda-clamav
 ```
 
 El comando fija el identificador de cada imagen al empezar y termina con error
@@ -246,3 +250,47 @@ en los archivos publicables, sin imprimir sus valores. No sustituye la revisión
 de cambios. Las comprobaciones automatizadas de GitHub no necesitan secretos de
 la municipalidad. Configura una rama protegida cuando el repositorio esté creado
 si quieres exigir sus comprobaciones antes de fusionar cambios.
+
+
+## Verificacion del 24/10/2026
+
+Se recorrieron los 140 casos de navegador, repartiendo el primer registro en una
+base vacía y los demás flujos en la demo aislada. Se comprobaron altas,
+ediciones, borrados, permisos, tickets, fotos, chat, inventario anual, descargas,
+sincronización y accesibilidad de los tres roles en tres tamaños de pantalla.
+La suite del servidor aprobó 352 de 353 casos y 22 subpruebas; el caso de límite
+de login heredaba contadores de otros casos. Se aisló su IP y se corrigieron
+las conexiones Redis de las pruebas antes de repetirlo: las 24 verificaciones
+de seguridad y reportes pasaron. También pasaron 26 comprobaciones de archivos
+y antivirus y 30 de IA local; estos grupos se solapan con la suite principal.
+La colección actual contiene 367 casos: los 14 añadidos y el caso corregido
+quedaron cubiertos en esas repeticiones específicas. No se repitió toda la
+suite tras corregir el aislamiento del caso de login.
+
+Con la imagen nueva de MongoDB, 500 lecturas a concurrencias 5/15/30 y 100 altas
+simultáneas no devolvieron errores. A concurrencia 30, el p95 de tickets fue
+4,08 segundos en este equipo; esto no garantiza esa capacidad en otro servidor.
+Pasaron el reinicio de servicios y la restauración en otra base y volumen,
+comparando foto, adjunto, login e idempotencia. El respaldo fue exclusivamente
+ficticio y temporal. Las pruebas no modifican los registros de producción.
+
+La imagen MongoDB 8.0.34 conserva el servidor oficial y recompila sus ocho
+utilidades y gosu con Go 1.26.9, actualiza x/net a 0.60.0 y el lector YAML a
+3.15.2 con suma verificada. La imagen final contiene solamente ese sistema
+actualizado; Docker Scout no detectó alertas altas ni críticas en ella.
+El backend sigue teniendo siete alertas altas en bibliotecas de Debian sin
+versión corregida disponible en esos repositorios; ClamAV conserva dos altas
+en libxml2 y libcurl. Sus actualizaciones requieren nueva validación.
+Son riesgos pendientes; las medidas de aislamiento no equivalen a un parche.
+
+MongoDB y Redis comparten una red interna exclusiva con la API y el worker.
+El antivirus tiene su propia red, sin acceso directo a la base de datos.
+MongoDB no publica puertos al equipo anfitrión. Para consultar la base local:
+`docker compose exec mongo mongosh`. La web accede mediante su red interna.
+
+API y worker funcionan sin capacidades adicionales y con temporales sin permiso
+de ejecución. Los PDF no acceden a recursos HTTP ni a archivos por URL.
+La configuración para publicar con dominio y HTTPS sigue en
+`compose.publico.yml`; debe aplicarse con un dominio real antes de exponer el
+servidor en Internet. Las comprobaciones TLS utilizaron una CA local de prueba.
+El linter conserva 16 avisos existentes; TypeScript y lint no devolvieron errores.

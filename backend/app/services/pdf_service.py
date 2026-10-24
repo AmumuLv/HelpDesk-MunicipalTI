@@ -172,8 +172,9 @@ def _pagina(titulo: str, cuerpo: str, *, subtitulo: str = "", pie_extra: str = "
 def _render(html: str) -> bytes:
     try:
         from weasyprint import HTML
+        from weasyprint.urls import URLFetcher
 
-        return HTML(string=html).write_pdf()
+        return HTML(string=html, url_fetcher=URLFetcher(allowed_protocols=[])).write_pdf()
     except Exception as exc:  # pragma: no cover - depende de librerias del sistema
         logger.error("WeasyPrint fallo: %s", exc)
         raise RuntimeError(f"No se pudo generar el PDF: {exc}") from exc

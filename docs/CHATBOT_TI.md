@@ -19,12 +19,12 @@ cuota del proveedor; la carga sostenida y las suites habituales no la consumen.
 
 ## Consultas de datos: motor interno de análisis
 
-La revisión de la IA integrada cubre consultas, recomendaciones de tickets y
-modelos estadísticos, además del chatbot Groq. En la instalación revisada, el
-proveedor interno `openai_compatible` con modelo `deepseek-chat` no respondió
-a la comprobación de disponibilidad. Las consultas reconocidas, la ayuda local
-y las reglas de clasificación siguen funcionando; la redacción generativa
-opcional no debe darse por disponible ni confundirse con Groq.
+La IA integrada utiliza consultas internas, ayuda local, reglas de
+clasificación y modelos estadísticos. Su proveedor generativo opcional
+está desactivado (`AI_PROVIDER=desactivado`): no necesita una clave ni consume
+cuota externa. El chatbot Groq conserva su configuración independiente.
+Las preguntas locales no reconocidas pueden reformularse o consultarse en
+el chatbot para obtener orientación abierta.
 
 Las consultas reconocen «hoy», «ayer», últimos 7/30/90 días y fechas explícitas
 DD/MM/AAAA o AAAA-MM-DD. Una fecha indicada en la pregunta prevalece sobre el
@@ -213,7 +213,7 @@ comandos, acceso libre a MongoDB ni acciones para modificar registros.
 La integración utiliza la API REST `generateContent` de Google:
 https://ai.google.dev/api/generate-content.
 La clave viaja únicamente del servidor a Google mediante `x-goog-api-key`.
-No se cambia `AI_PROVIDER`: los usuarios y la IA interna conservan su configuración.
+`AI_PROVIDER=desactivado` mantiene la IA interna local; Groq tiene su propia configuración.
 
 ## Alcance y datos
 

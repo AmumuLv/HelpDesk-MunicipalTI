@@ -1,0 +1,3 @@
+FROM clamav/clamav:1.4
+# Aplica actualizaciones del sistema y retira el cliente HTTP no utilizado.
+RUN apk upgrade --no-cache && apk del curl

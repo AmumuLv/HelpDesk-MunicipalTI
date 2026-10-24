@@ -15,6 +15,7 @@ Estas son las rutas predeterminadas de `docker-compose.yml`:
 | Respaldos locales que existan en el directorio de la API | `/data/backups/` | `mesa-ayuda_api-data` |
 | Oficinas, usuarios, equipos, tickets, chats y datos de inventario importados | Base `mesa_ayuda`, MongoDB en `/data/db` | `mesa-ayuda_mongo-data` |
 | Caché, colas y avisos temporales | Redis en `/data` | `mesa-ayuda_redis-data` |
+| Firmas del antivirus | `/var/lib/clamav/` | `mesa-ayuda_clamav-data` |
 | Respaldos del perfil opcional `backup` | `/data/backups/` del servicio `backup` | `mesa-ayuda_backup-data`, si se activa |
 | Respaldos manuales de las herramientas de traslado | La ruta indicada al ejecutar el comando, normalmente `backups/` del proyecto | Carpeta del equipo anfitrión |
 
@@ -69,3 +70,15 @@ La limpieza no elimina archivos de Descargas u otras carpetas ajenas al proyecto
 ni documentos almacenados en equipos externos. Git conserva versiones anteriores
 de los archivos de código y documentación que estuvieron registrados; eliminar
 un documento de la versión actual no reescribe el historial del repositorio.
+
+
+## Revision de archivos al subirlos
+
+Las fotos de perfil y los adjuntos se envían a ClamAV dentro de Docker antes
+de guardarse. Si el antivirus detecta una amenaza o no puede comprobar el
+archivo, la subida se rechaza. El contenido no se manda a un servicio externo.
+El volumen `clamav-data` conserva firmas de amenazas, no fotos ni documentos de
+los usuarios. Su base de firmas ocupa alrededor de 200 MB; el servicio consumió
+aproximadamente 1 GB de RAM en esta instalación durante la comprobación.
+Las importaciones Excel/CSV tienen sus propias validaciones; este control
+antivirus se aplica a fotos y adjuntos, no equivale a revisar todo el disco.

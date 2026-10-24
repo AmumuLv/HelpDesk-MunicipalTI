@@ -16,6 +16,9 @@ import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
+if os.environ.get("TEST_REDIS_URL"):
+    os.environ["REDIS_URL"] = os.environ["TEST_REDIS_URL"]
+os.environ.setdefault("CLAMAV_ENABLED", "false")
 os.environ.setdefault("APP_ENV", "test")
 os.environ.setdefault("SECRET_KEY", "clave-de-pruebas-no-usar-en-produccion-1234567890")
 os.environ.setdefault("MONGO_DB", f"mesa_ayuda_test_{uuid.uuid4().hex[:8]}")

@@ -55,9 +55,26 @@ def test_cabeceras_del_cliente_no_suplantan_ip_para_limites():
 
 async def test_no_se_elude_limite_login_cambiando_cabeceras(db, api, monkeypatch):
     monkeypatch.setattr(deps.settings, 'rate_limit_per_minute', 120)
+    from httpx import ASGITransport, AsyncClient
+    from app.main import app
+    import uuid
+    ip = '2001:db8:' + ':'.join(uuid.uuid4().hex[i:i+4] for i in range(0,24,4))
     estados = []
-    for i in range(21):
-        r = await api.post('/api/auth/login', headers={'X-Real-IP': f'10.1.0.{i}', 'X-Forwarded-For': f'10.2.0.{i}'}, json={'correo': f'inexistente{i}@prueba.local', 'password': 'PruebaFicticia123'})
-        estados.append(r.status_code)
+    async with AsyncClient(transport=ASGITransport(app=app, client=(ip, 1234)), base_url='http://test') as cliente:
+        for i in range(21):
+            r = await cliente.post('/api/auth/login', headers={'X-Real-IP': f'10.1.0.{i}', 'X-Forwarded-For': f'10.2.0.{i}'}, json={'correo': f'inexistente{i}@prueba.local', 'password': 'PruebaFicticia123'})
+            estados.append(r.status_code)
     assert 401 in estados
     assert estados[-1] == 429
+
+
+@pytest.mark.parametrize('url', ['http://127.0.0.1:9/imagen.png', 'file:///etc/passwd'])
+def test_pdf_no_descarga_recursos_ni_abre_archivos_por_url(monkeypatch, url):
+    from app.services.pdf_service import _render
+    from urllib.request import OpenerDirector
+    from unittest.mock import Mock
+    acceso = Mock(side_effect=AssertionError('No se debe acceder al recurso'))
+    monkeypatch.setattr(OpenerDirector, 'open', acceso)
+    pdf = _render(f'<p>Reporte sin recursos externos</p><img src="{url}">')
+    assert pdf.startswith(b'%PDF')
+    acceso.assert_not_called()

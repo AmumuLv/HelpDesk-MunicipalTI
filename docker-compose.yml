@@ -28,12 +28,12 @@ x-app-env: &app-env
   REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
   UPLOAD_DIR: ${UPLOAD_DIR:-/data/uploads}
   MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-15}
-  CLAMAV_ENABLED: ${CLAMAV_ENABLED:-false}
+  CLAMAV_ENABLED: ${CLAMAV_ENABLED:-true}
   CLAMAV_HOST: ${CLAMAV_HOST:-clamav}
   CLAMAV_PORT: ${CLAMAV_PORT:-3310}
   AI_GLOBAL_ENABLED: ${AI_GLOBAL_ENABLED:-true}
   AI_LEARNING_ENABLED: ${AI_LEARNING_ENABLED:-true}
-  AI_PROVIDER: ${AI_PROVIDER:-openai_compatible}
+  AI_PROVIDER: ${AI_PROVIDER:-desactivado}
   AI_BASE_URL: ${AI_BASE_URL:-http://llm:11434/v1}
   AI_API_KEY: ${AI_API_KEY:-local}
   AI_MODEL: ${AI_MODEL:-qwen2.5:7b}
@@ -61,12 +61,17 @@ x-app-build: &app-build
 services:
   # ── Base de datos: réplica set de un nodo (transacciones) ──
   mongo:
-    image: mongo:8.0
+    image: mesa-ayuda-mongo
+    build:
+      context: ./deploy
+      dockerfile: Dockerfile.mongo
+      network: ${BUILD_NETWORK:-default}
     restart: unless-stopped
     command:
       - mongod
       - --replSet
       - rs0
+      - --noscripting
       - --bind_ip_all
       - --port
       - "27017"
@@ -75,22 +80,22 @@ services:
     volumes:
       - mongo-data:/data/db
       - mongo-config:/data/configdb
-    # Solo para herramientas del propio equipo (MongoDB Compass).
-    # Escucha unicamente en 127.0.0.1, nunca en la red local.
-    # 27018 por defecto: el 27017 suele estar ocupado por un MongoDB local de Windows.
-    ports:
-      - "127.0.0.1:${MONGO_PORT:-27018}:27017"
+    # Acceso a la base exclusivamente desde la red interna de Docker.
     healthcheck:
       test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand({ ping: 1 }).ok"]
       interval: 10s
       timeout: 5s
       retries: 20
       start_period: 20s
-    networks: [red]
+    networks: [datos]
 
   # Inicializa el replica set automáticamente la primera vez
   mongo-init:
-    image: mongo:8.0
+    image: mesa-ayuda-mongo
+    build:
+      context: ./deploy
+      dockerfile: Dockerfile.mongo
+      network: ${BUILD_NETWORK:-default}
     restart: "no"
     depends_on:
       mongo:
@@ -118,7 +123,7 @@ services:
           sleep 2
         done
         echo "no se pudo confirmar el primario"; exit 1
-    networks: [red]
+    networks: [datos]
 
   # ── Redis: caché, pub/sub, colas, rate limit ───────────────
   redis:
@@ -132,15 +137,20 @@ services:
       interval: 10s
       timeout: 3s
       retries: 10
-    networks: [red]
+    networks: [datos]
 
   # ── Backend (FastAPI) ──────────────────────────────────────
   api:
     build: *app-build
     restart: unless-stopped
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    tmpfs: ["/tmp:rw,noexec,nosuid,nodev,size=256m,mode=1777"]
     env_file: [.env]
     environment: *app-env
     depends_on:
+      clamav:
+        condition: service_healthy
       mongo-init:
         condition: service_completed_successfully
       redis:
@@ -156,12 +166,15 @@ services:
       timeout: 5s
       retries: 10
       start_period: 40s
-    networks: [red]
+    networks: [red, datos, escaneo]
 
   # ── Worker de tareas en segundo plano (ARQ) ─────────────────
   worker:
     build: *app-build
     restart: unless-stopped
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    tmpfs: ["/tmp:rw,noexec,nosuid,nodev,size=256m,mode=1777"]
     command: ["arq", "app.worker.main.WorkerSettings"]
     env_file: [.env]
     environment: *app-env
@@ -178,7 +191,7 @@ services:
       timeout: 5s
       retries: 10
       start_period: 40s
-    networks: [red]
+    networks: [red, datos, escaneo]
 
   # ── Frontend compilado (Nginx) ─────────────────────────────
   web:
@@ -228,10 +241,17 @@ services:
       - caddy-config:/config
     networks: [red]
 
-  # ── Antivirus opcional para adjuntos (perfil: antivirus) ───
+  # ── Antivirus para adjuntos y fotos ───
   clamav:
-    image: clamav/clamav:1.4
-    profiles: [antivirus]
+    image: mesa-ayuda-clamav
+    build:
+      context: ./deploy
+      dockerfile: Dockerfile.clamav
+      network: ${BUILD_NETWORK:-default}
+    environment:
+      CLAMD_CONF_AlertExceedsMax: "yes"
+    volumes: [clamav-data:/var/lib/clamav]
+    security_opt: [no-new-privileges:true]
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "clamdcheck.sh", "/etc/clamav"]
@@ -239,11 +259,15 @@ services:
       timeout: 30s
       retries: 5
       start_period: 180s
-    networks: [red]
+    networks: [escaneo]
 
   # ── Respaldo programado de MongoDB (perfil: backup) ────────
   backup:
-    image: mongo:8.0
+    image: mesa-ayuda-mongo
+    build:
+      context: ./deploy
+      dockerfile: Dockerfile.mongo
+      network: ${BUILD_NETWORK:-default}
     profiles: [backup]
     restart: unless-stopped
     env_file: [.env]
@@ -259,9 +283,10 @@ services:
       - backup-data:/data/backups
       - ./deploy/backup.sh:/usr/local/bin/backup.sh:ro
     entrypoint: ["/bin/bash", "/usr/local/bin/backup.sh"]
-    networks: [red]
+    networks: [datos]
 
 volumes:
+  clamav-data:
   mongo-data:
   mongo-config:
   redis-data:
@@ -271,5 +296,9 @@ volumes:
   caddy-config:
 
 networks:
+  escaneo:
+    driver: bridge
+  datos:
+    internal: true
   red:
     driver: bridge

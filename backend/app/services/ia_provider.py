@@ -186,6 +186,7 @@ async def estado() -> dict[str, Any]:
         "modelo": settings.ai_model if disponible else None,
         "base_url": settings.ai_base_url if disponible else None,
         "disponible": disponible,
-        "motivo": None if disponible else "No se pudo contactar con el modelo de lenguaje.",
+        "motivo": ("Motor local activo, sin proveedor generativo externo." if isinstance(proveedor, ProveedorDesactivado)
+                   else None if disponible else "No se pudo contactar con el modelo de lenguaje."),
         "funcionalidad": "clasificacion_y_asignacion",
     }
