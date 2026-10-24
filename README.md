@@ -148,8 +148,12 @@ dentro de cada operación, el percentil 95 del grupo de 30 bajó de 24,0 a 3,1
 segundos en esta laptop. Es una medición local, no una garantía de capacidad.
 Se comprobaron PDF, Excel completo, reinicios, primer arranque y restauración
 real en otra base y volumen, conservando idénticos la foto y el adjunto de
-prueba. Firefox y WebKit quedaron sin verificar porque sus descargas agotaron
-el tiempo de espera. Los ensayos no consumen consultas de proveedores de IA.
+prueba. Al recuperar el acceso a las descargas se completaron 16 casos más:
+ocho en Firefox y ocho en WebKit, cubriendo permisos, reintentos, desconexiones,
+sincronización real entre cuentas, contenido HTML y registro de tickets sobre
+laptops independientes. WebKit comprueba el motor del navegador; no sustituye
+una prueba en un iPhone o Mac real. Los ensayos no consumen consultas de
+proveedores de IA.
 
 Para repetir los ensayos de concurrencia y recuperación sin tocar la instalación
 normal:
