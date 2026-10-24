@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { api, ErrorPeticion } from '../../api/cliente'
+import { claveSolicitud } from '../../api/solicitudes'
 import { useAjustesTicket, useCompaneros } from '../../api/hooks'
 import type { CuerpoTicket, TicketCreado } from '../../api/tipos'
 import { Button } from '../../componentes/base/Button'
@@ -31,6 +32,7 @@ export function Reportar() {
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState('')
   const bloqueo = useRef(false)
+  const solicitud = useRef({ firma: '', clave: '' })
   const encabezado = useRef<HTMLHeadingElement>(null)
   const tipos = useMemo(() => ajustes.data?.tipos_problema ?? [], [ajustes.data])
   const tipoElegido = tipos.find(item => item.clave === tipo)
@@ -59,7 +61,7 @@ export function Reportar() {
         ...(reportePara === 'oficina' && tipoOficina ? { activo_no_identificado: tipoOficina } : {}),
         adjuntos: [],
       }
-      creado = await api.crear<TicketCreado>('/tickets', cuerpo)
+      creado = await api.crear<TicketCreado>('/tickets', cuerpo, { headers: { 'Idempotency-Key': claveSolicitud(solicitud.current, cuerpo) } })
     } catch (fallo) {
       setError(fallo instanceof ErrorPeticion ? fallo.message : 'No pudimos enviar tu reporte. Tus datos siguen aquí; puedes volver a intentarlo.')
       bloqueo.current = false; setEnviando(false)

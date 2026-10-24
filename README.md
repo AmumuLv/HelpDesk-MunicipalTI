@@ -134,6 +134,44 @@ restaurar. Las pruebas de navegador usan Chromium, respuestas de IA simuladas y
 micrófono ficticio; no certifican proveedores externos ni todos los navegadores.
 La compilación pasa; lint conserva 16 advertencias previas y ningún error.
 
+La ampliación de resiliencia añadió 13 casos del servidor. La corrida general
+aprobó 293 casos y 22 subpruebas; después de la optimización del SLA pasaron 44
+casos dirigidos, incluidos los nuevos casos de calendario. Se verificaron 12
+casos distintos en Chromium y Edge; la sincronización por WebSocket se repitió
+dos veces por navegador, exigiendo que el cambio remoto aparezca en menos de
+cuatro segundos desde la respuesta del servidor.
+
+En la instalación aislada se crearon 5.000 equipos ficticios y 100 tickets
+concurrentes sin códigos duplicados. Las 500 lecturas con concurrencias de 5,
+15 y 30 terminaron sin errores HTTP. Tras reutilizar calendario y feriados solo
+dentro de cada operación, el percentil 95 del grupo de 30 bajó de 24,0 a 3,1
+segundos en esta laptop. Es una medición local, no una garantía de capacidad.
+Se comprobaron PDF, Excel completo, reinicios, primer arranque y restauración
+real en otra base y volumen, conservando idénticos la foto y el adjunto de
+prueba. Firefox y WebKit quedaron sin verificar porque sus descargas agotaron
+el tiempo de espera. Los ensayos no consumen consultas de proveedores de IA.
+
+Para repetir los ensayos de concurrencia y recuperación sin tocar la instalación
+normal:
+
+```powershell
+docker compose -f compose.pruebas.yml --profile navegador up -d --wait api
+$env:PRUEBA_API_URL='http://127.0.0.1:18100'
+$env:PRUEBA_NAVEGADORES='chromium,msedge'
+cd frontend
+npx playwright test pruebas/resiliencia.spec.ts
+cd ..
+python tools/verificar_resiliencia.py --ejecutar
+docker compose -f compose.pruebas.yml --profile navegador --profile suite --profile restauracion down -v
+```
+
+Edge debe estar instalado; se puede elegir solo `chromium`. Firefox y WebKit son
+opcionales mediante `PRUEBA_NAVEGADORES`, después de instalarlos con Playwright.
+Ejecuta el ensayo operativo después de terminar las otras pruebas: reinicia los
+servicios aislados, genera 5.000 equipos ficticios y comprueba un traslado real a
+otra base y volumen. El archivo temporal de traslado se elimina al terminar.
+El último comando elimina exclusivamente los volúmenes de pruebas.
+
 
 ---
 

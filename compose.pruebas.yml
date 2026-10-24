@@ -12,7 +12,7 @@ services:
   mongo:
     image: mongo:8.0
     command: [mongod, --replSet, rs0, --bind_ip_all, --wiredTigerCacheSizeGB, "0.5"]
-    tmpfs: [/data/db, /data/configdb]
+    volumes: [mongo-pruebas:/data/db, config-mongo-pruebas:/data/configdb]
     healthcheck:
       test: [CMD, mongosh, --quiet, --eval, "db.adminCommand({ping:1}).ok"]
       interval: 2s
@@ -54,7 +54,7 @@ services:
     tmpfs: ["/data:uid=10001,gid=10001"]
     volumes: [./backend:/app:ro]
     command: [python, -m, pytest, -ra, --tb=short, --show-capture=no, -p, "no:cacheprovider"]
-  api:
+  api: &api-pruebas
     build: {context: ./backend, target: develop}
     image: helpdesk-pruebas-api
     profiles: [navegador]
@@ -68,6 +68,19 @@ services:
     ports: ["127.0.0.1:18100:8000"]
     volumes: [./backend:/app:ro, datos-api:/data]
     command: [sh, -c, "python -m app.scripts.preparar_pruebas && exec uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+  api-restauracion:
+    <<: *api-pruebas
+    profiles: [restauracion]
+    environment:
+      <<: *entorno
+      MONGO_DB: helpdesk_test_restauracion
+      REDIS_URL: redis://redis:6379/3
+    ports: ["127.0.0.1:18101:8000"]
+    volumes: [./backend:/app:ro, datos-restauracion:/data]
+    command: [uvicorn, app.main:app, --host, 0.0.0.0, --port, "8000"]
 
 volumes:
+  mongo-pruebas:
+  config-mongo-pruebas:
   datos-api:
+  datos-restauracion:

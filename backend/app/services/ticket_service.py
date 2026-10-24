@@ -8,12 +8,16 @@ el ticket tiene linea de tiempo y notas internas, sin caja de respuesta para el 
 from __future__ import annotations
 
 import math
+from copy import deepcopy
+import hashlib
+import json
 import re
 from datetime import date, datetime, timedelta
 from typing import Any
 
 from bson import ObjectId
 from pymongo import ReturnDocument
+from pymongo.errors import DuplicateKeyError
 
 from app.core.audit import registrar
 from app.services.presentacion_ticket import titulo_reporte
@@ -55,6 +59,41 @@ DIAS_PERIODO = {"7d": 6, "30d": 29, "90d": 89, "mes": None, "anio": None}
 
 # Intentos al asignar un codigo libre si el contador choca con el indice unico
 MAX_REINTENTOS_CODIGO = 5
+
+
+def _identidad_solicitud(datos, usuario, tipo):
+    clave = datos.get('_solicitud_id')
+    if not clave:
+        return None
+    identidad = hashlib.sha256(f"{usuario['_id']}:{tipo}:{clave}".encode()).hexdigest()
+    contenido = {k: v for k, v in datos.items() if k != '_solicitud_id'}
+    huella = hashlib.sha256(json.dumps(contenido, sort_keys=True, default=str).encode()).hexdigest()
+    return ObjectId(identidad[:24]), huella
+
+
+async def _repetido(datos, usuario, tipo):
+    identidad = _identidad_solicitud(datos, usuario, tipo)
+    if identidad is None:
+        return None
+    existente = await get_db().tickets.find_one({'_id': identidad[0]})
+    if existente and existente.get('solicitud_huella') != identidad[1]:
+        raise Conflicto('Este envío ya fue utilizado para otros datos. Inicia un reporte nuevo.')
+    return existente
+
+
+async def _insertar_solicitud(documento, datos, usuario, tipo):
+    identidad = _identidad_solicitud(datos, usuario, tipo)
+    if identidad:
+        documento['_id'], documento['solicitud_huella'] = identidad
+    try:
+        resultado = await get_db().tickets.insert_one(documento)
+        documento['_id'] = resultado.inserted_id
+        return documento, True
+    except DuplicateKeyError:
+        repetido = await _repetido(datos, usuario, tipo)
+        if repetido is None:
+            raise
+        return repetido, False
 
 
 def rango_30d() -> tuple[Any, Any]:
@@ -255,6 +294,10 @@ async def crear_desde_usuario(
 ) -> dict[str, Any]:
     """Paso 1 + Paso 2 del reporte del usuario (2 pasos, lenguaje cotidiano)."""
     db = get_db()
+    solicitud_original = deepcopy(datos)
+    repetido = await _repetido(solicitud_original, usuario, 'portal')
+    if repetido:
+        return repetido
     persona = datos.get("persona") or {}
     reporte_para = datos.get('reporte_para') or ('propio' if persona.get('es_para_mi', True) else 'companero')
     if datos.get('reporte_para'):
@@ -357,8 +400,9 @@ async def crear_desde_usuario(
     documento.update(await resolver(contexto, {**datos, 'categoria': documento.get('categoria')}, usuario, creacion=True))
     documento.update(await sla_service.calcular_deadlines(documento["prioridad"], ahora))
 
-    resultado = await db["tickets"].insert_one(documento)
-    documento["_id"] = resultado.inserted_id
+    documento, nuevo = await _insertar_solicitud(documento, solicitud_original, usuario, 'portal')
+    if not nuevo:
+        return documento
     documento["tiene_chat"] = True
 
     if datos.get("adjuntos"):
@@ -476,6 +520,10 @@ def _nombre_activo(activo: dict[str, Any]) -> str:
 async def crear_manual(datos: dict[str, Any], *, usuario: dict[str, Any], ip: str | None = None) -> dict[str, Any]:
     """Registro manual por tecnico o administrador (2 pasos, sin chat)."""
     db = get_db()
+    solicitud_original = deepcopy(datos)
+    repetido = await _repetido(solicitud_original, usuario, 'manual')
+    if repetido:
+        return repetido
     persona = datos.get("persona") or {}
     afectado_id = a_id(persona.get("afectado_id"))
     detectado_por_tecnico = bool(persona.get("detectado_por_tec"))
@@ -573,8 +621,9 @@ async def crear_manual(datos: dict[str, Any], *, usuario: dict[str, Any], ip: st
     contexto = {**documento, 'activo_id': None, 'conjunto_id': None}
     documento.update(await resolver(contexto, {**datos, 'categoria': documento.get('categoria')}, usuario, creacion=True))
     documento.update(await sla_service.calcular_deadlines(documento["prioridad"], ahora))
-    resultado = await db["tickets"].insert_one(documento)
-    documento["_id"] = resultado.inserted_id
+    documento, nuevo = await _insertar_solicitud(documento, solicitud_original, usuario, 'manual')
+    if not nuevo:
+        return documento
     documento["tiene_chat"] = False
     if datos.get("adjuntos"):
         await db["adjuntos"].update_many(
@@ -765,7 +814,8 @@ async def listar(filtros: dict[str, Any], *, usuario: dict[str, Any]) -> dict[st
             .to_list(None)
         )
 
-    items = [await _resumen(documento) for documento in documentos]
+    with sla_service.lote_calculo():
+        items = [await _resumen(documento) for documento in documentos]
     return {
         "items": items,
         "total": total,
@@ -1066,7 +1116,12 @@ async def actualizar(ticket_id: ObjectId, datos: dict[str, Any], *, usuario: dic
     if not cambios:
         return await obtener(ticket_id, usuario=usuario)
     cambios["actualizado_en"] = utcnow()
-    await db["tickets"].update_one({"_id": ticket_id}, {"$set": cambios})
+    filtro = {'_id': ticket_id}
+    if datos.get('version_esperada') is not None:
+        filtro['actualizado_en'] = datos['version_esperada']
+    resultado = await db["tickets"].update_one(filtro, {"$set": cambios})
+    if not resultado.matched_count:
+        raise Conflicto('Este ticket cambió mientras lo editabas. Revisa los datos actualizados antes de guardar.')
     await _registrar_evento(
         {**ticket, **cambios},
         "actualizado",
@@ -1138,7 +1193,9 @@ async def asignar(ticket_id: ObjectId, datos: dict[str, Any], *, usuario: dict[s
         cambios["estado"] = ESTADO_EN_PROGRESO
         if not ticket.get("primera_lectura_en"):
             cambios["primera_lectura_en"] = cambios["actualizado_en"]
-    await db["tickets"].update_one({"_id": ticket_id}, {"$set": cambios})
+    resultado = await db["tickets"].update_one({'_id': ticket_id, 'tecnico_id': actual, 'estado': ticket.get('estado'), 'actualizado_en': ticket.get('actualizado_en')}, {"$set": cambios})
+    if not resultado.matched_count:
+        raise Conflicto('Otro integrante modificó o tomó este ticket. Actualiza la ficha antes de asignarlo.')
     await _registrar_evento(
         {**ticket, **cambios},
         "asignado",
@@ -1243,7 +1300,9 @@ async def cambiar_estado(ticket_id: ObjectId, datos: dict[str, Any], *, usuario:
         cambios["reabierto_en"] = ahora
         descripcion_evento = "Reabierto"
 
-    await db["tickets"].update_one({"_id": ticket_id}, {"$set": cambios})
+    resultado = await db["tickets"].update_one({'_id': ticket_id, 'estado': actual, 'tecnico_id': ticket.get('tecnico_id'), 'actualizado_en': ticket.get('actualizado_en')}, {"$set": cambios})
+    if not resultado.matched_count:
+        raise Conflicto('El estado o la asignación cambió en otra cuenta. Actualiza la ficha antes de continuar.')
     await _registrar_evento(
         {**ticket, **cambios},
         "estado",
@@ -1284,7 +1343,9 @@ async def _reabrir(ticket: dict[str, Any], usuario: dict[str, Any], *, motivo: s
         "actualizado_en": ahora,
         "ultima_reapertura": {"usuario": usuario.get("nombre"), "motivo": motivo, "fecha": ahora},
     }
-    await db["tickets"].update_one({"_id": ticket["_id"]}, {"$set": cambios})
+    resultado = await db["tickets"].update_one({'_id': ticket['_id'], 'estado': ticket.get('estado'), 'actualizado_en': ticket.get('actualizado_en')}, {"$set": cambios})
+    if not resultado.matched_count:
+        raise Conflicto('El ticket cambió en otra cuenta. Actualiza la ficha antes de reabrirlo.')
     await _registrar_evento(
         {**ticket, **cambios},
         "reabierto",

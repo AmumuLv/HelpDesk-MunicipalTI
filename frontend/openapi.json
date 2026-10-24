@@ -18141,6 +18141,18 @@
       },
       "TicketActualizar": {
         "properties": {
+          "version_esperada": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version Esperada"
+          },
           "alcance_incidencia": {
             "anyOf": [
               {

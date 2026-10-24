@@ -282,6 +282,7 @@ class FiltrosTicket(Base):
 
 
 class TicketActualizar(Base):
+    version_esperada: datetime | None = None
     alcance_incidencia: Literal['equipo', 'conjunto', 'programa', 'servicio', 'pendiente'] | None = None
     sistema_afectado: str | None = Field(default=None, max_length=120)
     asunto: str | None = Field(default=None, min_length=4, max_length=200)

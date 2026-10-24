@@ -41,7 +41,12 @@ export default defineConfig({
     trace: 'off',
     video: 'off',
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    { name: 'msedge', use: { ...devices['Desktop Edge'], channel: 'msedge' } },
+    { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
+    { name: 'webkit', use: { ...devices['Desktop Safari'] } },
+  ].filter(p => (process.env.PRUEBA_NAVEGADORES?.split(',') ?? ['chromium']).includes(p.name)),
   webServer: {
     command: `npm run dev -- --port ${PUERTO} --strictPort`,
     env: { VITE_API_TARGET: process.env.PRUEBA_API_URL ?? 'http://127.0.0.1:8100' },

@@ -51,7 +51,7 @@ export function TicketDetalle() {
 
   const ticket = useTicket(id)
   const ajustes = useAjustesTicket()
-  const [edicion, setEdicion] = useState<({ asunto: string; categoria: string } & VinculoTicket) | null>(null)
+  const [edicion, setEdicion] = useState<({ asunto: string; categoria: string; version_esperada?: string } & VinculoTicket) | null>(null)
   const [guardandoFicha, setGuardandoFicha] = useState(false)
   useEffect(() => { setEdicion(null) }, [id])
   const guardarFicha = async () => {
@@ -303,7 +303,7 @@ export function TicketDetalle() {
                 <p className="text-2xs font-bold tracking-wide text-muted-foreground uppercase">Incidencia reportada</p>
                 <h2 className="mt-1 break-words text-xl font-bold leading-snug [overflow-wrap:anywhere] sm:text-2xl">{datos.asunto}</h2>
               </div>
-              {!edicion ? <Button tamano="sm" variante="fantasma" icono={<Pencil size={15} />} onClick={() => setEdicion({ asunto: datos.asunto, categoria: datos.categoria ?? '', alcance_incidencia: datos.alcance_incidencia ?? (datos.activo_id ? 'equipo' : datos.conjunto_id ? 'conjunto' : 'pendiente'), sistema_afectado: datos.sistema_afectado ?? '', activo_id: datos.activo_id ?? '', conjunto_id: datos.conjunto_id ?? '', destino: datos.activo_id ? 'equipo' : datos.conjunto_id ? 'conjunto' : 'ninguna' })}>Editar</Button> : null}
+              {!edicion ? <Button tamano="sm" variante="fantasma" icono={<Pencil size={15} />} onClick={() => setEdicion({ version_esperada: datos.actualizado_en, asunto: datos.asunto, categoria: datos.categoria ?? '', alcance_incidencia: datos.alcance_incidencia ?? (datos.activo_id ? 'equipo' : datos.conjunto_id ? 'conjunto' : 'pendiente'), sistema_afectado: datos.sistema_afectado ?? '', activo_id: datos.activo_id ?? '', conjunto_id: datos.conjunto_id ?? '', destino: datos.activo_id ? 'equipo' : datos.conjunto_id ? 'conjunto' : 'ninguna' })}>Editar</Button> : null}
             </div>
             <div className="p-4 sm:p-5">
             {edicion ? <div className="mb-5 flex flex-col gap-3 border-b border-border pb-4">

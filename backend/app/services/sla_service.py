@@ -7,13 +7,47 @@ laborables reales.
 
 from __future__ import annotations
 
+from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import date, datetime, time, timedelta
+from functools import wraps
 from typing import Any
 
 from app.core.time import business_tz, utcnow
 from app.services import config_service, horario_service
 
 MAX_ITERACIONES = 5000
+_lecturas: ContextVar[dict | None] = ContextVar('lecturas_sla', default=None)
+
+
+@contextmanager
+def lote_calculo():
+    """Reutiliza lecturas solo en esta operación; nunca entre solicitudes."""
+    if _lecturas.get() is not None:
+        yield
+        return
+    token = _lecturas.set({})
+    try:
+        yield
+    finally:
+        _lecturas.reset(token)
+
+
+def _en_lote(funcion):
+    @wraps(funcion)
+    async def ejecutar(*args, **kwargs):
+        with lote_calculo():
+            return await funcion(*args, **kwargs)
+    return ejecutar
+
+
+async def _lectura(clave, cargar):
+    lecturas = _lecturas.get()
+    if lecturas is None:
+        return await cargar()
+    if clave not in lecturas:
+        lecturas[clave] = await cargar()
+    return lecturas[clave]
 
 
 def utc_tz():
@@ -34,9 +68,9 @@ def _parsear_hora(valor: str) -> time | None:
         return None
 
 
-def _tramos_del_dia(dia_local: date, tramos: list[dict[str, Any]]) -> list[tuple[datetime, datetime]]:
+def _tramos_del_dia(dia_local: date, tramos: list[dict[str, Any]], dias_laborables: list[int]) -> list[tuple[datetime, datetime]]:
     """Tramos laborables de un dia local, expresados en UTC."""
-    if dias_semana_index_local(dia_local) not in DIAS_LABORABLES_CACHE:
+    if dias_semana_index_local(dia_local) not in dias_laborables:
         return []
     tz = business_tz()
     utc = utc_tz()
@@ -54,16 +88,10 @@ def _tramos_del_dia(dia_local: date, tramos: list[dict[str, Any]]) -> list[tuple
     return ventana
 
 
-# Dias laborables del calendario institucional (se rellena por peticion)
-DIAS_LABORABLES_CACHE: list[int] = [1, 2, 3, 4, 5]
-
-
 async def _ventanas_laborables(desde_utc: datetime, hasta_utc: datetime) -> list[tuple[datetime, datetime]]:
     """Tramos laborables (en UTC) dentro de un rango, saltando dias no laborables."""
-    calendario = await config_service.calendario()
+    calendario = await _lectura('calendario', config_service.calendario)
     dias_laborables = [int(d) for d in (calendario.get("dias_laborables") or [0, 1, 2, 3, 4])]
-    DIAS_LABORABLES_CACHE.clear()
-    DIAS_LABORABLES_CACHE.extend(dias_laborables)
     tramos = calendario.get("tramos") or [{"entrada": "08:00", "salida": "18:00"}]
     excluir_feriados = not bool(calendario.get("incluir_feriados", False))
     tz = business_tz()
@@ -73,8 +101,8 @@ async def _ventanas_laborables(desde_utc: datetime, hasta_utc: datetime) -> list
     dia = desde_local
     while dia <= hasta_local:
         if dias_semana_index_local(dia) in dias_laborables:
-            if not (excluir_feriados and await horario_service.es_feriado(dia)):
-                for inicio, fin in _tramos_del_dia(dia, tramos):
+            if not (excluir_feriados and await _lectura(('feriado', dia), lambda: horario_service.es_feriado(dia))):
+                for inicio, fin in _tramos_del_dia(dia, tramos, dias_laborables):
                     ventana_inicio = max(inicio, desde_utc)
                     ventana_fin = min(fin, hasta_utc)
                     if ventana_fin > ventana_inicio:
@@ -83,11 +111,12 @@ async def _ventanas_laborables(desde_utc: datetime, hasta_utc: datetime) -> list
     return ventanas
 
 
+@_en_lote
 async def minutos_laborables_entre(desde_utc: datetime, hasta_utc: datetime) -> float:
     """Minutos de horario laboral entre dos instantes."""
     if hasta_utc <= desde_utc:
         return 0.0
-    if not await config_service.pausa_fuera_de_horario():
+    if not await _lectura('pausa', config_service.pausa_fuera_de_horario):
         return (hasta_utc - desde_utc).total_seconds() / 60
     total = 0.0
     for inicio, fin in await _ventanas_laborables(desde_utc, hasta_utc):
@@ -115,11 +144,12 @@ async def minutos_restantes_laborables(hasta_utc: datetime, desde_utc: datetime)
     return await minutos_laborables_entre(desde_utc, hasta_utc)
 
 
+@_en_lote
 async def sumar_minutos_laborables(desde_utc: datetime, minutos: float) -> datetime:
     """Instante en el que se acumulan ``minutos`` minutos laborables desde ``desde_utc``."""
     if minutos <= 0:
         return desde_utc
-    if not await config_service.pausa_fuera_de_horario():
+    if not await _lectura('pausa', config_service.pausa_fuera_de_horario):
         return desde_utc + timedelta(minutes=minutos)
     restantes = float(minutos)
     momento = desde_utc
@@ -146,11 +176,12 @@ async def sumar_minutos_laborables(desde_utc: datetime, minutos: float) -> datet
     return momento  # pragma: no cover - salvaguarda
 
 
+@_en_lote
 async def calcular_deadlines(prioridad: str, desde: datetime | None = None) -> dict[str, Any]:
     """Fechas limite de respuesta y resolucion para una prioridad dada."""
     inicio = desde or utcnow()
     regla = await config_service.regla_sla(prioridad)
-    pausa = await config_service.pausa_fuera_de_horario()
+    pausa = await _lectura('pausa', config_service.pausa_fuera_de_horario)
     if not pausa:
         responder_en = inicio + timedelta(hours=float(regla["horas_responder"]))
         resolver_en = inicio + timedelta(hours=float(regla["horas_resolver"]))
@@ -169,6 +200,7 @@ async def calcular_deadlines(prioridad: str, desde: datetime | None = None) -> d
     }
 
 
+@_en_lote
 async def estado_sla(ticket: dict[str, Any], *, momento: datetime | None = None) -> dict[str, Any]:
     """Estado del SLA de un ticket en formato listo para la interfaz.
 

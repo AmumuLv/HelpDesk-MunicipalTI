@@ -143,6 +143,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/dispositivos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Dispositivos */
+        get: operations["dispositivos_api_auth_dispositivos_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/dispositivos/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Cerrar Dispositivo */
+        delete: operations["cerrar_dispositivo_api_auth_dispositivos__session_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/preferencia-ia": {
         parameters: {
             query?: never;
@@ -176,6 +210,92 @@ export interface paths {
          * @description Datos publicos que el frontend necesita antes de iniciar sesion.
          */
         get: operations["configuracion_publica_api_publico_configuracion_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ia/chatbot/estado": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Estado */
+        get: operations["estado_api_ia_chatbot_estado_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ia/chatbot/conversaciones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Listar */
+        get: operations["listar_api_ia_chatbot_conversaciones_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ia/chatbot/conversaciones/{conversacion_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Obtener */
+        get: operations["obtener_api_ia_chatbot_conversaciones__conversacion_id__get"];
+        put?: never;
+        post?: never;
+        /** Eliminar */
+        delete: operations["eliminar_api_ia_chatbot_conversaciones__conversacion_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ia/chatbot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Consultar */
+        post: operations["consultar_api_ia_chatbot_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/equipos-oficina-tipos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tipos Equipos Oficina */
+        get: operations["tipos_equipos_oficina_api_portal_equipos_oficina_tipos_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -221,6 +341,29 @@ export interface paths {
         patch: operations["actualizar_zona_api_zonas__zona_id__patch"];
         trace?: never;
     };
+    "/api/zonas/{zona_id}/borrado": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Bloqueos Borrado Zona
+         * @description Qué se perdería al borrar la zona, antes de borrarla.
+         *
+         *     Lo pide el diálogo de confirmación. Usa la misma función que el borrado, así que
+         *     el aviso y la razón por la que se rechaza después no pueden decir cosas distintas.
+         */
+        get: operations["bloqueos_borrado_zona_api_zonas__zona_id__borrado_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/oficinas": {
         parameters: {
             query?: never;
@@ -256,6 +399,26 @@ export interface paths {
         head?: never;
         /** Actualizar Oficina */
         patch: operations["actualizar_oficina_api_oficinas__oficina_id__patch"];
+        trace?: never;
+    };
+    "/api/oficinas/{oficina_id}/borrado": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Bloqueos Borrado Oficina
+         * @description Qué se perdería al borrar la oficina, antes de borrarla. Ver la de zonas.
+         */
+        get: operations["bloqueos_borrado_oficina_api_oficinas__oficina_id__borrado_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/usuarios": {
@@ -302,7 +465,7 @@ export interface paths {
         };
         /**
          * Companeros
-         * @description Paso 2 del reporte: companeros de la misma oficina, con opcion de buscar en toda la institucion.
+         * @description El portal solo ofrece otras cuentas activas de la misma oficina.
          */
         get: operations["companeros_api_usuarios_companeros_get"];
         put?: never;
@@ -329,6 +492,130 @@ export interface paths {
         head?: never;
         /** Actualizar Usuario */
         patch: operations["actualizar_usuario_api_usuarios__usuario_id__patch"];
+        trace?: never;
+    };
+    "/api/usuarios/{usuario_id}/tickets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tickets Usuario */
+        get: operations["tickets_usuario_api_usuarios__usuario_id__tickets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/usuarios/{usuario_id}/inventario-historial": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Inventario Historial */
+        get: operations["inventario_historial_api_usuarios__usuario_id__inventario_historial_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/usuarios/{usuario_id}/destinos-ticket": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Destinos Ticket Persona */
+        get: operations["destinos_ticket_persona_api_usuarios__usuario_id__destinos_ticket_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/usuarios/{usuario_id}/dispositivos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Dispositivos Usuario */
+        get: operations["dispositivos_usuario_api_usuarios__usuario_id__dispositivos_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/usuarios/{usuario_id}/dispositivos/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Desconectar Usuario */
+        delete: operations["desconectar_usuario_api_usuarios__usuario_id__dispositivos__session_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/usuarios/{usuario_id}/foto": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Obtener Foto
+         * @description Devuelve la foto. 404 si la cuenta no tiene, que es lo que el avatar espera.
+         */
+        get: operations["obtener_foto_api_usuarios__usuario_id__foto_get"];
+        put?: never;
+        /** Subir Foto */
+        post: operations["subir_foto_api_usuarios__usuario_id__foto_post"];
+        /** Borrar Foto */
+        delete: operations["borrar_foto_api_usuarios__usuario_id__foto_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/usuarios/{usuario_id}/restablecer-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restablecer Password */
+        post: operations["restablecer_password_api_usuarios__usuario_id__restablecer_password_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/usuarios/{usuario_id}/desactivar": {
@@ -453,6 +740,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/activos/excel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Descargar Activos Excel
+         * @description El inventario registrado en el Excel del municipio: una hoja por zona.
+         *
+         *     Acepta los mismos filtros que el listado, así que lo que se descarga es lo que se
+         *     está viendo con los filtros puestos y no «todo» por sorpresa. El archivo usa las
+         *     columnas de la plantilla oficial, de modo que se puede volver a subir tal cual.
+         */
+        get: operations["descargar_activos_excel_api_activos_excel_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/activos/plantilla-manual": {
         parameters: {
             query?: never;
@@ -460,13 +771,30 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
-        put?: never;
         /**
          * Plantilla Registro Manual
          * @description Sugiere el siguiente nombre de conjunto y los componentes habituales.
          */
-        post: operations["plantilla_registro_manual_api_activos_plantilla_manual_post"];
+        get: operations["plantilla_registro_manual_api_activos_plantilla_manual_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/activos/duplicados": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Duplicados Activos */
+        get: operations["duplicados_activos_api_activos_duplicados_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -651,6 +979,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/equipos/de-persona/{usuario_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Equipos De Persona
+         * @description Los equipos de otra persona, para poder registrarle un caso.
+         *
+         *     El portal usa `/mis`, que es el de quien pregunta. Al registrar un caso de
+         *     otra persona hace falta lo mismo para ella, y **elegir de una lista** es lo
+         *     que evita tener que escribir el nombre del equipo: escribirlo busca por texto
+         *     sin anclar y «CPU» engancha un equipo cualquiera del edificio.
+         *
+         *     Requiere permiso de ver inventario, que es el mismo que hace falta para
+         *     entrar en Equipos.
+         */
+        get: operations["equipos_de_persona_api_equipos_de_persona__usuario_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/equipos/buscar": {
         parameters: {
             query?: never;
@@ -793,6 +1149,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/importacion/responsables-excel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Responsables Excel */
+        get: operations["responsables_excel_api_importacion_responsables_excel_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/importacion/responsables-excel/confirmar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirmar Responsables Excel */
+        post: operations["confirmar_responsables_excel_api_importacion_responsables_excel_confirmar_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/importacion/subir": {
         parameters: {
             query?: never;
@@ -817,7 +1207,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Obtener */
+        /**
+         * Obtener
+         * @description Ficha de un lote: qué archivo era, sus hojas, su mapeo y su resumen.
+         *
+         *     Pide `equipos.importar` como las demás rutas del lote. Antes solo exigía
+         *     estar conectado, así que cualquier cuenta —incluso una de persona
+         *     reportante— podía leer el nombre del archivo y la estructura de la hoja de
+         *     cálculo que importó el municipio. La ruta hermana `/resumen` ya lo exigía:
+         *     dos puertas al mismo dato, una con llave y otra sin ella.
+         */
         get: operations["obtener_api_importacion__lote_id__get"];
         put?: never;
         post?: never;
@@ -923,7 +1322,8 @@ export interface paths {
         get: operations["listar_api_importacion_get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /** Limpiar Historial */
+        delete: operations["limpiar_historial_api_importacion_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -961,6 +1361,23 @@ export interface paths {
          * @description Paso 1 + Paso 2 del reporte del usuario.
          */
         post: operations["crear_ticket_usuario_api_tickets_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tickets/{ticket_id}/tecnico-perfil": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Perfil Tecnico Asignado */
+        get: operations["perfil_tecnico_asignado_api_tickets__ticket_id__tecnico_perfil_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1037,6 +1454,23 @@ export interface paths {
         head?: never;
         /** Actualizar Ticket */
         patch: operations["actualizar_ticket_api_tickets__ticket_id__patch"];
+        trace?: never;
+    };
+    "/api/tickets/{ticket_id}/vinculos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Opciones Vinculo */
+        get: operations["opciones_vinculo_api_tickets__ticket_id__vinculos_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/tickets/{ticket_id}/asignar": {
@@ -1298,7 +1732,8 @@ export interface paths {
         get: operations["listar_notificaciones_api_notificaciones_get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /** Vaciar Notificaciones */
+        delete: operations["vaciar_notificaciones_api_notificaciones_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1316,6 +1751,23 @@ export interface paths {
         /** Leer Notificaciones */
         post: operations["leer_notificaciones_api_notificaciones_leer_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notificaciones/{notificacion_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Eliminar Notificacion */
+        delete: operations["eliminar_notificacion_api_notificaciones__notificacion_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1695,6 +2147,24 @@ export interface paths {
         put?: never;
         /** Valorar Articulo */
         post: operations["valorar_articulo_api_kb_articulos__articulo_id__valorar_post"];
+        /** Quitar Valoracion Articulo */
+        delete: operations["quitar_valoracion_articulo_api_kb_articulos__articulo_id__valorar_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/kb/articulos/{articulo_id}/me-gusta": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Personas Me Gusta */
+        get: operations["personas_me_gusta_api_kb_articulos__articulo_id__me_gusta_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1750,7 +2220,8 @@ export interface paths {
         delete: operations["eliminar_respuesta_rapida_api_kb_respuestas_rapidas__respuesta_id__delete"];
         options?: never;
         head?: never;
-        patch?: never;
+        /** Editar Respuesta Rapida */
+        patch: operations["editar_respuesta_rapida_api_kb_respuestas_rapidas__respuesta_id__patch"];
         trace?: never;
     };
     "/api/campanas": {
@@ -1771,6 +2242,81 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/campanas/anual/importar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Importar Inventario Anual */
+        post: operations["importar_inventario_anual_api_campanas_anual_importar_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/campanas/versiones/{version_id}/equipos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Equipos Version Anual */
+        get: operations["equipos_version_anual_api_campanas_versiones__version_id__equipos_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/campanas/versiones/{version_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Eliminar Archivo Anual */
+        delete: operations["eliminar_archivo_anual_api_campanas_versiones__version_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/campanas/previa": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Previa Campana
+         * @description Cuántos equipos entran en la campaña con ese alcance, **sin crearla**.
+         *
+         *     Responde a «¿qué significa "solo algunas zonas"?». Una descripción ayuda poco:
+         *     lo que responde de verdad es cuántas máquinas hay que ir a mirar en la sala,
+         *     y eso solo se sabe contando.
+         */
+        post: operations["previa_campana_api_campanas_previa_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/campanas/{campana_id}": {
         parameters: {
             query?: never;
@@ -1782,7 +2328,15 @@ export interface paths {
         get: operations["obtener_campana_api_campanas__campana_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Eliminar Campana
+         * @description Borra la campaña. El inventario no se toca.
+         *
+         *     Se escribe como `delete` y no como `post` porque es lo que es, y porque un botón
+         *     de «eliminar» tiene que poder detectarse con una petición que no se puede repetir
+         *     por accidente al recargar.
+         */
+        delete: operations["eliminar_campana_api_campanas__campana_id__delete"];
         options?: never;
         head?: never;
         /** Actualizar Campana */
@@ -1883,6 +2437,26 @@ export interface paths {
         };
         /** Historial Campanas */
         get: operations["historial_campanas_api_campanas_versiones_historico_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/campanas/versiones/{version_id}/excel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Descargar Version Excel
+         * @description El inventario de un año cerrado, en el Excel del municipio (una hoja por zona).
+         */
+        get: operations["descargar_version_excel_api_campanas_versiones__version_id__excel_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2059,7 +2633,8 @@ export interface paths {
         get: operations["auditoria_api_auditoria_get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /** Vaciar Auditoria */
+        delete: operations["vaciar_auditoria_api_auditoria_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2077,7 +2652,25 @@ export interface paths {
         put?: never;
         /** Crear Exportacion */
         post: operations["crear_exportacion_api_exportaciones_post"];
-        delete?: never;
+        /** Limpiar Reportes */
+        delete: operations["limpiar_reportes_api_exportaciones_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/exportaciones/{exportacion_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Eliminar Reporte */
+        delete: operations["eliminar_reporte_api_exportaciones__exportacion_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2228,6 +2821,8 @@ export interface components {
         };
         /** ArticuloActualizar */
         ArticuloActualizar: {
+            /** Visibilidad */
+            visibilidad?: ("todos" | "equipo_ti") | null;
             /** Titulo */
             titulo?: string | null;
             /** Categoria */
@@ -2249,6 +2844,12 @@ export interface components {
         };
         /** ArticuloCrear */
         ArticuloCrear: {
+            /**
+             * Visibilidad
+             * @default todos
+             * @enum {string}
+             */
+            visibilidad: "todos" | "equipo_ti";
             /** Titulo */
             titulo: string;
             /** Categoria */
@@ -2265,6 +2866,125 @@ export interface components {
             etiquetas?: string[];
             /** Relacionados */
             relacionados?: string[];
+            /**
+             * Activo
+             * @default true
+             */
+            activo: boolean;
+        };
+        /** ArticuloDetalle */
+        ArticuloDetalle: {
+            /**
+             * Me Gusta
+             * @default 0
+             */
+            me_gusta: number;
+            /**
+             * Visibilidad
+             * @default todos
+             * @enum {string}
+             */
+            visibilidad: "todos" | "equipo_ti";
+            /** Id */
+            id: string;
+            /** Titulo */
+            titulo: string;
+            /** Categoria */
+            categoria: string;
+            /** Resumen */
+            resumen: string;
+            /** Etiquetas */
+            etiquetas?: string[];
+            /** Pasos */
+            pasos?: string[];
+            /** Imagenes */
+            imagenes?: string[];
+            /** Relacionados */
+            relacionados?: string[];
+            /**
+             * Popularidad
+             * @default 0
+             */
+            popularidad: number;
+            /**
+             * Visualizaciones
+             * @default 0
+             */
+            visualizaciones: number;
+            /** Valoracion Promedio */
+            valoracion_promedio?: number | null;
+            /**
+             * Valoraciones
+             * @default 0
+             */
+            valoraciones: number;
+            /** Actualizado En */
+            actualizado_en?: string | null;
+            /**
+             * Activo
+             * @default true
+             */
+            activo: boolean;
+            /** Mi Valoracion */
+            mi_valoracion?: boolean | null;
+            /**
+             * Cuerpo
+             * @default
+             */
+            cuerpo: string;
+            /** Creado En */
+            creado_en?: string | null;
+            /** Creado Por */
+            creado_por?: string | null;
+        };
+        /** ArticuloResumen */
+        ArticuloResumen: {
+            /**
+             * Me Gusta
+             * @default 0
+             */
+            me_gusta: number;
+            /**
+             * Visibilidad
+             * @default todos
+             * @enum {string}
+             */
+            visibilidad: "todos" | "equipo_ti";
+            /** Id */
+            id: string;
+            /** Titulo */
+            titulo: string;
+            /** Categoria */
+            categoria: string;
+            /** Resumen */
+            resumen: string;
+            /** Etiquetas */
+            etiquetas?: string[];
+            /** Pasos */
+            pasos?: string[];
+            /** Imagenes */
+            imagenes?: string[];
+            /** Relacionados */
+            relacionados?: string[];
+            /**
+             * Popularidad
+             * @default 0
+             */
+            popularidad: number;
+            /**
+             * Visualizaciones
+             * @default 0
+             */
+            visualizaciones: number;
+            /** Valoracion Promedio */
+            valoracion_promedio?: number | null;
+            /**
+             * Valoraciones
+             * @default 0
+             */
+            valoraciones: number;
+            /** Actualizado En */
+            actualizado_en?: string | null;
             /**
              * Activo
              * @default true
@@ -2310,16 +3030,14 @@ export interface components {
             /** Archivo */
             archivo: string;
         };
-        /** Body_listar_tickets_api_tickets_get */
-        Body_listar_tickets_api_tickets_get: {
-            /** Estado */
-            estado?: string[] | null;
-            /** Prioridad */
-            prioridad?: string[] | null;
-            /** Categoria */
-            categoria?: string[] | null;
-            /** Origen */
-            origen?: string[] | null;
+        /** Body_importar_inventario_anual_api_campanas_anual_importar_post */
+        Body_importar_inventario_anual_api_campanas_anual_importar_post: {
+            /** Archivo */
+            archivo: string;
+            /** Anio */
+            anio: number;
+            /** Zona Csv */
+            zona_csv?: string | null;
         };
         /** Body_login_api_auth_login_post */
         Body_login_api_auth_login_post: {
@@ -2327,6 +3045,8 @@ export interface components {
             correo: string;
             /** Password */
             password: string;
+            /** Acceso */
+            acceso?: ("usuario" | "ti") | null;
         };
         /** Body_subir_adjunto_api_adjuntos_post */
         Body_subir_adjunto_api_adjuntos_post: {
@@ -2335,6 +3055,11 @@ export interface components {
         };
         /** Body_subir_api_importacion_subir_post */
         Body_subir_api_importacion_subir_post: {
+            /** Archivo */
+            archivo: string;
+        };
+        /** Body_subir_foto_api_usuarios__usuario_id__foto_post */
+        Body_subir_foto_api_usuarios__usuario_id__foto_post: {
             /** Archivo */
             archivo: string;
         };
@@ -2599,6 +3324,21 @@ export interface components {
             /** Zona Id */
             zona_id?: string | null;
         };
+        /** Consulta */
+        Consulta: {
+            /** Pregunta */
+            pregunta: string;
+            /** Historial */
+            historial?: components["schemas"]["Mensaje"][];
+            /** Pagina */
+            pagina?: string | null;
+            /** Filtros */
+            filtros?: {
+                [key: string]: string;
+            };
+            /** Conversacion Id */
+            conversacion_id?: string | null;
+        };
         /** ConversacionIA */
         ConversacionIA: {
             /** Id */
@@ -2758,6 +3498,30 @@ export interface components {
              */
             tipo: string;
         };
+        /** FiltrosAnalitica */
+        FiltrosAnalitica: {
+            /** Desde */
+            desde?: string | null;
+            /** Hasta */
+            hasta?: string | null;
+            /**
+             * Periodo
+             * @default 30d
+             */
+            periodo: string;
+            /** Zona Id */
+            zona_id?: string | null;
+            /** Oficina Id */
+            oficina_id?: string | null;
+            /** Categoria */
+            categoria?: string | null;
+            /** Tipo Activo */
+            tipo_activo?: string | null;
+            /** Tecnico Id */
+            tecnico_id?: string | null;
+            /** Equipo Id */
+            equipo_id?: string | null;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -2784,6 +3548,8 @@ export interface components {
             aceptar_todos: boolean;
             /** Estados Aceptados */
             estados_aceptados?: string[];
+            /** Estados Rechazados */
+            estados_rechazados?: string[];
         };
         /** Licencia */
         Licencia: {
@@ -2811,9 +3577,22 @@ export interface components {
                 [key: string]: unknown;
             }[];
         };
+        /** Mensaje */
+        Mensaje: {
+            /**
+             * Rol
+             * @enum {string}
+             */
+            rol: "user" | "assistant";
+            /** Texto */
+            texto: string;
+        };
         /** MensajeCrear */
         MensajeCrear: {
-            /** Cuerpo */
+            /**
+             * Cuerpo
+             * @default
+             */
             cuerpo: string;
             /** Adjuntos */
             adjuntos?: string[];
@@ -2827,9 +3606,13 @@ export interface components {
             /** Created At */
             created_at?: string | null;
             /** Fuentes */
-            fuentes?: {
-                [key: string]: unknown;
-            }[];
+            fuentes?: string[];
+            /** Enlaces */
+            enlaces?: {
+                [key: string]: string;
+            }[] | null;
+            /** Periodo */
+            periodo?: string | null;
             /** Tabla */
             tabla?: {
                 [key: string]: unknown;
@@ -2940,10 +3723,7 @@ export interface components {
         PreguntaIA: {
             /** Pregunta */
             pregunta: string;
-            /** Filtros */
-            filtros?: {
-                [key: string]: unknown;
-            };
+            filtros?: components["schemas"]["FiltrosAnalitica"];
             /** Conversacion Id */
             conversacion_id?: string | null;
         };
@@ -2977,13 +3757,26 @@ export interface components {
             /** Categoria */
             categoria?: string | null;
         };
+        /** RestablecerPassword */
+        RestablecerPassword: {
+            /** Password */
+            password: string;
+        };
         /**
          * SugerenciaAplicar
          * @description Aplicar, editar o descartar una recomendacion de IA.
+         *
+         *     `clave` es qué se decide (categoria, prioridad, tecnico_sugerido_id) y
+         *     `valor` con qué se queda. Es el contrato que usa la interfaz; `categoria` y
+         *     `prioridad` se aceptan sueltos para llamadas directas.
          */
         SugerenciaAplicar: {
             /** Accion */
             accion: string;
+            /** Clave */
+            clave?: string | null;
+            /** Valor */
+            valor?: string | null;
             /** Categoria */
             categoria?: string | null;
             /** Prioridad */
@@ -3012,6 +3805,12 @@ export interface components {
         };
         /** TicketActualizar */
         TicketActualizar: {
+            /** Version Esperada */
+            version_esperada?: string | null;
+            /** Alcance Incidencia */
+            alcance_incidencia?: ("equipo" | "conjunto" | "programa" | "servicio" | "pendiente") | null;
+            /** Sistema Afectado */
+            sistema_afectado?: string | null;
             /** Asunto */
             asunto?: string | null;
             /** Descripcion */
@@ -3027,6 +3826,8 @@ export interface components {
         };
         /** TicketManualCrear */
         TicketManualCrear: {
+            /** Sistema Afectado */
+            sistema_afectado?: string | null;
             persona?: components["schemas"]["PersonaBuscada"];
             /** Asunto */
             asunto: string;
@@ -3038,6 +3839,8 @@ export interface components {
             conjunto_id?: string | null;
             /** Activo No Identificado */
             activo_no_identificado?: string | null;
+            /** Activo Tipo */
+            activo_tipo?: string | null;
             /** Categoria */
             categoria?: string | null;
             /**
@@ -3057,6 +3860,10 @@ export interface components {
         };
         /** TicketUsuarioCrear */
         TicketUsuarioCrear: {
+            /** Reporte Para */
+            reporte_para?: ("propio" | "companero" | "oficina") | null;
+            /** Sistema Afectado */
+            sistema_afectado?: string | null;
             /** Tipo Problema */
             tipo_problema?: string | null;
             /** Descripcion */
@@ -3150,8 +3957,6 @@ export interface components {
             permisos?: {
                 [key: string]: boolean;
             } | null;
-            /** Password */
-            password?: string | null;
         };
         /** UsuarioCrear */
         UsuarioCrear: {
@@ -3535,6 +4340,72 @@ export interface operations {
             };
         };
     };
+    dispositivos_api_auth_dispositivos_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                ma_csrf?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cerrar_dispositivo_api_auth_dispositivos__session_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-CSRF-Token"?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: {
+                ma_csrf?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     leer_preferencia_ia_api_auth_preferencia_ia_get: {
         parameters: {
             query?: never;
@@ -3621,6 +4492,204 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    estado_api_ia_chatbot_estado_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                ma_csrf?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    listar_api_ia_chatbot_conversaciones_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                ma_csrf?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    obtener_api_ia_chatbot_conversaciones__conversacion_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversacion_id: string;
+            };
+            cookie?: {
+                ma_csrf?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    eliminar_api_ia_chatbot_conversaciones__conversacion_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-CSRF-Token"?: string | null;
+            };
+            path: {
+                conversacion_id: string;
+            };
+            cookie?: {
+                ma_csrf?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    consultar_api_ia_chatbot_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-CSRF-Token"?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                ma_csrf?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Consulta"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tipos_equipos_oficina_api_portal_equipos_oficina_tipos_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                ma_csrf?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -3804,6 +4873,39 @@ export interface operations {
             };
         };
     };
+    bloqueos_borrado_zona_api_zonas__zona_id__borrado_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                zona_id: string;
+            };
+            cookie?: {
+                ma_csrf?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     listar_oficinas_api_oficinas_get: {
         parameters: {
             query?: {
@@ -3963,6 +5065,39 @@ export interface operations {
                 "application/json": components["schemas"]["OficinaActualizar"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bloqueos_borrado_oficina_api_oficinas__oficina_id__borrado_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                oficina_id: string;
+            };
+            cookie?: {
+                ma_csrf?: string | null;
+            };
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -4178,6 +5313,327 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["UsuarioActualizar"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tickets_usuario_api_usuarios__usuario_id__tickets_get: {
+        parameters: {
+            query?: {
+                relacion?: "todos" | "creados" | "afectado" | "asignados";
+                estado?: string | null;
+                activo_id?: string | null;
+                conjunto_id?: string | null;
+                pagina?: number;
+                por_pagina?: number;
+            };
+            header?: never;
+            path: {
+                usuario_id: string;
+            };
+            cookie?: {
+                ma_csrf?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    inventario_historial_api_usuarios__usuario_id__inventario_historial_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                usuario_id: string;
+            };
+            cookie?: {
+                ma_csrf?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    destinos_ticket_persona_api_usuarios__usuario_id__destinos_ticket_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                usuario_id: string;
+            };
+            cookie?: {
+                ma_csrf?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dispositivos_usuario_api_usuarios__usuario_id__dispositivos_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                usuario_id: string;
+            };
+            cookie?: {
+                ma_csrf?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    desconectar_usuario_api_usuarios__usuario_id__dispositivos__session_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-CSRF-Token"?: string | null;
+            };
+            path: {
+                usuario_id: string;
+                session_id: string;
+            };
+            cookie?: {
+                ma_csrf?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    obtener_foto_api_usuarios__usuario_id__foto_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                usuario_id: string;
+            };
+            cookie?: {
+                ma_csrf?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    subir_foto_api_usuarios__usuario_id__foto_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-CSRF-Token"?: string | null;
+            };
+            path: {
+                usuario_id: string;
+            };
+            cookie?: {
+                ma_csrf?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_subir_foto_api_usuarios__usuario_id__foto_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    borrar_foto_api_usuarios__usuario_id__foto_delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-CSRF-Token"?: string | null;
+            };
+            path: {
+                usuario_id: string;
+            };
+            cookie?: {
+                ma_csrf?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restablecer_password_api_usuarios__usuario_id__restablecer_password_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-CSRF-Token"?: string | null;
+            };
+            path: {
+                usuario_id: string;
+            };
+            cookie?: {
+                ma_csrf?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RestablecerPassword"];
             };
         };
         responses: {
@@ -4498,12 +5954,14 @@ export interface operations {
                 propiedad?: string | null;
                 responsable_id?: string | null;
                 solo_uso_comun?: boolean | null;
+                responsables_pendientes?: boolean | null;
                 solo_faltantes?: boolean | null;
                 solo_opciones_avanzadas?: boolean | null;
                 conjunto_id?: string | null;
                 texto?: string | null;
                 pagina?: number;
                 por_pagina?: number;
+                orden?: "ubicacion" | "nombre_equipo" | "tipo" | "marca" | "estado" | "actualizado_en" | "creado_en";
                 vista?: string;
             };
             header?: never;
@@ -4571,10 +6029,85 @@ export interface operations {
             };
         };
     };
-    plantilla_registro_manual_api_activos_plantilla_manual_post: {
+    descargar_activos_excel_api_activos_excel_get: {
+        parameters: {
+            query?: {
+                zona_id?: string | null;
+                oficina_id?: string | null;
+                tipo?: string | null;
+                estado?: string | null;
+                texto?: string | null;
+                solo_faltantes?: boolean;
+                solo_uso_comun?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                ma_csrf?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    plantilla_registro_manual_api_activos_plantilla_manual_get: {
         parameters: {
             query: {
                 oficina_id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                ma_csrf?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    duplicados_activos_api_activos_duplicados_get: {
+        parameters: {
+            query?: {
+                codigo_patrimonial?: string | null;
+                direccion_ip?: string | null;
+                direccion_mac?: string | null;
+                excluir_id?: string | null;
             };
             header?: never;
             path?: never;
@@ -5035,6 +6568,39 @@ export interface operations {
             };
         };
     };
+    equipos_de_persona_api_equipos_de_persona__usuario_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                usuario_id: string;
+            };
+            cookie?: {
+                ma_csrf?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     buscar_equipos_api_equipos_buscar_get: {
         parameters: {
             query?: {
@@ -5277,6 +6843,76 @@ export interface operations {
             };
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    responsables_excel_api_importacion_responsables_excel_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                ma_csrf?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirmar_responsables_excel_api_importacion_responsables_excel_confirmar_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-CSRF-Token"?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                ma_csrf?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -5598,6 +7234,41 @@ export interface operations {
             };
         };
     };
+    limpiar_historial_api_importacion_delete: {
+        parameters: {
+            query?: {
+                conservar_lote?: string | null;
+            };
+            header?: {
+                "X-CSRF-Token"?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                ma_csrf?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     resumen_api_importacion__lote_id__resumen_get: {
         parameters: {
             query?: never;
@@ -5634,10 +7305,15 @@ export interface operations {
     listar_tickets_api_tickets_get: {
         parameters: {
             query?: {
+                conjunto_id?: string | null;
+                estado?: string[] | null;
+                prioridad?: string[] | null;
+                categoria?: string[] | null;
                 zona_id?: string | null;
                 oficina_id?: string | null;
                 tecnico_id?: string | null;
                 activo_id?: string | null;
+                origen?: string[] | null;
                 sla?: string | null;
                 texto?: string | null;
                 fecha_desde?: string | null;
@@ -5655,11 +7331,7 @@ export interface operations {
                 ma_csrf?: string | null;
             };
         };
-        requestBody?: {
-            content: {
-                "application/json": components["schemas"]["Body_listar_tickets_api_tickets_get"];
-            };
-        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -5700,6 +7372,39 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    perfil_tecnico_asignado_api_tickets__ticket_id__tecnico_perfil_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticket_id: string;
+            };
+            cookie?: {
+                ma_csrf?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -5868,6 +7573,39 @@ export interface operations {
                 "application/json": components["schemas"]["TicketActualizar"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    opciones_vinculo_api_tickets__ticket_id__vinculos_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticket_id: string;
+            };
+            cookie?: {
+                ma_csrf?: string | null;
+            };
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -6576,6 +8314,39 @@ export interface operations {
             };
         };
     };
+    vaciar_notificaciones_api_notificaciones_delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-CSRF-Token"?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                ma_csrf?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     leer_notificaciones_api_notificaciones_leer_post: {
         parameters: {
             query?: {
@@ -6585,6 +8356,41 @@ export interface operations {
                 "X-CSRF-Token"?: string | null;
             };
             path?: never;
+            cookie?: {
+                ma_csrf?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    eliminar_notificacion_api_notificaciones__notificacion_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-CSRF-Token"?: string | null;
+            };
+            path: {
+                notificacion_id: string;
+            };
             cookie?: {
                 ma_csrf?: string | null;
             };
@@ -7376,6 +9182,7 @@ export interface operations {
                 pagina?: number;
                 por_pagina?: number;
                 orden?: string;
+                visibilidad?: string | null;
             };
             header?: never;
             path?: never;
@@ -7428,7 +9235,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["ArticuloResumen"];
                 };
             };
             /** @description Validation Error */
@@ -7461,7 +9268,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["ArticuloDetalle"];
                 };
             };
             /** @description Validation Error */
@@ -7535,7 +9342,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["ArticuloResumen"];
                 };
             };
             /** @description Validation Error */
@@ -7567,6 +9374,77 @@ export interface operations {
                 "application/json": components["schemas"]["ValorarArticulo"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    quitar_valoracion_articulo_api_kb_articulos__articulo_id__valorar_delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-CSRF-Token"?: string | null;
+            };
+            path: {
+                articulo_id: string;
+            };
+            cookie?: {
+                ma_csrf?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    personas_me_gusta_api_kb_articulos__articulo_id__me_gusta_get: {
+        parameters: {
+            query?: {
+                pagina?: number;
+                por_pagina?: number;
+            };
+            header?: never;
+            path: {
+                articulo_id: string;
+            };
+            cookie?: {
+                ma_csrf?: string | null;
+            };
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -7722,6 +9600,45 @@ export interface operations {
             };
         };
     };
+    editar_respuesta_rapida_api_kb_respuestas_rapidas__respuesta_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-CSRF-Token"?: string | null;
+            };
+            path: {
+                respuesta_id: string;
+            };
+            cookie?: {
+                ma_csrf?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RespuestaRapida"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     listar_campanas_api_campanas_get: {
         parameters: {
             query?: never;
@@ -7790,10 +9707,193 @@ export interface operations {
             };
         };
     };
+    importar_inventario_anual_api_campanas_anual_importar_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-CSRF-Token"?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                ma_csrf?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_importar_inventario_anual_api_campanas_anual_importar_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    equipos_version_anual_api_campanas_versiones__version_id__equipos_get: {
+        parameters: {
+            query?: {
+                pagina?: number;
+                por_pagina?: number;
+                texto?: string;
+            };
+            header?: never;
+            path: {
+                version_id: string;
+            };
+            cookie?: {
+                ma_csrf?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    eliminar_archivo_anual_api_campanas_versiones__version_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-CSRF-Token"?: string | null;
+            };
+            path: {
+                version_id: string;
+            };
+            cookie?: {
+                ma_csrf?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    previa_campana_api_campanas_previa_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-CSRF-Token"?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                ma_csrf?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     obtener_campana_api_campanas__campana_id__get: {
         parameters: {
             query?: never;
             header?: never;
+            path: {
+                campana_id: string;
+            };
+            cookie?: {
+                ma_csrf?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    eliminar_campana_api_campanas__campana_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-CSRF-Token"?: string | null;
+            };
             path: {
                 campana_id: string;
             };
@@ -8069,6 +10169,39 @@ export interface operations {
             query?: never;
             header?: never;
             path?: never;
+            cookie?: {
+                ma_csrf?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    descargar_version_excel_api_campanas_versiones__version_id__excel_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version_id: string;
+            };
             cookie?: {
                 ma_csrf?: string | null;
             };
@@ -8471,6 +10604,39 @@ export interface operations {
             };
         };
     };
+    vaciar_auditoria_api_auditoria_delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-CSRF-Token"?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                ma_csrf?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     listar_exportaciones_api_exportaciones_get: {
         parameters: {
             query?: never;
@@ -8518,6 +10684,74 @@ export interface operations {
                 "application/json": components["schemas"]["ExportarSolicitud"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    limpiar_reportes_api_exportaciones_delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-CSRF-Token"?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                ma_csrf?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    eliminar_reporte_api_exportaciones__exportacion_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-CSRF-Token"?: string | null;
+            };
+            path: {
+                exportacion_id: string;
+            };
+            cookie?: {
+                ma_csrf?: string | null;
+            };
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

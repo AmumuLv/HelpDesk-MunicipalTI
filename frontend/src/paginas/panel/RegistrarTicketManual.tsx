@@ -18,6 +18,7 @@ import { useAjustesTicket, useBuscarUsuarios, useTecnicos } from '../../api/hook
 import type { CuerpoTicketManual, TicketCreado } from '../../api/tipos'
 import { Button } from '../../componentes/base/Button'
 import { SelectorDestinoIncidencia, categoriaDePc, type OpcionesDestino } from '../../componentes/dominio/DestinoIncidencia'
+import { claveSolicitud } from '../../api/solicitudes'
 import { Input, Select, Textarea } from '../../componentes/base/Campo'
 import { PageHeader, Panel, PantallaFormulario } from '../../componentes/base/Estructura'
 import { useAvisos } from '../../estado/Avisos'
@@ -46,6 +47,7 @@ export function RegistrarTicketManual() {
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const bloqueoEnvio = useRef(false)
+  const solicitud = useRef({ firma: '', clave: '' })
   const rutaDestinos = personaId ? `/usuarios/${personaId}/destinos-ticket` : undefined
   const destinos = useQuery({ queryKey: ['destinos-ticket', rutaDestinos], queryFn: () => api.obtener<OpcionesDestino>(rutaDestinos!), enabled: Boolean(rutaDestinos) })
   const equipoElegido = destinos.data?.equipos.find(e => e.id === equipoId)
@@ -121,7 +123,7 @@ export function RegistrarTicketManual() {
         ...(conjuntoId ? { conjunto_id: conjuntoId } : {}),
         ...(programaNombre ? { sistema_afectado: programaNombre } : {}),
       }
-      const creado = await api.crear<TicketCreado>('/tickets/manual', cuerpo)
+      const creado = await api.crear<TicketCreado>('/tickets/manual', cuerpo, { headers: { 'Idempotency-Key': claveSolicitud(solicitud.current, cuerpo) } })
       await consultas.invalidateQueries({ queryKey: ['tickets'] })
       avisos.exito('Ticket creado', `Código ${creado.ticket.codigo}`)
       navegar(`/panel/tickets/${creado.ticket.id}`)

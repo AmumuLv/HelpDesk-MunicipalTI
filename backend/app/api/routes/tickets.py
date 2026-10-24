@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Annotated, Any
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
 from fastapi.responses import JSONResponse
@@ -49,6 +50,16 @@ DependeCerrar = Annotated[None, Depends(requiere("tickets.cerrar_reabrir"))]
 DependeEliminar = Annotated[None, Depends(requiere("tickets.eliminar"))]
 
 
+def _datos_envio(datos: dict, request: Request) -> dict:
+    clave = request.headers.get('Idempotency-Key')
+    if clave:
+        try:
+            datos['_solicitud_id'] = str(UUID(clave))
+        except ValueError:
+            raise Validacion('El identificador del envío no es válido.')
+    return datos
+
+
 def _ip(request: Request) -> str:
     directo = request.headers.get("x-real-ip")
     if directo:
@@ -64,7 +75,7 @@ async def crear_ticket_usuario(
 ):
     """Paso 1 + Paso 2 del reporte del usuario."""
     ticket = await ticket_service.crear_desde_usuario(
-        datos.model_dump(), usuario=sesion.usuario, ip=_ip(request)
+        _datos_envio(datos.model_dump(), request), usuario=sesion.usuario, ip=_ip(request)
     )
     detalle = await ticket_service.obtener(ticket["_id"], usuario=sesion.usuario)
     esperado = _tiempo_esperado(detalle)
@@ -117,7 +128,7 @@ async def crear_ticket_manual(
     datos: TicketManualCrear, request: Request, sesion: DependeUsuarioCsrf
 ):
     sesion.exigir_tecnico()
-    ticket = await ticket_service.crear_manual(datos.model_dump(), usuario=sesion.usuario, ip=_ip(request))
+    ticket = await ticket_service.crear_manual(_datos_envio(datos.model_dump(), request), usuario=sesion.usuario, ip=_ip(request))
     detalle = await ticket_service.obtener(ticket["_id"], usuario=sesion.usuario)
     return {
         "ticket": {k: detalle.get(k) for k in ("id", "codigo", "estado", "prioridad", "tiene_chat", "afectado_nombre")},
