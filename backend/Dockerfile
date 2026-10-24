@@ -25,7 +25,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 COPY requirements.txt constraints.txt ./
-RUN pip install --no-cache-dir -c constraints.txt -r requirements.txt
+RUN python -m pip install --no-cache-dir --upgrade -c constraints.txt pip \
+    && pip install --no-cache-dir -c constraints.txt -r requirements.txt
 
 COPY . .
 
@@ -52,4 +53,4 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload
 # ── prod ─────────────────────────────────────────────────────
 FROM base AS prod
 ENV APP_ENV=production PYTHONPATH=/app
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*", "--ws-max-size", "8192", "--ws-max-queue", "8"]

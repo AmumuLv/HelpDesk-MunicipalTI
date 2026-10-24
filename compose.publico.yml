@@ -1,0 +1,15 @@
+# Preparación para Internet. Requiere dominio propio y DNS dirigido al servidor.
+# docker compose -f docker-compose.yml -f compose.publico.yml up -d --build --wait
+services:
+  api:
+    ports: !reset []
+    environment:
+      COOKIE_SECURE: "true"
+      CORS_ORIGINS: "https://${PUBLIC_DOMAIN:?Define PUBLIC_DOMAIN con tu dominio, sin protocolo ni rutas}"
+  web:
+    ports: !reset []
+  mongo:
+    ports: !reset []
+  proxy:
+    environment:
+      SITE_ADDRESS: "${PUBLIC_DOMAIN:?Define PUBLIC_DOMAIN con tu dominio, sin protocolo ni rutas}"

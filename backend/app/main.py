@@ -85,9 +85,9 @@ app = FastAPI(
         "inventario de equipos con estado por campo, campanas de inventario anual, SLA con "
         "calendario laboral y analitica con IA que propone y la persona decide."
     ),
-    docs_url="/api/docs",
-    redoc_url="/api/redoc",
-    openapi_url="/api/openapi.json",
+    docs_url=None if settings.is_production else "/api/docs",
+    redoc_url=None if settings.is_production else "/api/redoc",
+    openapi_url=None if settings.is_production else "/api/openapi.json",
     default_response_class=JSONApiResponse,
     lifespan=lifespan,
 )
@@ -144,4 +144,4 @@ async def health() -> dict[str, Any]:
 
 @app.get("/", include_in_schema=False)
 async def raiz() -> dict[str, str]:
-    return {"servicio": settings.app_name, "api": settings.api_prefix, "documentacion": f"{settings.api_prefix}/docs"}
+    return {"servicio": settings.app_name, "api": settings.api_prefix, **({"documentacion": f"{settings.api_prefix}/docs"} if not settings.is_production else {})}

@@ -33,12 +33,6 @@ DependeUsuarioCsrf = Annotated[SesionActual, Depends(exigir_csrf)]
 
 
 def _ip(request: Request) -> str:
-    directo = request.headers.get("x-real-ip")
-    if directo:
-        return directo
-    encadenado = request.headers.get("x-forwarded-for")
-    if encadenado:
-        return encadenado.split(",")[0].strip()
     return request.client.host if request.client else "local"
 
 

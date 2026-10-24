@@ -91,12 +91,8 @@ class SesionActual:
 
 
 def _ip(request: Request) -> str | None:
-    directo = request.headers.get("x-real-ip")
-    if directo:
-        return directo
-    encadenado = request.headers.get("x-forwarded-for")
-    if encadenado:
-        return encadenado.split(",")[0].strip()
+    # Uvicorn resuelve el proxy de confianza; las cabeceras del navegador no
+    # deben permitir eludir límites cambiando X-Real-IP en cada solicitud.
     return request.client.host if request.client else None
 
 

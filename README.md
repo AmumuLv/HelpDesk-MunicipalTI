@@ -176,6 +176,18 @@ servicios aislados, genera 5.000 equipos ficticios y comprueba un traslado real 
 otra base y volumen. El archivo temporal de traslado se elimina al terminar.
 El último comando elimina exclusivamente los volúmenes de pruebas.
 
+La carga sostenida se comprobó durante 30 minutos con seis sesiones y 5.000
+equipos ficticios: 9.926 solicitudes, cero errores, 29 altas y 12 renovaciones
+de sesión. El percentil 95 global fue 369 ms y la memoria final observada de la
+API fue 153 MiB; no hubo crecimiento sostenido durante este ensayo local.
+Se ejecutaron otras comprobaciones en paralelo, por lo que no es una medición
+de capacidad exclusiva ni una prueba de varias horas.
+
+Para repetirla: `python tools/prueba_sostenida.py --ejecutar --minutos 30`;
+para dos horas, usa `--minutos 120`. Requiere la API aislada iniciada. Las pruebas
+reales de proveedor se describen en `docs/CHATBOT_TI.md`; la preparación HTTPS
+y las comprobaciones de publicación, en `docs/INSTALAR_Y_TRASLADAR.md`.
+
 
 ---
 

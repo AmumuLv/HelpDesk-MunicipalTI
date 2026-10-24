@@ -157,6 +157,50 @@ Ese comando solo elimina los servicios efímeros del archivo de pruebas.
 
 ## Publicación y secretos
 
+Para Internet se preparó `compose.publico.yml`. Configura `PUBLIC_DOMAIN` en
+`.env` con un dominio propio, sin protocolo ni rutas, y dirige su DNS al servidor.
+El dominio debe ser accesible en los puertos 80 y 443 para emitir el certificado:
+
+```bash
+docker compose -f docker-compose.yml -f compose.publico.yml up -d --build --wait
+```
+
+Ese modo habilita cookies Secure, permite CORS únicamente desde el dominio y
+retira los puertos directos de MongoDB, API y frontend. El acceso pasa por Caddy.
+En el modo local, los puertos de herramientas de API y frontend escuchan solo
+en 127.0.0.1; para entrar desde otro equipo se utiliza el proxy, no el puerto 8080.
+No actives el modo público sobre HTTP: el navegador no enviaría las cookies Secure.
+Antes de abrirlo, verifica el certificado real del dominio y la conexión desde
+la red donde se usará. Las pruebas locales con CA propia no certifican ese dominio.
+
+La documentación interactiva y el esquema OpenAPI están desactivados en
+producción; se conservan en desarrollo y en la API de pruebas. El chat autentica
+el socket en su primer mensaje, sin incluir el token en la URL, y revalida la
+sesión y el acceso antes de enviar eventos. La CSP permite scripts propios y
+mantiene imágenes, audio y temas; los logs del proxy retiran parámetros de token.
+
+La revisión comprobó 62 paquetes Python y la auditoría completa npm sin avisos
+pendientes después de actualizar dependencias. Se aprobaron 89 pruebas del
+servidor (más 4 subpruebas), 16 casos de navegador en cuatro motores/perfiles y
+un recorrido HTTPS con certificado de prueba verificado, cookies Secure/HttpOnly,
+CORS ajeno rechazado, CSRF obligatorio y cierre de WebSocket tras revocar sesión.
+Esto cubre dependencias de aplicación y configuración; no es un escaneo completo
+del sistema operativo ni una certificación de seguridad de una instalación remota.
+
+Los ensayos se repiten con:
+
+```bash
+docker compose -f compose.pruebas.yml --profile seguridad up -d --wait api-seguridad web-seguridad proxy-seguridad
+python tools/verificar_publicacion.py --ejecutar
+python tools/auditar_dependencias.py
+```
+
+El perfil seguridad usa datos ficticios y una CA efímera dentro de sus
+contenedores. No instala certificados de confianza en Windows. El navegador de
+la sonda fija la clave pública del certificado previamente validado por Python.
+El antivirus de adjuntos es opcional y no se activó durante estos ensayos;
+la revisión de tipo y tamaño de archivos no sustituye un análisis antimalware.
+
 El repositorio es independiente del Escritorio. Antes de cada publicación:
 
 ```bash

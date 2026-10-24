@@ -39,7 +39,7 @@ services:
       timeout: 3s
       retries: 30
   tests:
-    build: {context: ./backend, target: develop}
+    build: {context: ./backend, target: develop, network: "${BUILD_NETWORK:-default}"}
     image: helpdesk-pruebas-api
     profiles: [suite]
     depends_on:
@@ -55,7 +55,7 @@ services:
     volumes: [./backend:/app:ro]
     command: [python, -m, pytest, -ra, --tb=short, --show-capture=no, -p, "no:cacheprovider"]
   api: &api-pruebas
-    build: {context: ./backend, target: develop}
+    build: {context: ./backend, target: develop, network: "${BUILD_NETWORK:-default}"}
     image: helpdesk-pruebas-api
     profiles: [navegador]
     depends_on:
@@ -78,6 +78,40 @@ services:
     ports: ["127.0.0.1:18101:8000"]
     volumes: [./backend:/app:ro, datos-restauracion:/data]
     command: [uvicorn, app.main:app, --host, 0.0.0.0, --port, "8000"]
+  api-seguridad:
+    <<: *api-pruebas
+    profiles: [seguridad]
+    environment:
+      <<: *entorno
+      APP_ENV: production
+      MONGO_DB: helpdesk_test_navegador
+      REDIS_URL: redis://redis:6379/6
+      COOKIE_SECURE: "true"
+      CORS_ORIGINS: "https://localhost:18111"
+    ports: ["127.0.0.1:18102:8000"]
+    volumes: [./backend:/app:ro, datos-api:/data]
+    command: [uvicorn, app.main:app, --host, 0.0.0.0, --port, "8000", --proxy-headers, --forwarded-allow-ips, "*", --ws-max-size, "8192", --ws-max-queue, "8"]
+  web-seguridad:
+    image: mesa-ayuda-web
+    profiles: [seguridad]
+    depends_on:
+      api-seguridad: {condition: service_healthy}
+  proxy-seguridad:
+    image: caddy:2-alpine
+    profiles: [seguridad]
+    depends_on: [web-seguridad]
+    environment:
+      SITE_ADDRESS: localhost
+      API_UPSTREAM: api-seguridad:8000
+      WEB_UPSTREAM: web-seguridad:80
+    ports: ["127.0.0.1:18110:80", "127.0.0.1:18111:443"]
+    volumes: [./deploy/Caddyfile:/etc/caddy/Caddyfile:ro]
+    tmpfs: [/data, /config]
+    healthcheck:
+      test: [CMD, test, -f, /data/caddy/pki/authorities/local/root.crt]
+      interval: 2s
+      timeout: 3s
+      retries: 30
 
 volumes:
   mongo-pruebas:

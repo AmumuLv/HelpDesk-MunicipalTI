@@ -38,9 +38,11 @@ export function useTiempoReal(canal: 'notificaciones' | 'ticket', ticketId?: str
       const ruta = canal === 'ticket' ? `/ws/ticket/${encodeURIComponent(ticketId!)}` : '/ws/notificaciones'
       const url = new URL(rutaApi(ruta), window.location.origin)
       url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
-      url.searchParams.set('token', token)
       socket = new WebSocket(url)
-      socket.onopen = () => { intentos = 0; ultimaActividad = Date.now(); actualizar(['*']) }
+      socket.onopen = () => {
+        socket?.send(JSON.stringify({ tipo: 'autenticar', token }))
+        intentos = 0; ultimaActividad = Date.now(); actualizar(['*'])
+      }
       socket.onmessage = mensaje => {
         ultimaActividad = Date.now()
         try {

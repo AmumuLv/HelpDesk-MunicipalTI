@@ -11,7 +11,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect
 
 from app.api.deps import DependeUsuario, SesionActual, exigir_csrf
-from app.core.db import get_redis
+from app.core.db import get_db, get_redis
 from app.core.errors import AppError
 from app.core.ids import a_id
 from app.services import auth_service, notificaciones_service, ticket_service
@@ -62,8 +62,10 @@ async def eliminar_notificacion(notificacion_id: str, sesion: SesionActual = Dep
 class ConexionSocket:
     """Suscripcion de un cliente a los canales de Redis que le importan."""
 
-    def __init__(self, websocket: WebSocket):
+    def __init__(self, websocket: WebSocket, acceso: str | None = None, ticket_id=None):
         self.websocket = websocket
+        self.acceso = acceso
+        self.ticket_id = ticket_id
         self.pubsub = None
         self.cola: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=256)
 
@@ -79,6 +81,8 @@ class ConexionSocket:
                     mensaje = await asyncio.wait_for(self.cola.get(), timeout=20)
                 except asyncio.TimeoutError:
                     mensaje = {'tipo': 'latido'}
+                if not await self.autorizado():
+                    return
                 await self.websocket.send_json(mensaje)
 
         async def recibir():
@@ -123,9 +127,31 @@ class ConexionSocket:
     async def enviar(self, dato: dict[str, Any]) -> None:
         await self.cola.put(dato)
 
+    async def autorizado(self) -> bool:
+        if self.acceso is None:
+            return True
+        try:
+            sesion = await auth_service.payload_sesion(self.acceso)
+            if self.ticket_id is not None:
+                ticket = await get_db().tickets.find_one({'_id': self.ticket_id, 'eliminado': {'$ne': True}})
+                if ticket is None:
+                    raise ValueError('Ticket no disponible')
+                ticket_service._verificar_acceso(ticket, sesion['usuario'])
+        except Exception:
+            await self.websocket.close(code=4401, reason='Sesion o acceso no valido')
+            return False
+        return True
 
-async def _autenticar(websocket: WebSocket, token: str | None) -> dict[str, Any] | None:
-    if not token:
+
+async def _autenticar(websocket: WebSocket) -> dict[str, Any] | None:
+    # El token viaja en el primer mensaje, nunca en la URL ni en access logs.
+    try:
+        dato = await asyncio.wait_for(websocket.receive_json(), timeout=5)
+    except (asyncio.TimeoutError, ValueError, KeyError, TypeError, WebSocketDisconnect, RuntimeError):
+        await websocket.close(code=4401, reason="Falta autenticacion")
+        return None
+    token = dato.get('token') if isinstance(dato, dict) and dato.get('tipo') == 'autenticar' else None
+    if not isinstance(token, str) or not token or len(token) > 4096:
         await websocket.close(code=4401, reason="Sin token")
         return None
     try:
@@ -136,14 +162,15 @@ async def _autenticar(websocket: WebSocket, token: str | None) -> dict[str, Any]
     except Exception:  # pragma: no cover
         await websocket.close(code=4401, reason="Sesion no valida")
         return None
+    websocket.state.acceso = token
     return payload["usuario"]
 
 
 @router.websocket("/ws/ticket/{ticket_id}")
-async def websocket_ticket(websocket: WebSocket, ticket_id: str, token: str | None = Query(default=None)) -> None:
+async def websocket_ticket(websocket: WebSocket, ticket_id: str) -> None:
     """Canal del chat de un ticket. Si el ticket no tiene chat, se cierra con el motivo."""
     await websocket.accept()
-    usuario = await _autenticar(websocket, token)
+    usuario = await _autenticar(websocket)
     if usuario is None:
         return
     objetivo = a_id(ticket_id)
@@ -161,7 +188,7 @@ async def websocket_ticket(websocket: WebSocket, ticket_id: str, token: str | No
         )
         await websocket.close(code=4400, reason="sin_chat")
         return
-    conexion = ConexionSocket(websocket)
+    conexion = ConexionSocket(websocket, websocket.state.acceso, objetivo)
     canales = [
         notificaciones_service.CANAL_TICKET.format(ticket_id=objetivo),
         notificaciones_service.CANAL_USUARIO.format(usuario_id=usuario["_id"]),
@@ -170,11 +197,11 @@ async def websocket_ticket(websocket: WebSocket, ticket_id: str, token: str | No
 
 
 @router.websocket("/ws/notificaciones")
-async def websocket_notificaciones(websocket: WebSocket, token: str | None = Query(default=None)) -> None:
+async def websocket_notificaciones(websocket: WebSocket) -> None:
     await websocket.accept()
-    usuario = await _autenticar(websocket, token)
+    usuario = await _autenticar(websocket)
     if usuario is None:
         return
-    conexion = ConexionSocket(websocket)
+    conexion = ConexionSocket(websocket, websocket.state.acceso)
     from app.services.sincronizacion_service import CANAL
     await conexion.run([notificaciones_service.CANAL_USUARIO.format(usuario_id=usuario["_id"]), notificaciones_service.CANAL_CONFIG_IA, CANAL])

@@ -1,5 +1,22 @@
 # Groq: proveedor actual del chatbot TI
 
+## Verificación con proveedor real
+
+Se probaron orientación técnica, total real de inventario y peticiones de borrado
+y de secretos sobre una base independiente con datos ficticios. Groq devolvió
+el total verificable de 5.028 equipos y rechazó borrar tickets o revelar claves;
+los registros no cambiaron. Las cuatro consultas consumieron 14.750 tokens.
+La primera salida HTTPS desde la red puente de Docker fallaba; el diagnóstico
+por red host funcionó. Después de reiniciar Docker Desktop se repitió una
+consulta por la red normal y funcionó, consumiendo otros 2.845 tokens.
+
+Para repetirlo, inicia antes la API de `compose.pruebas.yml` y ejecuta
+`python tools/verificar_ia_real.py --ejecutar`. Usa `--casos orientacion` para
+una sola consulta. La clave se lee del servidor, pasa por memoria y stdin y no
+se imprime ni se guarda en archivos. La sonda crea únicamente una base ficticia
+separada y no llena los chats de las cuentas reales. Estas pruebas sí consumen
+cuota del proveedor; la carga sostenida y las suites habituales no la consumen.
+
 ## Consultas de datos: motor interno de análisis
 
 Las respuestas nuevas de este asistente aparecen con escritura progresiva local,
