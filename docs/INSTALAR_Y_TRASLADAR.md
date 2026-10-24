@@ -190,6 +190,7 @@ del sistema operativo ni una certificación de seguridad de una instalación rem
 Los ensayos se repiten con:
 
 ```bash
+docker compose build api worker web proxy
 docker compose -f compose.pruebas.yml --profile seguridad up -d --wait api-seguridad web-seguridad proxy-seguridad
 python tools/verificar_publicacion.py --ejecutar
 python tools/auditar_dependencias.py
@@ -200,6 +201,38 @@ contenedores. No instala certificados de confianza en Windows. El navegador de
 la sonda fija la clave pública del certificado previamente validado por Python.
 El antivirus de adjuntos es opcional y no se activó durante estos ensayos;
 la revisión de tipo y tamaño de archivos no sustituye un análisis antimalware.
+
+### Auditoría de las imágenes Docker
+
+La revisión de Python y JavaScript no incluye todas las bibliotecas del sistema
+operativo ni las que vienen incorporadas en otras herramientas. También se
+comprobó este nivel con Docker Scout. Las imágenes reconstruidas de web y proxy
+no presentaron avisos altos o críticos en el escaneo realizado; Redis actualizado
+tampoco. Esto no significa que todos los servicios estén libres de vulnerabilidades.
+
+La imagen del backend mantiene siete avisos altos en bibliotecas Debian
+(`cjson`, `libxml2`, `zlib` y `harfbuzz`) que el escáner señala sin versión
+corregida para esa distribución. La imagen oficial MongoDB 8.0 auditada mantiene
+avisos altos y críticos en componentes incluidos, entre ellos las herramientas
+Go y `js-yaml`. No se deben omitir estos avisos al decidir una publicación en
+Internet: requieren revisar alcance, actualizaciones y mitigaciones. MongoDB y
+Redis permanecen fuera de los puertos públicos de la configuración de publicación.
+
+Se actualizó Nginx a 1.30.6 y se retiraron curl y módulos dinámicos que esta web
+no utiliza. El proxy compila Caddy 2.11.7 con Go 1.26.9 y x/net 0.60.0 sobre un
+runtime Alpine mínimo. El backend de producción conserva el usuario sin
+privilegios y no incorpora pip ni sus dependencias de instalación en ejecución.
+Las imágenes de desarrollo sí mantienen pip para ejecutar las pruebas.
+
+Para repetir el análisis de imágenes locales, sin guardar informes:
+
+```bash
+python tools/auditar_imagenes.py mesa-ayuda-api mesa-ayuda-web mesa-ayuda-proxy redis:7-alpine mongo:8.0
+```
+
+El comando fija el identificador de cada imagen al empezar y termina con error
+si encuentra avisos altos/críticos o no consigue verificar una imagen. Ejecuta
+un único escaneo a la vez para evitar bloquear la caché de Docker Scout.
 
 El repositorio es independiente del Escritorio. Antes de cada publicación:
 

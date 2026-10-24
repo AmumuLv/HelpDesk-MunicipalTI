@@ -21,7 +21,8 @@ if __name__ == '__main__':
     parser.add_argument('--imagen', help='Verifica una imagen reconstruida antes de desplegarla')
     args = parser.parse_args()
     comando = ['docker', 'run', '--rm', '--entrypoint', 'python', args.imagen] if args.imagen else ['docker', 'compose', 'exec', '-T', 'api', 'python']
-    paquetes = json.loads(subprocess.check_output([*comando, '-m', 'pip', 'list', '--format=json']))
+    codigo = "import importlib.metadata as m,json; print(json.dumps([{'name':d.metadata['Name'],'version':d.version} for d in m.distributions()]))"
+    paquetes = json.loads(subprocess.check_output([*comando, '-c', codigo]))
     with ThreadPoolExecutor(max_workers=6) as grupo:
         resultados = list(grupo.map(revisar, paquetes))
     problemas = [r for r in resultados if r.get('avisos')]

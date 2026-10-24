@@ -1,0 +1,20 @@
+# Compila la versión oficial con las correcciones de Go y x/net verificadas.
+FROM golang:1.26.9-alpine AS compilacion
+ENV CGO_ENABLED=0 GOTOOLCHAIN=local
+WORKDIR /src
+RUN go mod download github.com/caddyserver/caddy/v2@v2.11.7 \
+    && cp -a /go/pkg/mod/github.com/caddyserver/caddy/v2@v2.11.7/. /src/ \
+    && chmod -R u+w /src \
+    && go mod edit -require=golang.org/x/net@v0.60.0 \
+    && go build -mod=mod -p=2 -trimpath -ldflags="-s -w" -o /out/caddy ./cmd/caddy
+
+FROM alpine:3.24
+RUN apk upgrade --no-cache \
+    && apk add --no-cache ca-certificates tzdata \
+    && mkdir -p /etc/caddy /config/caddy /data/caddy /srv
+ENV XDG_CONFIG_HOME=/config XDG_DATA_HOME=/data
+COPY --from=compilacion /out/caddy /usr/bin/caddy
+COPY Caddyfile /etc/caddy/Caddyfile
+WORKDIR /srv
+EXPOSE 80 443 443/udp
+CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]

@@ -205,7 +205,11 @@ services:
 
   # ── Proxy inverso (HTTPS opcional con dominio real) ────────
   proxy:
-    image: caddy:2-alpine
+    image: mesa-ayuda-proxy
+    build:
+      context: ./deploy
+      dockerfile: Dockerfile.proxy
+      network: ${BUILD_NETWORK:-default}
     restart: unless-stopped
     depends_on:
       api:

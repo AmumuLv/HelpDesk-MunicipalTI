@@ -19,6 +19,28 @@ cuota del proveedor; la carga sostenida y las suites habituales no la consumen.
 
 ## Consultas de datos: motor interno de análisis
 
+La revisión de la IA integrada cubre consultas, recomendaciones de tickets y
+modelos estadísticos, además del chatbot Groq. En la instalación revisada, el
+proveedor interno `openai_compatible` con modelo `deepseek-chat` no respondió
+a la comprobación de disponibilidad. Las consultas reconocidas, la ayuda local
+y las reglas de clasificación siguen funcionando; la redacción generativa
+opcional no debe darse por disponible ni confundirse con Groq.
+
+Las consultas reconocen «hoy», «ayer», últimos 7/30/90 días y fechas explícitas
+DD/MM/AAAA o AAAA-MM-DD. Una fecha indicada en la pregunta prevalece sobre el
+selector y se muestra en la respuesta; fechas imposibles o rangos invertidos
+se rechazan. Ante nombres ambiguos, se solicita el nombre completo en lugar de
+escoger a la primera persona. Si el modelo no devuelve ninguna herramienta
+autorizada, no se le pide redactar cifras sin respaldo.
+
+La clasificación por reglas reconoce acentos y palabras completas: «conexión»
+se interpreta igual que «conexion», «antivirus» no se interpreta como «virus»
+y «no funciona» por sí solo no permite afirmar que un equipo no enciende.
+Estas reglas proponen decisiones; no equivalen a comprensión general del lenguaje.
+El entrenamiento y el indicador individual de fallas excluyen tickets eliminados.
+El indicador se rotula como orientación, sin afirmar que sea una probabilidad
+futura validada. El historial por familias continúa siendo un recuento observado.
+
 Las respuestas nuevas de este asistente aparecen con escritura progresiva local,
 en un máximo aproximado de 80 actualizaciones cada 30 ms. No se hacen nuevas
 peticiones ni se consumen tokens por la animación. Las conversaciones recuperadas

@@ -19,6 +19,8 @@ from httpx import ASGITransport, AsyncClient
 os.environ.setdefault("APP_ENV", "test")
 os.environ.setdefault("SECRET_KEY", "clave-de-pruebas-no-usar-en-produccion-1234567890")
 os.environ.setdefault("MONGO_DB", f"mesa_ayuda_test_{uuid.uuid4().hex[:8]}")
+if os.environ["MONGO_DB"] == "helpdesk_test_suite":
+    os.environ["MONGO_DB"] += "_" + uuid.uuid4().hex[:8]
 os.environ.setdefault("BUSINESS_TIMEZONE", "America/Lima")
 os.environ.setdefault("RATE_LIMIT_PER_MINUTE", "3000")
 

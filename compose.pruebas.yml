@@ -97,7 +97,7 @@ services:
     depends_on:
       api-seguridad: {condition: service_healthy}
   proxy-seguridad:
-    image: caddy:2-alpine
+    image: mesa-ayuda-proxy
     profiles: [seguridad]
     depends_on: [web-seguridad]
     environment:

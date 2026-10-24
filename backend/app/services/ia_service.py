@@ -17,7 +17,7 @@ from bson import ObjectId
 
 from app.core.audit import registrar
 from app.core.db import get_db
-from app.core.ids import a_id
+from app.core.ids import a_id, clave as clave_texto
 from app.core.time import utcnow
 from app.domain.constants import (
     PRIORIDAD_ALTA,
@@ -50,7 +50,7 @@ async def _nombre_tecnico(db, tecnico_id: ObjectId) -> str | None:
 
 # Palabras que determinan categoria y prioridad sin depender del modelo
 PALABRAS_CATEGORIA: dict[str, list[str]] = {
-    "No enciende": ["no enciende", "no prende", "no arranca", "apagado", "no funciona", "murio", "se apago", "no prende"],
+    "No enciende": ["no enciende", "no prende", "no arranca", "apagado", "murio", "se apago"],
     "Internet / Red": ["internet", "wifi", "wi-fi", "red", "conexion", "no navega", "sin internet", "red lenta", "se desconecta"],
     "Impresora": ["impresora", "imprimir", "impresion", "papel", "toner", "tinta", "scanner"],
     "Sistema / Programa": ["programa", "sistema", "aplicacion", "se traba", "error", "no abre", "office", "word", "excel", "power point", "powerpoint", "pdf", "pantalla azul", "crash"],
@@ -119,11 +119,16 @@ async def _registrar_aprendizaje(
 
 
 # ── Clasificacion de categoria y prioridad ───────────────────
+def _menciona(texto: str, palabra: str) -> bool:
+    return bool(re.search(r"\b" + re.escape(clave_texto(palabra).lower()) + r"\b", texto))
+
+
 def _clasificar_por_palabras(texto: str, tipo_activo: str | None) -> tuple[str | None, float, str]:
+    texto = clave_texto(texto).lower()
     mejor_categoria = None
     mejor_puntaje = 0
     for categoria, palabras in PALABRAS_CATEGORIA.items():
-        puntaje = sum(1 for palabra in palabras if palabra in texto)
+        puntaje = sum(1 for palabra in set(palabras) if _menciona(texto, palabra))
         if puntaje > mejor_puntaje:
             mejor_puntaje = puntaje
             mejor_categoria = categoria
@@ -137,6 +142,7 @@ def _clasificar_por_palabras(texto: str, tipo_activo: str | None) -> tuple[str |
 
 
 def _prioridad_por_palabras(texto: str, urgencia: str | None, tipo_activo: str | None) -> tuple[str, float, str]:
+    texto = clave_texto(texto).lower()
     base = URGENCIA_A_PRIORIDAD.get(urgencia or "", PRIORIDAD_MEDIA)
     confianza = 0.7
     explicacion = {
@@ -145,11 +151,11 @@ def _prioridad_por_palabras(texto: str, urgencia: str | None, tipo_activo: str |
         PRIORIDAD_ALTA: "Indicaste que no puedes trabajar.",
         PRIORIDAD_CRITICA: "Indicaste que te detiene por completo.",
     }.get(base, "La urgencia indicada define la prioridad inicial.")
-    if any(palabra in texto for palabra in PALABRAS_CRITICAS):
+    if any(_menciona(texto, palabra) for palabra in PALABRAS_CRITICAS):
         if base != PRIORIDAD_CRITICA:
             explicacion = "El texto indica una situacion critica."
             return PRIORIDAD_CRITICA, 0.75, explicacion
-    if any(palabra in texto for palabra in PALABRAS_ALTAS) and base == PRIORIDAD_BAJA:
+    if any(_menciona(texto, palabra) for palabra in PALABRAS_ALTAS) and base == PRIORIDAD_BAJA:
         return PRIORIDAD_ALTA, 0.65, "El texto indica urgencia aunque indicaste que puede esperar."
     if tipo_activo == "Impresora" and base == PRIORIDAD_BAJA:
         return PRIORIDAD_MEDIA, 0.6, "Una impresora afecta a varias personas de la oficina."
@@ -308,6 +314,8 @@ async def _generar_texto_ticket(ticket: dict[str, Any], texto: str) -> dict[str,
         return {}
     try:
         datos = json.loads(respuesta.texto)
+        if not isinstance(datos, dict):
+            return {}
         return {
             k: _limitar_explicacion(v)
             for k, v in datos.items()

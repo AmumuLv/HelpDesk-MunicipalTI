@@ -19,7 +19,9 @@ ENV VITE_API_BASE=${VITE_API_BASE}
 RUN npm run build
 
 # ── prod ─────────────────────────────────────────────────────
-FROM nginx:1.27-alpine AS prod
+FROM nginx:1.30.6-alpine AS prod
+RUN apk upgrade --no-cache \
+    && apk del curl nginx-module-xslt nginx-module-njs nginx-module-image-filter nginx-module-geoip nginx-module-acme
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY nginx-seguridad.inc /etc/nginx/seguridad.inc

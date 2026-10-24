@@ -166,7 +166,7 @@ cd frontend
 npx playwright test pruebas/resiliencia.spec.ts
 cd ..
 python tools/verificar_resiliencia.py --ejecutar
-docker compose -f compose.pruebas.yml --profile navegador --profile suite --profile restauracion down -v
+docker compose -f compose.pruebas.yml --profile navegador --profile suite --profile restauracion --profile seguridad down -v
 ```
 
 Edge debe estar instalado; se puede elegir solo `chromium`. Firefox y WebKit son
@@ -187,6 +187,41 @@ Para repetirla: `python tools/prueba_sostenida.py --ejecutar --minutos 30`;
 para dos horas, usa `--minutos 120`. Requiere la API aislada iniciada. Las pruebas
 reales de proveedor se describen en `docs/CHATBOT_TI.md`; la preparación HTTPS
 y las comprobaciones de publicación, en `docs/INSTALAR_Y_TRASLADAR.md`.
+
+La ampliación de la verificación aprobó 333 casos del backend y 22 subpruebas,
+32 casos dirigidos de IA y 15 comprobaciones de archivos inválidos. Los grupos
+se solapan; no deben sumarse como casos únicos. Los nueve recorridos de
+accesibilidad de los tres roles en móvil, tableta y escritorio se completaron
+en Chromium tras corregir el tratamiento de disponibilidad vacía.
+
+La carga de dos horas terminó con seis sesiones, 36.332 solicitudes, cero
+errores, 116 tickets ficticios creados y 66 renovaciones de sesión. El P95 global
+fue 731 ms y la memoria final de la API, 168 MiB. Se añadieron 5.000 equipos
+ficticios hacia el minuto 24, quedando 5.028; las compilaciones, suites y ráfagas
+de concurrencia se ejecutaron durante parte del ensayo. La memoria se estabilizó
+después de esa ampliación. Es una prueba local de estabilidad con carga mixta.
+
+Con 5.028 equipos ficticios, se repitieron 500 lecturas escalonadas sin
+compilaciones ni suites activas, manteniendo las seis sesiones de carga de fondo:
+
+| Solicitudes concurrentes adicionales | Lecturas | Errores | P95 del listado de tickets |
+| --- | --- | --- | --- |
+| 5 | 50 | 0 | 1,19 s |
+| 15 | 150 | 0 | 5,76 s |
+| 30 | 300 | 0 | 9,16 s |
+
+Estos resultados muestran estabilidad y también una limitación de rendimiento
+bajo concurrencia en esta laptop; no garantizan tiempos de respuesta en otro
+servidor. La auditoría de imágenes y sus avisos pendientes se detallan en la
+guía de instalación. La revisión de la IA integrada está en `docs/CHATBOT_TI.md`.
+
+Al terminar las dos horas, sin esas sesiones de fondo, el ensayo operativo con
+10.028 equipos ficticios completó otras 500 lecturas sin errores. El P95 del
+listado de tickets fue 0,39/1,49/3,70 s con 5/15/30 solicitudes concurrentes.
+También aprobó 100 altas simultáneas sin códigos duplicados, PDF de tickets,
+Excel completo, reinicio de MongoDB/Redis/API y restauración en otra base y
+volumen conservando la foto y el adjunto por sus hashes. El respaldo temporal
+contenía únicamente datos ficticios y se eliminó al finalizar.
 
 
 ---

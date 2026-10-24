@@ -152,7 +152,8 @@ def _json_seguro(texto: Any) -> dict[str, Any]:
     if isinstance(texto, dict):
         return texto
     try:
-        return json.loads(texto or "{}")
+        valor = json.loads(texto or "{}")
+        return valor if isinstance(valor, dict) else {}
     except (TypeError, ValueError):
         return {}
 

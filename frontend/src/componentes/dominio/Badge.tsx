@@ -139,7 +139,7 @@ export function DisponibilidadBadge({
   destacado = true,
   className,
 }: {
-  estado: string
+  estado: string | null | undefined
   etiqueta?: string | null
   tamano?: Tamano
   destacado?: boolean

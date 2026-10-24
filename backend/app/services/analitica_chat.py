@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import re
+from datetime import date, timedelta
 from typing import Any
 
 from bson import ObjectId
@@ -111,7 +112,11 @@ async def herramienta_equipos_de_usuario(filtros: dict[str, Any], argumentos: di
     ).to_list(5)
     if not usuarios:
         return {"encontrado": False, "consulta": nombre, "mensaje": "No hay ninguna persona con ese nombre en el directorio."}
-    usuario = usuarios[0]
+    exactos = [u for u in usuarios if clave_oscura(u.get("nombre", "")) == clave_oscura(nombre)]
+    candidatos = exactos or usuarios
+    if len(candidatos) != 1:
+        return {"encontrado": False, "mensaje": "Hay varias personas con ese nombre. Indica el nombre completo: " + ", ".join(u["nombre"] for u in candidatos) + "."}
+    usuario = candidatos[0]
     equipos = await inventario_service.equipos_de_usuario(usuario["_id"])
     tickets = await db["tickets"].count_documents({"afectado_id": usuario["_id"], "eliminado": {"$ne": True}})
     return {
@@ -149,14 +154,19 @@ async def herramienta_tickets_de_usuario(filtros: dict[str, Any], argumentos: di
     ).to_list(3) if nombre else []
     if not usuarios:
         return {"encontrado": False, "mensaje": "Indica el nombre de la persona."}
-    id_usuario = usuarios[0]["_id"]
+    exactos = [u for u in usuarios if clave_oscura(u.get("nombre", "")) == clave_oscura(nombre)]
+    candidatos = exactos or usuarios
+    if len(candidatos) != 1:
+        return {"encontrado": False, "mensaje": "Hay varias personas con ese nombre. Indica el nombre completo: " + ", ".join(u["nombre"] for u in candidatos) + "."}
+    persona = candidatos[0]
+    id_usuario = persona["_id"]
     totales = await agregar("tickets", [
             {"$match": {"eliminado": {"$ne": True}, "$or": [{"reportante_id": id_usuario}, {"afectado_id": id_usuario}]}},
             {"$group": {"_id": "$estado", "total": {"$sum": 1}}},
         ])
     return {
         "encontrado": True,
-        "persona": usuarios[0].get("nombre"),
+        "persona": persona.get("nombre"),
         "por_estado": [{"estado": t["_id"], "total": t["total"]} for t in totales],
     }
 
@@ -465,6 +475,37 @@ def _fecha_visible(valor):
         return str(valor)
 
 
+def _periodo_pregunta(pregunta: str, filtros: dict[str, Any]) -> dict[str, Any]:
+    """Las fechas explícitas de la pregunta prevalecen sobre el selector."""
+    texto = clave(pregunta).lower()
+    resultado = dict(filtros)
+    fechas = re.findall(r"\b(?:\d{4}-\d{2}-\d{2}|\d{1,2}/\d{1,2}/\d{4})\b", pregunta)
+    if fechas:
+        if len(fechas) > 2:
+            raise Validacion("Indica una fecha o un rango de dos fechas.")
+        try:
+            dias = [date.fromisoformat(f) if '-' in f else date(*map(int, reversed(f.split('/')))) for f in fechas]
+        except ValueError:
+            raise Validacion("Las fechas de la pregunta no son válidas. Usa día/mes/año.")
+        resultado.update(desde=dias[0], hasta=dias[-1])
+    elif re.search(r"\b(hoy|ayer)\b", texto):
+        if re.search(r"\bhoy\b", texto) and re.search(r"\bayer\b", texto):
+            raise Validacion("Indica un rango de fechas para comparar hoy y ayer.")
+        dia = local_date() - timedelta(days=1 if re.search(r"\bayer\b", texto) else 0)
+        resultado.update(desde=dia, hasta=dia)
+    else:
+        for expresion, periodo in (("este mes", "mes"), ("este ano", "anio"), ("ultimos 90", "90d"), ("ultimos 30", "30d"), ("ultimos 7", "7d")):
+            if expresion in texto:
+                resultado.update(periodo=periodo)
+                resultado.pop("desde", None)
+                resultado.pop("hasta", None)
+                break
+    analitica_service.resolver_periodo(resultado)
+    if fechas or re.search(r"\b(hoy|ayer)\b", texto):
+        resultado["periodo"] = f"{resultado['desde']:%d/%m/%Y} – {resultado['hasta']:%d/%m/%Y}"
+    return resultado
+
+
 async def responder(
     pregunta: str,
     *,
@@ -482,15 +523,7 @@ async def responder(
         return {'texto': ayuda, 'tabla': None, 'enlaces': [], 'fuentes': ['guia_analisis'],
                 'explicacion': 'Orientación funcional del sistema, sin consultar un modelo externo. No representa un recuento de registros.',
                 'periodo': None, 'confianza': 1.0, 'suficiente_datos': True, 'herramientas': []}
-    filtros = dict(filtros or {})
-    texto_periodo = pregunta.lower()
-    for expresion, periodo in (("este mes", "mes"), ("este año", "anio"), ("últimos 90", "90d"), ("ultimos 90", "90d"), ("últimos 30", "30d"), ("ultimos 30", "30d")):
-        if expresion in texto_periodo:
-            filtros = {**filtros, "periodo": periodo}
-            filtros.pop("desde", None)
-            filtros.pop("hasta", None)
-            break
-    analitica_service.resolver_periodo(filtros)
+    filtros = _periodo_pregunta(pregunta, filtros or {})
     db = get_db()
     proveedor = ia_provider.obtener_proveedor()
     # Las preguntas reconocidas se resuelven directamente: no necesitan tokens
@@ -522,13 +555,20 @@ async def responder(
         if respuesta.disponible:
             if respuesta.llamadas:
                 resultados: list[dict[str, Any]] = []
-                for llamada in respuesta.llamadas:
+                for llamada in respuesta.llamadas[:3]:
                     nombre = llamada.get("nombre") or ""
                     if nombre not in HERRAMIENTAS or not _permitida(nombre, usuario):
                         continue
-                    datos = await ejecutar_herramienta(nombre, llamada.get("argumentos") or {}, filtros=filtros, usuario=usuario)
+                    argumentos = llamada.get("argumentos") or {}
+                    if not isinstance(argumentos, dict):
+                        continue
+                    datos = await ejecutar_herramienta(nombre, argumentos, filtros=filtros, usuario=usuario)
                     mensajes_usados.append(nombre)
                     resultados.append({"herramienta": nombre, "datos": datos})
+                if not resultados:
+                    return {"texto": "No se obtuvo una consulta autorizada que respalde la respuesta. Elige una consulta sugerida.",
+                            "tabla": None, "enlaces": [], "confianza": 0.0, "fuentes": [], "herramientas": [],
+                            "suficiente_datos": False, "puede_responder": False, "periodo": filtros.get("periodo", "30d")}
                 segunda = await proveedor.completar(
                     mensajes
                     + [

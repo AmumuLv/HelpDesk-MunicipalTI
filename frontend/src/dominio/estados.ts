@@ -293,7 +293,8 @@ export const DISPONIBILIDADES: Record<string, DefinicionEstado> = {
   },
 }
 
-export function disponibilidadDe(clave: string, etiqueta?: string | null): DefinicionEstado {
+export function disponibilidadDe(clave: string | null | undefined, etiqueta?: string | null): DefinicionEstado {
+  if (!clave) return { ...ESTADO_DESCONOCIDO, texto: etiqueta || 'Sin dato' }
   const base = DISPONIBILIDADES[clave] ?? DISPONIBILIDADES[claveNormalizada(clave)]
   if (!base) return { ...ESTADO_DESCONOCIDO, clave, texto: etiqueta || clave }
   return etiqueta ? { ...base, texto: etiqueta } : base

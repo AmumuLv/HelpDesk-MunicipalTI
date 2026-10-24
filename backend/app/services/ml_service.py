@@ -133,7 +133,7 @@ async def _datos_entrenamiento() -> dict[str, Any]:
                 "from": "tickets",
                 "let": {"id_activo": "$_id"},
                 "pipeline": [
-                    {"$match": {"$expr": {"$eq": ["$activo_id", "$$id_activo"]}, "creado_en": {"$gte": desde}}},
+                    {"$match": {"$expr": {"$eq": ["$activo_id", "$$id_activo"]}, "creado_en": {"$gte": desde}, "eliminado": {"$ne": True}}},
                     {"$group": {"_id": None, "total": {"$sum": 1}, "hardware": {"$sum": {"$cond": [{"$eq": ["$categoria", "Hardware"]}, 1, 0]}}}},
                 ],
                 "as": "historial",
@@ -228,7 +228,7 @@ async def predecir_falla(activo: dict[str, Any]) -> dict[str, Any]:
     """Probabilidad de falla con horizonte y confianza. Nunca como certeza."""
     db = get_db()
     desde = utcnow() - timedelta(days=365)
-    conteo = await db["tickets"].count_documents({"activo_id": activo["_id"], "creado_en": {"$gte": desde}})
+    conteo = await db["tickets"].count_documents({"activo_id": activo["_id"], "creado_en": {"$gte": desde}, "eliminado": {"$ne": True}})
     cache = await _modelo()
     suficiente = cache.get("suficiente") or _datos_suficientes(0)
     modelo = cache.get("modelo")
@@ -264,7 +264,7 @@ async def predecir_falla(activo: dict[str, Any]) -> dict[str, Any]:
         "horizonte_dias": 90,
         "confianza": round(confianza, 2),
         "factores": factores,
-        "suficiente_datos": bool(suficiente.get("suficiente_datos")),
+        "suficiente_datos": metodo == "modelo_entrenado",
         "muestras": suficiente.get("muestras", 0),
         "minimo_requerido": suficiente.get("minimo_requerido", MINIMO_MUESTRAS_MODELO),
         "actualizado_en": utcnow(),
@@ -272,7 +272,7 @@ async def predecir_falla(activo: dict[str, Any]) -> dict[str, Any]:
         "dias_activo": antiguedad_dias(activo),
         "garantia_vigente": garantia_vigente(activo),
         "metodo": metodo,
-        "aviso": "Estimacion basada en el historial del sistema. No es una certeza.",
+        "aviso": "Indicador orientativo basado en el historial. No es una probabilidad de falla futura validada; requiere evaluación de TI.",
     }
 
 

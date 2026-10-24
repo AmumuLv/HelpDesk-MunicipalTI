@@ -24,9 +24,9 @@ export const TAMANOS: Tamano[] = [
 
 /** Roles de la demo, con su correo y contraseña. */
 export const ROLES = {
-  administrador: { correo: 'admin@demo.local', password: 'Demo12345' },
-  tecnico: { correo: 'jorge.castillo@municipalidad.gob.pe', password: 'Demo12345' },
-  usuario: { correo: 'usuario1@demo.local', password: 'Demo12345' },
+  administrador: { correo: process.env.PRUEBA_CORREO_ADMIN ?? 'admin@demo.local', password: 'Demo12345' },
+  tecnico: { correo: process.env.PRUEBA_CORREO_TECNICO ?? 'jorge.castillo@municipalidad.gob.pe', password: 'Demo12345' },
+  usuario: { correo: process.env.PRUEBA_CORREO_USUARIO ?? 'usuario1@demo.local', password: 'Demo12345' },
 } as const
 
 export type ClaveRol = keyof typeof ROLES
@@ -102,7 +102,7 @@ export function vigilarConsola(pagina: Page): string[] {
     errores.push(texto)
   })
   pagina.on('pageerror', (fallo) => {
-    const texto = String(fallo)
+    const texto = `${pagina.url()}: ${fallo.stack ?? fallo.message}`
     if (IGNORAR_CONSOLA.some((patron) => patron.test(texto))) return
     errores.push(texto)
   })
@@ -222,7 +222,7 @@ export async function revisar(pagina: Page, opciones: { rol: ClaveRol; nombre: s
   // abierto, así que la red nunca queda quieta. Se espera a que el contenido
   // principal esté y luego se da un respiro para los gráficos.
   await pagina.waitForLoadState('domcontentloaded')
-  await pagina.waitForTimeout(900)
+  await expect(pagina.getByRole('heading').first()).toBeVisible({ timeout: 30_000 })
 
   await sinDesbordamiento(pagina, donde)
   await focoVisible(pagina, donde)
