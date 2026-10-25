@@ -63,7 +63,12 @@ test('fichas de organización paginan todas sus listas sin ocultar registros', a
   await avanzar('Personas', 'Persona 12')
   await page.getByRole('tab', { name: 'Equipos asignados' }).click()
   await expect(page.getByRole('link', { name: 'Dispositivo 16', exact: true })).toBeVisible()
-  await avanzar('Equipos asignados', 'Dispositivo 18')
+  // Un único responsable conserva sus 18 equipos juntos; no se pagina por
+  // dispositivos aunque sobrepase el antiguo corte de 16.
+  await expect(page.getByRole('link', { name: 'Dispositivo 18', exact: true })).toBeVisible()
+  const asignados = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Equipos asignados', exact: true }) }).last()
+  await expect(asignados.getByText('18 equipos', { exact: true })).toBeVisible()
+  await expect(asignados.getByRole('button', { name: 'Siguiente', exact: true })).toHaveCount(0)
   await page.getByRole('tab', { name: 'Uso común' }).click()
   await avanzar('Equipos de uso común', 'Dispositivo 12')
   // La tabla actual consulta y pagina 25 tickets en su propia API.

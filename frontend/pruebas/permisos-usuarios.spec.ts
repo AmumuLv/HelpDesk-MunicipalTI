@@ -28,11 +28,10 @@ test('un técnico consulta cerrados sin pedir exportaciones y necesita permiso p
   await expect(page.getByRole('table').first()).toBeVisible()
   await expect(page.getByRole('button', { name: /^Descargas/ })).toHaveCount(0)
   // Simular solo la delegación de ver reportes: exportar sigue sin concederse.
-  await page.route('**/api/auth/sesion', async ruta => {
-    const respuesta = await ruta.fetch()
-    const sesion = await respuesta.json()
-    await ruta.fulfill({ response: respuesta, json: { ...sesion, permisos: [...sesion.permisos, 'reportes.ver'].filter((p: string) => p !== 'exportar') } })
-  })
+  // Leer antes de interceptar evita dejar un route.fetch pendiente cuando la
+  // pantalla termina de comprobar permisos y Playwright cierra el contexto.
+  const sesion = await apiGet<{ permisos: string[] } & Record<string, unknown>>(page, '/api/auth/sesion')
+  await page.route('**/api/auth/sesion', ruta => ruta.fulfill({ json: { ...sesion, permisos: [...sesion.permisos, 'reportes.ver'].filter((p: string) => p !== 'exportar') } }))
   await page.goto('/panel/reportes')
   await expect(page.getByText('No tienes acceso a la generación y descarga de reportes', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Generar archivo', exact: true })).toHaveCount(0)

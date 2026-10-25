@@ -3,6 +3,54 @@ import AxeBuilder from '@axe-core/playwright'
 
 test.setTimeout(90_000)
 
+test('equipos de oficina pagina responsables sin separar sus componentes ni alterar el total', async ({ page }) => {
+  await portal(page, false, 'administrador')
+  const grupos = Array.from({ length: 6 }, (_, i) => ({ responsable_id: `responsable-${i}`, responsable: i === 5 ? 'Verónica Sánchez' : `Responsable ${i}`, equipos: Array.from({ length: i === 5 ? 4 : 3 }, (_, j) => ({ id: `equipo-${i}-${j}`, nombre: i === 5 ? ['CPU Verónica', 'Monitor Verónica', 'Mouse Verónica', 'Teclado Verónica'][j] : `Dispositivo ${i}-${j}`, tipo: ['CPU', 'Monitor', 'Mouse', 'Teclado'][j], estado: 'OPERATIVO' })) }))
+  await page.route('**/api/oficinas/oficina', ruta => ruta.fulfill({ json: { id: 'oficina', nombre: 'Soporte', zona_id: 'zona', zona_nombre: 'Palacio', zona_color_indice: 1, total_equipos: 19, total_usuarios: 6, tickets_abiertos: 0, completitud_inventario: 100, usuarios: [], equipos_por_usuario: grupos, equipos_uso_comun: [], tendencia: [], incidencias_recurrentes: [] } }))
+  await page.goto('/panel/oficinas/oficina')
+  await page.getByRole('tab', { name: /Equipos asignados/ }).click()
+  const panel = page.getByRole('tabpanel').filter({ has: page.getByRole('heading', { name: 'Equipos asignados', exact: true }) })
+  await expect(panel.getByText('Verónica Sánchez', { exact: true })).toHaveCount(0)
+  await panel.getByRole('button', { name: 'Siguiente', exact: true }).click()
+  await expect(panel.getByText('Verónica Sánchez', { exact: true })).toBeVisible()
+  await expect(panel.getByText('4 equipos', { exact: true })).toBeVisible()
+  for (const nombre of ['CPU Verónica', 'Monitor Verónica', 'Mouse Verónica', 'Teclado Verónica']) await expect(panel.getByText(nombre, { exact: true })).toBeVisible()
+  await panel.getByRole('button', { name: 'Anterior', exact: true }).click()
+  await expect(panel.getByText('Verónica Sánchez', { exact: true })).toHaveCount(0)
+})
+
+test('resultado de responsables permite recorrer todos los perfiles, buscar y abrir su ficha', async ({ page }) => {
+  await portal(page, false, 'administrador')
+  const detalle = Array.from({ length: 25 }, (_, i) => ({ clave: `p${i}`, usuario_id: `persona-${i}`, nombre_excel: `Responsable ${String(i).padStart(2, '0')}`, nombre_asignado: `Responsable ${String(i).padStart(2, '0')}`, accion: 'creado', oficina_nombre: i === 24 ? 'Alcaldía' : 'Soporte', zona_nombre: 'Palacio', equipos: 1, coincidencia: null, similitud: null, nombre_parece_oficina: false }))
+  await page.route('**/api/importacion**', ruta => {
+    const camino = new URL(ruta.request().url()).pathname
+    let json: unknown = { items: [] }
+    if (camino.endsWith('/subir')) json = { lote_id: 'lote' }
+    else if (camino.endsWith('/previsualizar')) json = { lote_id: 'lote', filas: [], total_filas: 1, validas: 1, crearia: 1, actualizaria: 0, omitiria: 0, con_error: 0, con_advertencia: 0 }
+    else if (camino.endsWith('/responsables-excel/confirmar')) json = { personas_creadas: 25, equipos_vinculados: 25, detalle }
+    else if (camino.endsWith('/responsables-excel')) json = { items: detalle.map(fila => ({ clave: fila.clave, oficina_id: 'oficina', oficina_nombre: fila.oficina_nombre, nombre_original: fila.nombre_excel, nombres_originales: [fila.nombre_excel], equipos: 1, candidatos: [] })) }
+    else if (camino.endsWith('/confirmar')) json = { creados: 1, actualizados: 0, omitidos: 0, errores: 0, detalle: [], reversible: false }
+    else if (camino.endsWith('/lote')) json = { lote_id: 'lote', nombre_archivo: 'revision.csv', estado: 'analizado', analisis: { hojas: [], columnas_por_hoja: {} } }
+    return ruta.fulfill({ json })
+  })
+  await page.goto('/panel/equipos/importar')
+  await page.getByLabel('Archivo de Excel con el inventario').setInputFiles({ name: 'revision.csv', mimeType: 'text/csv', buffer: Buffer.from('AREA;Tipo de equipo\nSoporte;Laptop') })
+  await page.getByRole('button', { name: 'Aplicar la importación', exact: true }).click()
+  await page.getByRole('checkbox', { name: /Crear un perfil para las que faltan/ }).check()
+  await page.getByRole('button', { name: 'Continuar', exact: true }).click()
+  const lista = page.getByRole('list', { name: 'Perfiles creados y vinculados' })
+  await expect(lista.getByRole('listitem')).toHaveCount(20)
+  await expect(page.getByText(/casos que podrían estar mal/)).toHaveCount(0)
+  await page.getByRole('button', { name: 'Siguiente', exact: true }).click()
+  await expect(lista.getByRole('listitem')).toHaveCount(5)
+  await expect(lista.getByText('Responsable 24', { exact: true })).toBeVisible()
+  await page.getByLabel('Buscar perfiles del resultado').fill('alcaldia')
+  await expect(lista.getByRole('listitem')).toHaveCount(1)
+  await expect(lista.getByRole('link')).toHaveAttribute('href', '/panel/usuarios/persona-24')
+  await lista.getByRole('link').click()
+  await expect(page).toHaveURL(/\/panel\/usuarios\/persona-24$/)
+})
+
 for (const rol of ['tecnico', 'administrador']) {
   test(`${rol} cambia y quita su foto desde Mi perfil sin cambiar de portal`, async ({ page }) => {
     await portal(page, false, rol)

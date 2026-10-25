@@ -7,7 +7,8 @@ import wave
 from bson import ObjectId
 import pytest
 
-from app.core.errors import Validacion
+from app.core.errors import DependenciaNoDisponible, Validacion
+from app.services import audio_service
 from app.services.audio_service import validar_audio
 from tests.test_tickets_horarios import _mundo
 
@@ -30,6 +31,34 @@ def test_limite_duracion_y_peso():
         validar_audio(wav(1) + bytes(5 * 1024 * 1024))
     with pytest.raises(Validacion, match='leer el audio'):
         validar_audio(b'audio roto')
+
+
+def test_timeout_del_analizador_es_temporal_no_audio_invalido(monkeypatch):
+    def ocupado(*args, **kwargs):
+        raise subprocess.TimeoutExpired('ffprobe', 10)
+
+    monkeypatch.setattr(audio_service.subprocess, 'run', ocupado)
+    with pytest.raises(DependenciaNoDisponible) as error:
+        validar_audio(wav(1))
+    assert error.value.status_code == 503
+    assert error.value.codigo == 'audio_no_disponible'
+
+
+async def test_timeout_no_guarda_el_adjunto_y_permite_reintentar(db, api, monkeypatch):
+    mundo = await _mundo(api, 'audio-ocupado')
+    original = audio_service.subprocess.run
+
+    def ocupado(*args, **kwargs):
+        raise subprocess.TimeoutExpired('ffprobe', 10)
+
+    monkeypatch.setattr(audio_service.subprocess, 'run', ocupado)
+    respuesta = await api.post('/api/adjuntos', headers=mundo['usuario'], files={'archivo': ('nota.wav', wav(1), 'audio/wav')})
+    assert respuesta.status_code == 503, respuesta.text
+    assert await db.adjuntos.count_documents({}) == 0
+    monkeypatch.setattr(audio_service.subprocess, 'run', original)
+    reintento = await api.post('/api/adjuntos', headers=mundo['usuario'], files={'archivo': ('nota.wav', wav(1), 'audio/wav')})
+    assert reintento.status_code == 201, reintento.text
+    assert await db.adjuntos.count_documents({}) == 1
 
 
 async def test_formatos_nativos_se_guardan_sin_conversion_y_rechaza_excesos(db, api, tmp_path):

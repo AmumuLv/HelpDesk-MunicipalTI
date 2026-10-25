@@ -5,7 +5,7 @@ import math
 import subprocess
 from tempfile import NamedTemporaryFile
 
-from app.core.errors import Validacion
+from app.core.errors import DependenciaNoDisponible, Validacion
 
 MAX_BYTES = 5 * 1024 * 1024
 MAX_SEGUNDOS = 120
@@ -35,6 +35,11 @@ def validar_audio(contenido: bytes) -> float:
             duracion = max(duracion, max(t + max(0, d) for t, d in tiempos) - min(t for t, _ in tiempos))
         if not math.isfinite(duracion) or duracion <= 0:
             raise ValueError('Duración no disponible')
+    except subprocess.TimeoutExpired as exc:
+        raise DependenciaNoDisponible(
+            'No pudimos comprobar el audio a tiempo. El servicio está ocupado; inténtalo nuevamente en un momento.',
+            codigo='audio_no_disponible',
+        ) from exc
     except (subprocess.SubprocessError, OSError, ValueError, KeyError, TypeError) as exc:
         raise Validacion('No se pudo leer el audio. Vuelve a grabarlo o adjunta un audio válido.') from exc
     # Margen para el último paquete del codificador del navegador.

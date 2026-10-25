@@ -294,3 +294,132 @@ La configuración para publicar con dominio y HTTPS sigue en
 `compose.publico.yml`; debe aplicarse con un dominio real antes de exponer el
 servidor en Internet. Las comprobaciones TLS utilizaron una CA local de prueba.
 El linter conserva 16 avisos existentes; TypeScript y lint no devolvieron errores.
+
+## Verificación del 24–25/10/2026: cierre funcional y operación local
+
+Las siguientes comprobaciones se realizaron en `helpdesk-verificacion`, con
+cuentas, archivos y bases ficticias. La instalación operativa conserva sus
+registros. No se crearon respaldos de datos reales.
+
+### Funciones, permisos e IA integrada
+
+- Backend: corrida completa de **367 casos**, con **366 aprobados, un fallo y
+  22 subpruebas aprobadas**. El fallo fue el tiempo límite de diez segundos de
+  `ffprobe` al comprobar un WAV válido, durante la ejecución de otras tareas.
+  El mismo caso pasó al repetirlo aislado. Se corrigió la clasificación del
+  error: un tiempo de espera devuelve **503 `audio_no_disponible`**, no una
+  acusación de archivo inválido. No se guarda contenido sin comprobarlo.
+- Después de esa corrección pasaron los **cuatro casos de audio**: límites,
+  formatos reales, error temporal y reintento sin adjuntos duplicados. Incluyen
+  dos regresiones nuevas; la colección actual tiene **369 casos**. No se
+  repitió toda la colección después del ajuste: la evidencia final combina
+  la corrida completa y las repeticiones dirigidas.
+- Chromium: **142 casos distintos cubiertos**. Pasaron tres de instalación
+  inicial y 137 de la corrida principal de 139. Sus dos fallos correspondían
+  a una respuesta interceptada que se cerraba antes de leerse y a una prueba
+  que todavía esperaba dividir equipos cada 16 dispositivos. Se ajustaron las
+  pruebas y ambas pasaron al repetirlas, manteniendo las comprobaciones de
+  permisos y de totalidad de los equipos.
+- Firefox y WebKit: **16 ejecuciones dirigidas aprobadas**, ocho por motor:
+  permisos, agrupación por persona, perfiles importados, reintentos, pérdida
+  de red, sincronización entre cuentas, HTML como texto y tickets sobre laptop.
+  No equivalen a pruebas en un teléfono físico o Safari de un Mac real.
+- Pasaron los nueve recorridos completos de accesibilidad de los tres roles
+  en celular, tableta y escritorio. También se comprobaron reportes, cuentas,
+  edición, borrado, conocimiento, horarios, ausencias, inventario anual,
+  valoraciones, sesiones y ayudas internas.
+- La IA local se comprobó dentro de la suite: clasificación, fechas,
+  consultas autorizadas, fuentes y tratamiento de información insuficiente.
+  Esto no certifica la precisión predictiva sobre incidencias reales;
+  requiere evaluación con historial etiquetado separado del entrenamiento.
+
+Lint terminó sin errores y con 16 advertencias existentes. Pasaron 41 casos de
+estilos, ocho pruebas de herramientas y la comprobación de textos de IA.
+Se verificaron 159 llamadas frente a 151 rutas, sin rutas inexistentes, y la
+revisión de 408 archivos no encontró problemas de publicación. Las auditorías
+de Python (61 paquetes verificados) y npm no detectaron avisos conocidos en
+los resultados consultados. La compilación Docker fue correcta.
+
+### Proveedor real y seguridad
+
+Groq rechazó el acceso del usuario común y respondió la orientación técnica
+(2.849 tokens informados). La segunda pregunta, sobre el total del inventario
+ficticio, alcanzó un límite externo después de solicitar una lectura. La sonda
+se detuvo: no se completaron el contraste de la cifra ni las peticiones reales
+de borrado y secretos. No se repitieron llamadas para agotar más cuota. Los
+ensayos del proveedor usaron datos ficticios; no la base institucional.
+
+ClamAV real aceptó contenido inocuo y rechazó el patrón de prueba EICAR,
+en memoria y sin guardar archivos. La configuración sigue rechazando fotos y
+adjuntos si no puede comprobarlos. Los servicios de datos no publican puertos.
+
+El escaneo de la API reconstruida tras el ajuste de audio y de ClamAV, repetido
+el 25/10, mantiene **ocho hallazgos altos por imagen**:
+
+| Imagen | Hallazgos altos | Paquetes afectados |
+| --- | ---: | --- |
+| API | 6 | libxml2, cjson y zlib de Debian |
+| ClamAV | 2 | libxml2 y libcurl de Alpine |
+
+API y worker compartían las mismas capas de archivos en la comprobación; el
+worker hereda esos riesgos del backend. No deben sumarse como vulnerabilidades
+distintas. Tampoco son ocho CVE únicos: existe un aviso compartido entre
+distribuciones. En el escaneo anterior de esta batería, web, proxy, Redis y
+MongoDB no presentaron avisos altos o críticos. No se certifica ausencia de
+vulnerabilidades ni se consideran corregidos los ocho hallazgos pendientes.
+
+La sonda HTTPS aislada aprobó cadena y nombre de certificado mediante una CA
+de laboratorio, cookies Secure/HttpOnly, CSRF obligatorio, rechazo de CORS
+ajeno, CSP, cierre HTTP/WebSocket y ausencia de tokens en el log del proxy.
+Tres pantallas funcionaron con HTTPS sin violaciones CSP y conservaron el tema.
+No se instalaron certificados de confianza en Windows. La instalación normal
+permanece en HTTP local: el titular confirmó que aún no tiene dominio ni
+servidor definitivo.
+
+### Recuperación y carga
+
+Con **5.032 equipos ficticios**, pasaron 100 altas simultáneas sin códigos
+duplicados y 500 lecturas con concurrencias 5/15/30, sin errores HTTP. Se
+generaron PDF de tickets y Excel de inventario completo. Tras reiniciar
+MongoDB, Redis y API ficticios se conservaron registros, sesión nueva e
+idempotencia. La restauración en otra base y volumen mantuvo idénticos el
+adjunto y la foto por sus hashes, además del acceso y el ticket.
+
+El respaldo contenía exclusivamente datos ficticios y se eliminó al terminar.
+Es una restauración en el mismo equipo, no un traslado físico a otro dispositivo.
+Las primeras mediciones coincidieron parcialmente con auditorías; las cifras
+de rendimiento finales deben distinguirse de esa carga adicional.
+
+El ensayo sostenido terminó a los **30,02 minutos**, con seis sesiones:
+**10.217 solicitudes, cero errores, 29 tickets ficticios creados y 12
+renovaciones de sesión correctas**. El p95 global fue **157,73 ms** y la memoria
+final de la API fue **146,5 MiB**, sin crecimiento sostenido observado durante
+esta ventana. No fue una prueba de varias horas ni un certificado de capacidad.
+
+Después de terminar la carga y el escaneo, se repitieron otras 500 lecturas
+escalonadas sobre los mismos 5.032 equipos ficticios:
+
+| Solicitudes concurrentes | Lecturas | Errores HTTP | p95 del listado de tickets |
+| --- | ---: | ---: | ---: |
+| 5 | 50 | 0 | 0,51 s |
+| 15 | 150 | 0 | 1,69 s |
+| 30 | 300 | 0 | 3,24 s |
+
+La latencia aumenta con la concurrencia; no debe confundirse este ensayo con
+el número de trabajadores que podría admitir un servidor definitivo. No hubo
+compilaciones, escaneos ni suites activas durante esta última medición.
+
+Al terminar se retiraron los contenedores y volúmenes ficticios, los resultados
+temporales y 72 capturas generadas por las pruebas. Se conservaron sus fuentes
+automáticas y los documentos de presentación solicitados. El respaldo temporal
+ficticio ya no existe; la instalación normal sigue en funcionamiento.
+
+### Límites pendientes
+
+Faltan dominio/HTTPS público y capacidad del servidor definitivo, uso en
+dispositivos y red municipal reales, traslado físico a otro equipo y aceptación
+de trabajadores y técnicos. Las métricas de esta laptop no garantizan capacidad
+en otro servidor. Durante la batería intensiva se observó un tiempo de espera
+de la comprobación de salud del worker; después volvió a saludable. Ese aviso
+no demuestra una caída del proceso, pero aconseja medir recursos y supervisión
+en el despliegue elegido.

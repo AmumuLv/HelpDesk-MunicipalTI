@@ -72,6 +72,7 @@ async def test_crea_perfiles_sin_credenciales_y_vincula_en_lote(db, api):
     ana = detalle["Ana López"]
     assert ana["accion"] == "vinculado"
     assert ana["nombre_asignado"] == "Ana Lopez"
+    assert ana["usuario_id"] == str(candidata["_id"])
     assert ana["coincidencia"] == "exacta"
     assert ana["zona_nombre"] == "Zona personas_excel"
     assert ana["oficina_nombre"] == "COMUNA"
@@ -86,6 +87,7 @@ async def test_crea_perfiles_sin_credenciales_y_vincula_en_lote(db, api):
 
     persona_creada = await db["usuarios"].find_one({"nombre": "Luis Ramos"})
     assert persona_creada is not None
+    assert luis["usuario_id"] == str(persona_creada["_id"])
     assert persona_creada["email"] is None
     assert persona_creada["password_hash"] is None
     assert await db["usuarios"].count_documents({"nombre": "Luis Ramos"}) == 1

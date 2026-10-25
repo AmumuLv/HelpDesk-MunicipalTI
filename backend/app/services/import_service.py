@@ -165,7 +165,7 @@ async def listar_responsables_excel() -> list[dict[str, Any]]:
 
 async def confirmar_responsables_excel(
     selecciones: list[dict[str, str]], *, usuario: dict[str, Any]
-) -> dict[str, int]:
+) -> dict[str, Any]:
     """Vincula en lote responsables del Excel o crea perfiles sin credenciales."""
     db = get_db()
     grupos = await _cargar_grupos_responsables_excel()
@@ -243,6 +243,7 @@ async def confirmar_responsables_excel(
                 "clave": clave_grupo,
                 "nombre_excel": grupo["nombre_original"],
                 "nombre_asignado": persona_nombre,
+                "usuario_id": str(responsable_id),
                 "accion": accion,
                 "oficina_nombre": grupo.get("oficina_nombre"),
                 "zona_nombre": grupo.get("zona_nombre"),

@@ -393,12 +393,12 @@ export function PerfilOficina() {
         </ContenidoTab>
 
         <ContenidoTab valor="asignados" className="pt-4">
-          <Panel titulo="Equipos asignados" descripcion="Quién tiene asignado cada equipo">
+          <Panel titulo="Equipos asignados" descripcion="Equipos agrupados por responsable. Las páginas cuentan personas y mantienen todos sus equipos juntos.">
             {oficina.equipos_por_usuario.length === 0 ? (
               <Vacio texto="Ningún equipo de esta oficina tiene responsable asignado." />
             ) : (
-              <ListaPaginada key={id} porPagina={16} items={oficina.equipos_por_usuario.flatMap((grupo, indice) => grupo.equipos.map((equipo) => ({ grupo, indice, equipo })))}>{(items) => <ul className="flex flex-col gap-4">
-                {agruparEquipos(items).map((grupo) => {
+              <ListaPaginada key={id} porPagina={5} items={oficina.equipos_por_usuario}>{(items) => <ul className="flex flex-col gap-4">
+                {items.map((grupo) => {
                   const cuenta = grupo.equipos.length
                   const responsableId = grupo.responsable_id ?? grupo.equipos.find((equipo) => equipo.responsable_id)?.responsable_id
                   const sinCuenta = equipoDe(grupo.equipos) && !responsableId
@@ -533,13 +533,4 @@ function ListaPaginada<T>({ items, children, porPagina = 10 }: { items: T[]; chi
     {children(items.slice((actual - 1) * porPagina, actual * porPagina))}
     {totalPaginas > 1 && <Paginacion pagina={actual} totalPaginas={totalPaginas} total={items.length} porPagina={porPagina} alCambiar={setPagina} />}
   </div>
-}
-
-function agruparEquipos(items: { grupo: OficinaPerfil['equipos_por_usuario'][number]; indice: number; equipo: Equipo }[]) {
-  const grupos = new Map<number, OficinaPerfil['equipos_por_usuario'][number]>()
-  for (const { grupo, indice, equipo } of items) {
-    if (!grupos.has(indice)) grupos.set(indice, { ...grupo, equipos: [] })
-    grupos.get(indice)!.equipos.push(equipo)
-  }
-  return [...grupos.values()]
 }

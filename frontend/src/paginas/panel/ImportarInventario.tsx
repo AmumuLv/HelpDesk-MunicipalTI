@@ -3,10 +3,12 @@ import { LimpiarRegistros } from '../../componentes/dominio/LimpiarRegistros'
 
 import { ArrowLeft, CircleAlert, FileSpreadsheet, RotateCcw, TriangleAlert, Upload } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 
 import { api } from '../../api/cliente'
 import { useEstadoImportacion } from '../../api/hooks'
-import { Select } from '../../componentes/base/Campo'
+import { Input, Select } from '../../componentes/base/Campo'
+import { Paginacion } from '../../componentes/dominio/DataTable'
 import { PiePasos, Stepper } from '../../componentes/base/Stepper'
 import { Button } from '../../componentes/base/Button'
 import { Panel, Nota, EmptyState, PantallaFormulario } from '../../componentes/base/Estructura'
@@ -91,6 +93,7 @@ type Resultado = {
 }
 type DetalleResponsable = {
   clave: string
+  usuario_id?: string
   nombre_excel: string
   nombre_asignado: string | null
   accion: 'creado' | 'vinculado'
@@ -136,6 +139,8 @@ export function ImportarInventario() {
   const [seleccionesResponsables, setSeleccionesResponsables] = useState<Record<string, string>>({})
   const [confirmandoResponsables, setConfirmandoResponsables] = useState(false)
   const [resultadoResponsables, setResultadoResponsables] = useState<ResultadoResponsables | null>(null)
+  const [busquedaPersona, setBusquedaPersona] = useState('')
+  const [paginaPersona, setPaginaPersona] = useState(1)
   const [responsablesRevisados, setResponsablesRevisados] = useState(false)
   const [paginaPedida, setPaginaPedida] = useState(1)
   /* Cuando se decide no vincular a nadie del Excel, el bloque desaparece pero
@@ -200,18 +205,26 @@ export function ImportarInventario() {
   /*
     Los casos que **podrían** estar mal, para resaltarlos en la pantalla final.
 
-    Tres cosas, y ninguna es un error comprobado: se señalan para que una mirada
+    Dos cosas, y ninguna es un error comprobado: se señalan para que una mirada
     rápida decida si hay que corregir algo.
 
     - **el nombre del Excel es el de la oficina**: en estos libros la columna de
       responsable a veces trae el nombre del área y no el de una persona;
     - **coincidencia parecida**: se parece a alguien pero no es el mismo nombre;
       es lo más fácil de equivocar sin enterarse;
-    - **perfil creado sin cuenta**: no está mal, pero conviene saberlo.
+    Los perfiles sin credenciales se explican aparte: crearlos no es un error.
   */
   const sospechosos = (resultadoResponsables?.detalle ?? []).filter(
-    (fila) => fila.nombre_parece_oficina || fila.coincidencia === 'parecida' || fila.accion === 'creado',
+    (fila) => fila.nombre_parece_oficina || fila.coincidencia === 'parecida',
   )
+  const normalizarBusqueda = (texto: string) => texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase()
+  const personasFiltradas = (resultadoResponsables?.detalle ?? []).filter((fila) =>
+    normalizarBusqueda([fila.nombre_excel, fila.nombre_asignado, fila.oficina_nombre, fila.zona_nombre].filter(Boolean).join(' '))
+      .includes(normalizarBusqueda(busquedaPersona.trim())),
+  )
+  const paginasPersonas = Math.max(1, Math.ceil(personasFiltradas.length / 20))
+  const paginaPersonasActual = Math.min(paginaPersona, paginasPersonas)
+  const personasDeLaPagina = personasFiltradas.slice((paginaPersonasActual - 1) * 20, paginaPersonasActual * 20)
   const conjuntosCreados = resultado?.conjuntos_creados ?? 0
 
   /* «1 zona nueva, 4 oficinas nuevas y 12 conjuntos nuevos»: una sola «y», antes
@@ -568,6 +581,8 @@ export function ImportarInventario() {
         { selecciones: gruposResponsables.map((grupo) => ({ clave: grupo.clave, usuario_id: selecciones[grupo.clave] })) },
       )
       setResultadoResponsables(respuesta)
+      setBusquedaPersona('')
+      setPaginaPersona(1)
       setGruposResponsables([])
       avisos.exito(
         'Personas del Excel vinculadas',
@@ -1044,6 +1059,10 @@ export function ImportarInventario() {
                 {plural(resultadoResponsables.equipos_vinculados, 'equipo quedó', 'equipos quedaron')} con
                 responsable asignado.
               </p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Todos los perfiles están en la lista de abajo. Busca por nombre, oficina o zona y usa las páginas para ver los demás.
+                Los perfiles sin credenciales no pueden iniciar sesión.
+              </p>
 
               {sospechosos.length > 0 ? (
                 <div className="mt-3 rounded-[var(--radius-panel)] border border-warning/40 bg-warning-soft p-3">
@@ -1071,8 +1090,11 @@ export function ImportarInventario() {
                 </div>
               ) : null}
 
-              <ul className="sin-barra mt-3 flex max-h-96 flex-col gap-1.5 overflow-y-auto pr-1">
-                {resultadoResponsables.detalle.map((fila) => (
+              <div className="mt-3">
+                <Input etiqueta="Buscar perfiles del resultado" value={busquedaPersona} onChange={(evento) => { setBusquedaPersona(evento.target.value); setPaginaPersona(1) }} placeholder="Nombre, oficina o zona" />
+              </div>
+              <ul aria-label="Perfiles creados y vinculados" className="mt-3 flex flex-col gap-1.5">
+                {personasDeLaPagina.map((fila) => (
                   <li key={fila.clave} className="rounded border border-border p-2 text-sm">
                     <div className="flex flex-wrap items-baseline gap-x-2">
                       <span className="font-semibold">{fila.nombre_excel}</span>
@@ -1089,9 +1111,18 @@ export function ImportarInventario() {
                         .filter(Boolean)
                         .join(' · ')}
                     </p>
+                    {fila.usuario_id && sesion.puede('usuarios.ver') ? (
+                      <Link className="mt-2 inline-block font-semibold text-primary-strong hover:underline" to={`/panel/usuarios/${fila.usuario_id}`}>
+                        Ver perfil de {fila.nombre_asignado || fila.nombre_excel}
+                      </Link>
+                    ) : null}
                   </li>
                 ))}
               </ul>
+              {!personasFiltradas.length ? <p className="mt-3 text-sm text-muted-foreground">No hay perfiles que coincidan con la búsqueda.</p> : null}
+              <div className="mt-3">
+                <Paginacion pagina={paginaPersonasActual} totalPaginas={paginasPersonas} total={personasFiltradas.length} porPagina={20} alCambiar={setPaginaPersona} />
+              </div>
               <p className="mt-2 text-2xs text-muted-foreground">
                 Para corregir uno, abre su ficha desde Equipos → Inventario, o cambia el
                 responsable del equipo.
