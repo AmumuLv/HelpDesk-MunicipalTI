@@ -5,7 +5,7 @@ import { entrar } from './utilidades'
 // Desde la raíz: docker compose -f compose.pruebas.yml run -d --rm --service-ports
 // --name helpdesk-registro-inicial -e MONGO_DB=helpdesk_test_registro api
 // uvicorn app.main:app --host 0.0.0.0 --port 8000
-// Desde frontend: PRUEBA_API_URL=http://127.0.0.1:18100 npx playwright test pruebas/registro-inicial.spec.ts
+// Desde frontend: PRUEBA_API_URL=http://127.0.0.1:18100 npx playwright test -c playwright.inicial.config.ts
 test.describe.configure({ mode: 'serial' })
 test.beforeEach(async ({ page }) => { page.setDefaultTimeout(20_000) })
 test.beforeAll(async ({ request }) => {
@@ -34,6 +34,24 @@ test('primera laptop: crea zona y oficina desde el registro sin perder los datos
   await dialogo.getByRole('button', { name: 'Crear zona y continuar' }).click()
   await expect(dialogo.getByText('Esta zona todavía no tiene oficinas', { exact: true })).toBeVisible()
   await dialogo.getByLabel('Nombre de la nueva oficina').fill('Oficina inicial ficticia')
+  // A background synchronization must not unmount the inline form or lose its draft.
+  const oficinasActualizadas = page.waitForResponse(r => new URL(r.url()).pathname === '/api/oficinas' && r.request().method() === 'GET')
+  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')))
+  await oficinasActualizadas
+  await expect(dialogo.getByLabel('Nombre de la nueva oficina')).toHaveValue('Oficina inicial ficticia')
+  const rutaOficinas = /\/api\/oficinas(?:\?.*)?$/
+  await page.route(rutaOficinas, ruta => ruta.request().method() === 'GET'
+    ? ruta.fulfill({ status: 503, json: { mensaje: 'Interrupcion temporal ficticia' } })
+    : ruta.continue())
+  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')))
+  await expect(dialogo.getByText('No pudimos cargar las oficinas', { exact: true })).toBeVisible()
+  await expect(dialogo.getByLabel('Nombre de la nueva oficina')).toHaveValue('Oficina inicial ficticia')
+  await page.unroute(rutaOficinas)
+  const oficinasRecuperadas = page.waitForResponse(r => new URL(r.url()).pathname === '/api/oficinas' && r.status() === 200)
+  await dialogo.getByRole('button', { name: 'Reintentar oficinas', exact: true }).click()
+  await oficinasRecuperadas
+  await expect(dialogo.getByLabel('Nombre de la nueva oficina')).toHaveValue('Oficina inicial ficticia')
+  await expect(dialogo.getByRole('button', { name: 'Crear oficina y continuar' })).toBeEnabled()
   await dialogo.getByRole('button', { name: 'Crear oficina y continuar' }).click()
   await expect(dialogo.getByRole('button', { name: 'Continuar', exact: true })).toBeEnabled()
   await dialogo.getByRole('button', { name: 'Continuar', exact: true }).click()

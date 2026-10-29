@@ -19,10 +19,10 @@ import { Button } from '../../componentes/base/Button'
 import { ConfirmDialog } from '../../componentes/base/Sobreposiciones'
 import { ErrorState, Nota, PageHeader, Panel, SkeletonPanel } from '../../componentes/base/Estructura'
 import { fechaHora, desdeHace } from '../../dominio/formato'
-import { useSesion } from '../../estado/Sesion'
+import { useSesion } from '../../estado/useSesion'
 import { cn } from '../../lib/cn'
 import { useTiempoReal } from '../../api/tiempoReal'
-import { useAvisos } from '../../estado/Avisos'
+import { useAvisos } from '../../estado/useAvisos'
 import { AdjuntosMensaje, CompositorMensaje } from '../../componentes/dominio/MultimediaChat'
 import { PerfilTecnicoTicket } from '../../componentes/dominio/PerfilTecnicoTicket'
 
@@ -45,17 +45,19 @@ export function TicketUsuario() {
   useTiempoReal('ticket', id, tieneChat)
   const mensajes = useMensajesTicket(id, tieneChat)
   const cantidadMensajes = mensajes.data?.items.length ?? 0
+  const recargarTicket = ticket.refetch
+  const recargarMensajes = mensajes.refetch
   useEffect(() => {
     if (listaMensajes.current && seguirMensajes.current) listaMensajes.current.scrollTop = listaMensajes.current.scrollHeight
   }, [cantidadMensajes])
   useEffect(() => {
     const temporizador = window.setInterval(() => {
       if (document.visibilityState !== 'visible') return
-      void ticket.refetch()
-      if (tieneChat) void mensajes.refetch()
+      void recargarTicket()
+      if (tieneChat) void recargarMensajes()
     }, 5_000)
     return () => window.clearInterval(temporizador)
-  }, [id, tieneChat, ticket.refetch, mensajes.refetch])
+  }, [id, tieneChat, recargarTicket, recargarMensajes])
 
   const [mensaje, setMensaje] = useState('')
   const [enviando, setEnviando] = useState(false)
@@ -162,8 +164,9 @@ export function TicketUsuario() {
         <div className="mt-3">
         <p className="text-base whitespace-pre-line">{datos.descripcion}</p>
         <dl className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-          <Dato etiqueta="Oficina" valor={datos.oficina_nombre ?? 'Sin oficina'} />
-          <Dato etiqueta="Equipo" valor={datos.activo_nombre ?? 'No indicado'} />
+            <Dato etiqueta="Solicitud" valor={datos.reporte_para === 'oficina' ? 'Para mi oficina' : datos.reporte_para === 'companero' ? 'Para un compañero' : 'Para mí'} />
+            <Dato etiqueta="Oficina" valor={datos.oficina_nombre ?? 'Sin oficina'} />
+            <Dato etiqueta="Equipo" valor={datos.activo_nombre ?? 'No indicado'} />
         </dl>
         </div>
       </details>

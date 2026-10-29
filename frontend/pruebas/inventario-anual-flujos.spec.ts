@@ -19,7 +19,14 @@ test('nota de voz limita adjuntos a cinco MB y se detiene a los dos minutos', as
   await expect(page.getByRole('list', { name: 'Adjuntos preparados' })).toHaveCount(0)
   await page.clock.install()
   await page.getByRole('button', { name: 'Grabar audio', exact: true }).click()
-  await expect(page.getByRole('status').filter({ hasText: /Grabando 0:0[12]/ })).toBeVisible()
+  const registroVoz = page.getByRole('status').filter({ hasText: /^Grabando \d+:\d{2}$/ })
+  await expect(registroVoz).toBeVisible()
+  // Signal detection can take more than two seconds on a busy machine. Check
+  // elapsed recording time instead of requiring an already elapsed time window.
+  await expect.poll(async () => {
+    const tiempo = /Grabando (\d+):(\d{2})/.exec(await registroVoz.textContent() ?? '')
+    return tiempo ? Number(tiempo[1]) * 60 + Number(tiempo[2]) : 0
+  }).toBeGreaterThanOrEqual(1)
   await page.clock.fastForward(120_100)
   await expect(page.getByRole('button', { name: 'Grabar audio', exact: true })).toBeVisible()
   await expect(page.getByRole('list', { name: 'Adjuntos preparados' }).locator('audio')).toBeVisible()

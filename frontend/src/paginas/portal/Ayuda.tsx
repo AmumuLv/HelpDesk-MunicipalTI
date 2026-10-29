@@ -17,7 +17,7 @@ import { Button } from '../../componentes/base/Button'
 import { SearchInput, Select } from '../../componentes/base/Campo'
 import { EmptyState, ErrorState, PageHeader, Panel, SkeletonPanel } from '../../componentes/base/Estructura'
 import { numero } from '../../dominio/formato'
-import { useSesion } from '../../estado/Sesion'
+import { useSesion } from '../../estado/useSesion'
 
 export function Ayuda() {
   const sesion = useSesion()

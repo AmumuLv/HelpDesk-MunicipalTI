@@ -24,6 +24,10 @@ const BASE = `http://127.0.0.1:${PUERTO}`
 
 export default defineConfig({
   testDir: './pruebas',
+  globalSetup: process.env.PRUEBA_API_URL ? './pruebas/esperar-api.ts' : undefined,
+  // These three scenarios require an empty database, unlike the seeded suite.
+  // Run them explicitly with playwright.inicial.config.ts.
+  testIgnore: ['**/registro-inicial.spec.ts'],
   // Cada prueba recorre todas las pantallas de un rol en un tamaño, y cada
   // pantalla pasa cuatro comprobaciones: 90 s se quedaban cortos.
   timeout: 420_000,

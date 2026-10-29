@@ -9,8 +9,8 @@ import { Button } from '../../componentes/base/Button'
 import { Input, Select } from '../../componentes/base/Campo'
 import { EmptyState, ErrorState, NoPermission, Nota, PageHeader, Panel, SkeletonPanel } from '../../componentes/base/Estructura'
 import { fechaHora, fechaNumerica, hoy, sumarDias, tamano } from '../../dominio/formato'
-import { useAvisos } from '../../estado/Avisos'
-import { useSesion } from '../../estado/Sesion'
+import { useAvisos } from '../../estado/useAvisos'
+import { useSesion } from '../../estado/useSesion'
 
 const REPORTES = [
   { valor: 'tickets', etiqueta: 'Tickets del periodo', detalle: 'Para revisar qué se reportó y cómo se encuentra cada caso creado en las fechas elegidas.', incluye: ['Casos abiertos y finalizados', 'Persona, equipo y ubicación', 'Técnico, fechas y tiempos'] },

@@ -19,7 +19,7 @@ import { disponibilidadDe, type TonoUrgencia } from '../../dominio/estados'
 import { useActivos, useBuscarEquipos, useCatalogoEquipos, useOficinas, useZonas } from '../../api/hooks'
 import { consulta } from '../../api/cliente'
 import { descargarDeLaApi, nombreDeArchivo } from '../../api/descarga'
-import { useAvisos } from '../../estado/Avisos'
+import { useAvisos } from '../../estado/useAvisos'
 import type { ItemActivo, FiltrosActivos, ItemEquipoBuscado } from '../../api/tipos'
 import { CompletitudBadge, DisponibilidadBadge, EstadoCampoBadge } from '../../componentes/dominio/Badge'
 import { DataTable, Paginacion, CeldaVacia, type ColumnaTabla } from '../../componentes/dominio/DataTable'
@@ -28,7 +28,7 @@ import { Button } from '../../componentes/base/Button'
 import { SearchInput, Select } from '../../componentes/base/Campo'
 import { PopoverSimple, Sheet } from '../../componentes/base/Sobreposiciones'
 import { EmptyState, ErrorState, PageHeader } from '../../componentes/base/Estructura'
-import { useSesion } from '../../estado/Sesion'
+import { useSesion } from '../../estado/useSesion'
 import { ZonaBadge } from '../../componentes/dominio/ZonaBadge'
 import { EnlaceOficina } from '../../componentes/dominio/EnlaceOficina'
 import { IconoTipoEquipo } from '../../componentes/dominio/IconoTipoEquipo'
@@ -155,6 +155,7 @@ export function Equipos() {
     ? ['1', 'true'].includes(parametros.get('solo_faltantes') ?? '')
     : leerUbicacionInventario(claveUbicacion).soloFaltantes
 
+  const soloUsoComun = parametros.get('solo_uso_comun') === '1'
   const [texto, setTexto] = useState(() => parametros.get('texto') ?? '')
   const [zonaId, setZonaId] = useState(() => enlaceConUbicacion ? parametros.get('zona_id') ?? '' : leerUbicacionInventario(claveUbicacion).zona)
   const [oficinaId, setOficinaId] = useState(() => enlaceConUbicacion ? parametros.get('oficina_id') ?? '' : leerUbicacionInventario(claveUbicacion).oficina)
@@ -193,6 +194,7 @@ export function Equipos() {
   const avisos = useAvisos()
 
   const filtros: FiltrosActivos = {
+    ...(soloUsoComun ? { solo_uso_comun: 'true' } : {}),
     ...(responsablesPendientes ? { responsables_pendientes: true } : {}),
     ...(soloFaltantes ? { solo_faltantes: true } : {}),
     ...(texto.trim() ? { texto: texto.trim() } : {}),
@@ -226,6 +228,7 @@ export function Equipos() {
         tipo: tipo || undefined,
         texto: textoBusqueda.trim() || undefined,
         solo_faltantes: soloFaltantes || undefined,
+        solo_uso_comun: soloUsoComun || undefined,
       })
       const partes = ['inventario']
       const zonaNombre = zonas.data?.items.find((z) => z.id === zonaId)?.nombre
@@ -246,7 +249,7 @@ export function Equipos() {
     * API ya viene filtrado, así que con cero no se puede saber por qué.
     */
   const hayFiltroPuesto = Boolean(
-    responsablesPendientes || soloFaltantes || texto.trim() || zonaId || oficinaId || tipo,
+    soloUsoComun || responsablesPendientes || soloFaltantes || texto.trim() || zonaId || oficinaId || tipo,
   )
 
   // Las coincidencias se consultan con retardo: antes salía una petición por
@@ -462,6 +465,7 @@ export function Equipos() {
           placeholder="Todos"
           opciones={tipos.map((valor) => ({ valor, etiqueta: valor }))}
         />
+        <Select etiqueta="Asignación" value={soloUsoComun ? 'comun' : 'todos'} onChange={evento => { const nuevos = new URLSearchParams(parametros); if (evento.target.value === 'comun') nuevos.set('solo_uso_comun', '1'); else nuevos.delete('solo_uso_comun'); cambiarParametros(nuevos); setPagina(1) }} opciones={[{ valor: 'todos', etiqueta: 'Todos los equipos' }, { valor: 'comun', etiqueta: 'Compartidos de la oficina' }]} />
         <Select
           etiqueta="Agrupar por"
           value={agruparPor}

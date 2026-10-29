@@ -42,8 +42,8 @@ import { EmptyState, ErrorState, Nota, PageHeader, Panel, PantallaFormulario, Sk
 import { EnlaceOficina } from '../../componentes/dominio/EnlaceOficina'
 import { Paginacion } from '../../componentes/dominio/DataTable'
 import { numero, plural } from '../../dominio/formato'
-import { useAvisos } from '../../estado/Avisos'
-import { useSesion } from '../../estado/Sesion'
+import { useAvisos } from '../../estado/useAvisos'
+import { useSesion } from '../../estado/useSesion'
 
 type Elemento = { id: string; nombre: string }
 type AEditar = Elemento & { tipo: 'zona' | 'oficina'; activa: boolean }

@@ -12,7 +12,7 @@ import { api } from '../../api/cliente'
 import type { RespuestasRapidasRespuesta } from '../../api/tipos'
 
 import { useMensajesTicket } from '../../api/hooks'
-import { useSesion } from '../../estado/Sesion'
+import { useSesion } from '../../estado/useSesion'
 import { cn } from '../../lib/cn'
 import { fechaHora } from '../../dominio/formato'
 import { Panel } from '../base/Estructura'

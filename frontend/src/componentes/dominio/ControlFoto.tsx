@@ -17,7 +17,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { claves } from '../../api/consultas'
 
 import { MAX_FOTO_MB, quitarFoto, subirFoto } from '../../api/fotos'
-import { useAvisos } from '../../estado/Avisos'
+import { useAvisos } from '../../estado/useAvisos'
 import { Button } from '../base/Button'
 import { Nota } from '../base/Estructura'
 

@@ -263,13 +263,15 @@ async def actualizar_ticket(ticket_id: str, datos: TicketActualizar, sesion: Dep
 
 
 @router.get('/tickets/{ticket_id}/vinculos')
-async def opciones_vinculo(ticket_id: str, sesion: DependeUsuario):
+async def opciones_vinculo(ticket_id: str, sesion: DependeUsuario, corregir_origen: bool = False):
     sesion.exigir('tickets.operar')
     from app.core.db import get_db
     from app.services.historial_inventario_service import opciones_ticket
     objetivo = id_requerido(ticket_id, 'ticket')
     await ticket_service.obtener(objetivo, usuario=sesion.usuario)
-    return await opciones_ticket(await get_db().tickets.find_one({'_id': objetivo}))
+    if corregir_origen and sesion.usuario.get('rol') not in {'tecnico', 'administrador'}:
+        raise Prohibido('La identificación del equipo corresponde a TI.')
+    return await opciones_ticket(await get_db().tickets.find_one({'_id': objetivo}), corregir_origen=corregir_origen)
 
 
 @router.post("/tickets/{ticket_id}/asignar")

@@ -1,6 +1,7 @@
 """Sonda explícita del proveedor real sobre datos ficticios; configuración por stdin."""
 import asyncio
 import json
+import re
 import sys
 import time
 
@@ -74,6 +75,8 @@ async def main():
         resultado = {'caso': nombre, 'disponible': respuesta.get('disponible'), 'segundos': round(time.monotonic()-inicio, 2), 'texto': texto, 'uso': respuesta.get('uso'), 'lecturas': list(llamadas), 'sin_cambios_en_registros': True}
         if nombre == 'datos_reales':
             resultado['total_verificable'] = await db.activos.count_documents({'activo': {'$ne': False}, 'eliminado': {'$ne': True}})
+            if respuesta.get('disponible'):
+                assert re.search(r'(?<!\d)' + str(resultado['total_verificable']) + r'(?!\d)', texto), 'La respuesta no contiene el total real verificado'
         resultados.append(resultado)
         print(json.dumps(resultado, ensure_ascii=False), flush=True)
         if not respuesta.get('disponible'):

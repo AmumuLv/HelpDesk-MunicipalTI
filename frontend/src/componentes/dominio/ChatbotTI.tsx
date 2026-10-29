@@ -1,9 +1,9 @@
 import { ArrowUpRight, Bot, MessageCirclePlus, Send, ShieldCheck, Sparkles, Trash2, X } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useLocation } from 'react-router-dom'
 import { api } from '../../api/cliente'
-import { useSesion } from '../../estado/Sesion'
+import { useSesion } from '../../estado/useSesion'
 import * as Dialog from '@radix-ui/react-dialog'
 import './ChatbotTI.css'
 
@@ -18,7 +18,7 @@ export function ChatbotTI() {
   const sesion = useSesion()
   const ubicacion = useLocation()
   const cache = useQueryClient()
-  const claveConversacion = ['chatbot-ti', 'conversacion', sesion.usuario?.id]
+  const claveConversacion = useMemo(() => ['chatbot-ti', 'conversacion', sesion.usuario?.id], [sesion.usuario?.id])
   const permitido = sesion.rol === 'tecnico' || sesion.rol === 'administrador'
   const [abierto, setAbierto] = useState(false)
   const [pregunta, setPregunta] = useState('')
@@ -39,7 +39,7 @@ export function ChatbotTI() {
   const historial = useQuery({ queryKey: ['chatbot-ti', 'historial', sesion.usuario?.id], queryFn: () => api.obtener<{ items: ChatGuardado[] }>('/ia/chatbot/conversaciones'), enabled: permitido && abierto, retry: false, refetchInterval: abierto ? 15000 : false })
   const limite = limiteChat ?? estado.data?.limite_consultas
   const agotado = limite !== undefined && consumo.consultas >= limite
-  const abrirChat = async (id: string) => {
+  const abrirChat = useCallback(async (id: string) => {
     if (bloqueo.current) return
     const propietario = cuenta.current
     setCargandoChat(true); setError(''); setAnimarIndice(null)
@@ -50,18 +50,29 @@ export function ChatbotTI() {
       cache.setQueryData(claveConversacion, { ...chat, id })
     } catch (fallo) { if (cuenta.current === propietario) setError(fallo instanceof Error ? fallo.message : 'No se pudo abrir la conversación.') }
     finally { if (cuenta.current === propietario) setCargandoChat(false) }
-  }
+  }, [cache, claveConversacion])
+  const nuevaConsulta = useCallback(() => {
+    if (bloqueo.current || cargandoChat) return
+    restaurada.current = true
+    const vacia = { mensajes: [], consumo: { consultas: 0, tokens: 0, conTokens: 0 } }
+    cache.setQueryData(claveConversacion, vacia)
+    setMensajes([]); setConsumo(vacia.consumo); setError('')
+    setAnimarIndice(null)
+    setChatId(undefined); setLimiteChat(undefined); setPregunta('')
+  }, [cache, claveConversacion, cargandoChat])
   useEffect(() => {
     if (!abierto || !historial.isFetched || restaurada.current) return
     restaurada.current = true
     if (!chatId && !mensajes.length && historial.data?.items?.length) void abrirChat(historial.data.items[0].id)
-  }, [abierto, historial.isFetched, historial.data])
+  }, [abierto, historial.isFetched, historial.data, chatId, mensajes.length, abrirChat])
   useEffect(() => {
-    if (!abierto || !chatId || enviando || cargandoChat || historial.isFetching || !historial.data?.items) return
+    if (!abierto || !chatId || enviando || cargandoChat || historial.isFetching || historial.isError || !historial.data?.items) return
     const remoto = historial.data.items.find(chat => chat.id === chatId)
     if (!remoto) { nuevaConsulta(); return }
-    if (!remoto.en_curso && (remoto.consumo.consultas !== consumo.consultas || remoto.consumo.tokens !== consumo.tokens)) void abrirChat(chatId)
-  }, [abierto, historial.data, historial.isFetching, chatId, enviando])
+    // A cached list may lag behind the detail just loaded. Never reopen the
+    // same chat repeatedly to replace newer messages with that older snapshot.
+    if (!remoto.en_curso && (remoto.consumo.consultas > consumo.consultas || remoto.consumo.tokens > consumo.tokens)) void abrirChat(chatId)
+  }, [abierto, historial.data, historial.isFetching, historial.isError, chatId, enviando, cargandoChat, consumo.consultas, consumo.tokens, abrirChat, nuevaConsulta])
   useEffect(() => {
     cache.setQueryDefaults(['chatbot-ti', 'conversacion'], { gcTime: Infinity })
     const guardada = cache.getQueryData<Conversacion>(['chatbot-ti', 'conversacion', sesion.usuario?.id])
@@ -77,15 +88,6 @@ export function ChatbotTI() {
     const marco = requestAnimationFrame(() => { if (registro.current) registro.current.scrollTop = registro.current.scrollHeight })
     return () => cancelAnimationFrame(marco)
   }, [abierto, mensajes, enviando])
-  const nuevaConsulta = () => {
-    if (bloqueo.current || cargandoChat) return
-    restaurada.current = true
-    const vacia = { mensajes: [], consumo: { consultas: 0, tokens: 0, conTokens: 0 } }
-    cache.setQueryData(claveConversacion, vacia)
-    setMensajes([]); setConsumo(vacia.consumo); setError('')
-    setAnimarIndice(null)
-    setChatId(undefined); setLimiteChat(undefined); setPregunta('')
-  }
   const eliminarChat = async () => {
     if (!chatId || bloqueo.current || cargandoChat) return
     const propietario = cuenta.current

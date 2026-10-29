@@ -35,8 +35,8 @@ import { Avatar, ErrorState, PageHeader, Panel, SkeletonPanel } from '../../comp
 import { fechaHora } from '../../dominio/formato'
 import { cn } from '../../lib/cn'
 import { ESTADOS, origenDe, TRANSICIONES_TICKET } from '../../dominio/estados'
-import { useAvisos } from '../../estado/Avisos'
-import { useSesion } from '../../estado/Sesion'
+import { useAvisos } from '../../estado/useAvisos'
+import { useSesion } from '../../estado/useSesion'
 import { ZonaBadge } from '../../componentes/dominio/ZonaBadge'
 import { EnlaceOficina } from '../../componentes/dominio/EnlaceOficina'
 import { IconoTipoEquipo } from '../../componentes/dominio/IconoTipoEquipo'
@@ -284,7 +284,7 @@ export function TicketDetalle() {
           </DatoCabecera>
         ) : null}
         <DatoCabecera etiqueta="Origen">
-          <span className="text-sm font-medium text-foreground">{origenDe(datos.origen).texto}</span>
+          <span className="text-sm font-medium text-foreground">{datos.reporte_para === 'oficina' ? 'Reportado para la oficina' : origenDe(datos.origen).texto}</span>
         </DatoCabecera>
       </div>
 
@@ -315,7 +315,7 @@ export function TicketDetalle() {
             <section aria-label="Descripción del problema" className="min-w-0 rounded-xl bg-surface-2/50 p-4 sm:p-5">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <h3 className="flex items-center gap-2.5 text-sm font-semibold"><span className="rounded-lg bg-primary-soft p-2 text-info-strong"><MessageSquare size={17} aria-hidden="true" /></span>Descripción del problema</h3>
-                {datos.reporte_para === 'oficina' ? <span className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-warning-soft px-3 py-1 text-xs font-medium text-warning-strong"><Building2 size={14} className="shrink-0" aria-hidden="true" />Reporte de oficina</span> : datos.reporte_para === 'companero' || (datos.reportante_id && datos.afectado_id && datos.reportante_id !== datos.afectado_id) ? <span className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-primary-soft px-3 py-1 text-xs font-medium text-info-strong"><Users size={14} className="shrink-0" aria-hidden="true" />Reporte para un compañero</span> : datos.reporte_para === 'propio' ? <span className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground"><UserCheck size={14} className="shrink-0" aria-hidden="true" />Reporte personal</span> : null}
+                {!edicion ? <>{datos.reporte_para === 'oficina' ? <span className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-warning-soft px-3 py-1 text-xs font-medium text-warning-strong"><Building2 size={14} className="shrink-0" aria-hidden="true" />Reporte de oficina</span> : datos.reporte_para === 'companero' || (datos.reportante_id && datos.afectado_id && datos.reportante_id !== datos.afectado_id) ? <span className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-primary-soft px-3 py-1 text-xs font-medium text-info-strong"><Users size={14} className="shrink-0" aria-hidden="true" />Reporte para un compañero</span> : datos.reporte_para === 'propio' ? <span className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground"><UserCheck size={14} className="shrink-0" aria-hidden="true" />Reporte personal</span> : null}</> : null}
               </div>
               <div className="border-l-2 border-accion/40 pl-4">
                 {datos.descripcion ? <p className="max-w-[72ch] whitespace-pre-wrap text-sm leading-7 [overflow-wrap:anywhere] sm:text-base">{datos.descripcion}</p> : <p className="text-sm text-muted-foreground">No se añadió una descripción.</p>}
@@ -335,7 +335,7 @@ export function TicketDetalle() {
               </div>
               <div className="flex min-w-0 items-center gap-3 rounded-xl border border-border bg-surface-2/50 p-3">
                 <span className="shrink-0"><IconoTipoEquipo tipo={datos.activo_tipo} tamano={24} /></span>
-                <div className="min-w-0"><p className="text-2xs text-muted-foreground">{datos.activo_id ? 'Equipo afectado' : 'Computadora afectada'}</p>
+                <div className="min-w-0"><p className="text-2xs text-muted-foreground">{datos.conjunto_id && !datos.activo_id ? 'Computadora afectada' : 'Equipo afectado'}</p>
                   {datos.activo_id ? <Link to={`/panel/equipos/${datos.activo_id}`} className="block truncate text-sm font-semibold text-primary-strong hover:underline" title={datos.activo_nombre ?? undefined}>{datos.activo_nombre || datos.activo_tipo || 'Ver ficha del equipo'}</Link> : <p className="truncate text-sm font-semibold" title={datos.conjunto_nombre ?? undefined}>{datos.conjunto_id ? datos.conjunto_nombre || 'Conjunto completo' : datos.activo_nombre ? `${datos.activo_nombre} · por identificar` : ['programa', 'servicio'].includes(datos.alcance_incidencia ?? '') ? 'Sin equipo: programa o servicio general' : 'Equipo por identificar'}</p>}
                   {datos.sistema_afectado ? <p className="truncate text-xs text-muted-foreground" title={datos.sistema_afectado}>{datos.sistema_afectado}</p> : null}
                 </div>
@@ -348,11 +348,11 @@ export function TicketDetalle() {
                 valor={datos.reportante_nombre}
                 enlace={sesion.puede('usuarios.ver') && datos.reportante_id ? `/panel/usuarios/${datos.reportante_id}` : undefined}
               />
-              <Campo
+              {datos.reporte_para === 'oficina' ? <Campo etiqueta="Afecta a" valor="La oficina · equipo compartido" /> : datos.reportante_id && datos.reportante_id === datos.afectado_id ? <Campo etiqueta="Solicitud" valor="Para sí mismo" /> : <Campo
                 etiqueta="Afecta a"
                 valor={datos.afectado_nombre}
                 enlace={sesion.puede('usuarios.ver') && datos.afectado_id ? `/panel/usuarios/${datos.afectado_id}` : undefined}
-              />
+              />}
               <Campo etiqueta="Zona">
                 <ZonaBadge id={datos.zona_id} nombre={datos.zona_nombre} />
               </Campo>

@@ -1,0 +1,1 @@
+export function categoriaDePc(categoria: string) { const c = categoria.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); return !c.includes('formate') && /programa|sistema|software|correo|cuenta/.test(c) }

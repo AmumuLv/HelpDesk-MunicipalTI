@@ -14,7 +14,7 @@ import { HorarioTecnico } from '../../componentes/dominio/HorarioTecnico'
 import { CalendarioEquipoTi } from '../../componentes/dominio/CalendarioEquipoTi'
 import { Paginacion } from '../../componentes/dominio/DataTable'
 import { fechaCorta } from '../../dominio/formato'
-import { useSesion } from '../../estado/Sesion'
+import { useSesion } from '../../estado/useSesion'
 
 export function PerfilTecnico() {
   const { id } = useParams()

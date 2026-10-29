@@ -6,7 +6,8 @@ jobs:
   backend:
     # MongoDB 8.0 requiere un kernel anterior a 6.19 (SERVER-121912).
     runs-on: ubuntu-22.04
-    timeout-minutes: 25
+    # The image now compiles and checks its native security backports as well.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - name: Suite del servidor en servicios aislados

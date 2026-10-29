@@ -8,7 +8,7 @@
 
 import { Monitor, Users } from 'lucide-react'
 import { useEffect } from 'react'
-import { useSesion } from '../../estado/Sesion'
+import { useSesion } from '../../estado/useSesion'
 import { Link } from 'react-router-dom'
 
 import { useEquiposDePersona } from '../../api/hooks'

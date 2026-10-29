@@ -202,8 +202,6 @@ const salida = `/**
  * la interfaz no podría leer un solo campo sin adivinar.
  */
 
-/* eslint-disable */
-
 /* ═══════════════════════ Respuestas ═══════════════════════ */
 
 ${bloques.join('\n')}

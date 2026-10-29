@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useAvisos } from '../../estado/Avisos'
+import { useAvisos } from '../../estado/useAvisos'
 
 export function useGrabacionVoz(alGrabar: (archivo: File) => Promise<void>) {
   const avisos = useAvisos()

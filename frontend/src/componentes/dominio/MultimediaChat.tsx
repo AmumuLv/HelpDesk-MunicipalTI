@@ -2,7 +2,7 @@ import { ImagePlus, Mic, Paperclip, Send, SlidersHorizontal, Square, X } from 'l
 import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../../api/cliente'
-import { useAvisos } from '../../estado/Avisos'
+import { useAvisos } from '../../estado/useAvisos'
 import { Button } from '../base/Button'
 import { useGrabacionVoz } from './useGrabacionVoz'
 
@@ -44,9 +44,10 @@ export function CompositorMensaje({ valor, alCambiar, cargando, onEnviar, textoE
 
   useEffect(() => {
     vivo.current = true
+    const direcciones = urls.current
     return () => {
       vivo.current = false
-      urls.current.forEach(url => URL.revokeObjectURL(url))
+      direcciones.forEach(url => URL.revokeObjectURL(url))
     }
   }, [])
 

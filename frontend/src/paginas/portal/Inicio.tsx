@@ -6,7 +6,7 @@ import { Button } from '../../componentes/base/Button'
 import { ErrorState, SkeletonPanel } from '../../componentes/base/Estructura'
 import { EstadoReporte } from '../../componentes/dominio/EstadoReporte'
 import { desdeHace } from '../../dominio/formato'
-import { useSesion } from '../../estado/Sesion'
+import { useSesion } from '../../estado/useSesion'
 
 export function Inicio() {
   const sesion = useSesion()

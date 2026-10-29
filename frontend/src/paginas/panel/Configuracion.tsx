@@ -29,9 +29,9 @@ import {
   Tab,
   TabsPanel,
 } from '../../componentes/base/Estructura'
-import { useAvisos } from '../../estado/Avisos'
+import { useAvisos } from '../../estado/useAvisos'
 import { TEXTOS_IA } from '../../dominio/textos-ia'
-import { useSesion } from '../../estado/Sesion'
+import { useSesion } from '../../estado/useSesion'
 import { Paginacion } from '../../componentes/dominio/DataTable'
 import { ConfiguracionSla } from '../../componentes/dominio/ConfiguracionSla'
 
@@ -51,6 +51,8 @@ export function Configuracion() {
   const [avisarAfectado, setAvisarAfectado] = useState(true)
   const [avisarReportante, setAvisarReportante] = useState(true)
   const ultimoFormulario = useRef<string | null>(null)
+  const formularioActual = useRef('')
+  formularioActual.current = JSON.stringify([institucion, iaGlobal, iaAprendizaje, iaRecomendaciones, confianzaMinima, avisarAfectado, avisarReportante])
 
   useEffect(() => {
     document.title = 'Configuración · Mesa de Ayuda TI'
@@ -58,7 +60,7 @@ export function Configuracion() {
 
   useEffect(() => {
     if (!config.data) return
-    const actual = JSON.stringify([institucion, iaGlobal, iaAprendizaje, iaRecomendaciones, confianzaMinima, avisarAfectado, avisarReportante])
+    const actual = formularioActual.current
     const nuevo = JSON.stringify([config.data.institucion?.nombre ?? '', config.data.ia?.global_activa ?? false, config.data.ia?.aprendizaje_activo ?? false, config.data.ia?.recomendaciones_activas ?? false, String(config.data.ia?.confianza_minima ?? ''), config.data.notificaciones?.avisar_al_afectado ?? true, config.data.notificaciones?.avisar_al_reportante ?? true])
     const editando = ultimoFormulario.current !== null && actual !== ultimoFormulario.current
     ultimoFormulario.current = nuevo

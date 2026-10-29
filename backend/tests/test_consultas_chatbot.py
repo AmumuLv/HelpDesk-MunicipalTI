@@ -13,6 +13,59 @@ from app.services import chatbot_service as chat
 
 
 class ConsultasChatbotTest(unittest.IsolatedAsyncioTestCase):
+    def test_total_equipos_usa_el_total_no_la_muestra_y_admite_cero(self):
+        for total in (0, 1, 280):
+            with self.subTest(total=total):
+                texto = consultas.resumen_total_equipos({'recurso': 'equipos', 'total': total, 'items': [{'nombre': 'Muestra'}]}, 'Cuántos equipos activos hay registrados')
+                self.assertIn(f'**{total} equipo', texto)
+
+    def test_total_equipos_no_sustituye_listados_filtros_o_permisos(self):
+        datos = {'recurso': 'equipos', 'total': 28}
+        for pregunta in ('Cuántos equipos hay y cuáles son sus nombres', 'Cuántos equipos hay por oficina', 'Cuántos equipos hay con 8 GB de RAM', 'Cuántos equipos hay y cuántos usuarios', 'Cuántos equipos hay este mes', 'Cuántos equipos hay obsoletos', 'Cuántos equipos hay dados de baja', 'Cuántos equipos hay registrados en 2026', 'Cuántos equipos hay por sistema', 'Cuántos equipos hay no activos'):
+            with self.subTest(pregunta=pregunta):
+                self.assertIsNone(consultas.resumen_total_equipos(datos, pregunta))
+        for variante in ({**datos, 'error': 'Acceso denegado'}, {**datos, 'recurso': 'usuarios'}, {**datos, 'total': True}, {**datos, 'total': -1}):
+            self.assertIsNone(consultas.resumen_total_equipos(variante, 'Cuántos equipos hay'))
+        self.assertIn('28 equipos', consultas.resumen_total_equipos(datos, 'Consulta el inventario actual y dime exactamente cuántos equipos activos hay registrados. Necesito el total real, no una estimación.'))
+
+    async def test_conteo_simple_evita_segunda_llamada_groq_y_conserva_uso(self):
+        primera = httpx.Response(200, json={
+            'usage': {'prompt_tokens': 100, 'completion_tokens': 20, 'total_tokens': 120},
+            'choices': [{'message': {'content': None, 'tool_calls': [{'id': 'lectura', 'type': 'function', 'function': {'name': 'consultar_sistema', 'arguments': json.dumps({'recurso': 'equipos'})}}]}}],
+        }, request=httpx.Request('POST', 'https://api.groq.com/openai/v1/chat/completions'))
+        cliente = MagicMock()
+        cliente.post = AsyncMock(return_value=primera)
+        contexto = MagicMock()
+        contexto.__aenter__ = AsyncMock(return_value=cliente)
+        contexto.__aexit__ = AsyncMock(return_value=False)
+        with patch.object(chat.settings, 'groq_model', 'openai/gpt-oss-20b'), patch.object(chat.settings, 'groq_api_key', 'clave-ficticia'), patch.object(chat.httpx, 'AsyncClient', return_value=contexto), patch.object(consultas, 'ejecutar_seguro', new=AsyncMock(return_value={'recurso': 'equipos', 'total': 280, 'items': []})):
+            respuesta = await chat.responder_groq('Solo lectura', 'Cuántos equipos activos hay registrados', [], [], usuario={'rol': 'administrador'})
+        self.assertTrue(respuesta['disponible'])
+        self.assertIn('280 equipos', respuesta['texto'])
+        self.assertEqual(respuesta['uso']['total'], 120)
+        self.assertTrue(respuesta['fuentes'])
+        cliente.post.assert_awaited_once()
+
+    async def test_fallo_en_segunda_ronda_conserva_los_tokens_ya_confirmados(self):
+        peticion = httpx.Request('POST', 'https://api.groq.com/openai/v1/chat/completions')
+        primera = httpx.Response(200, json={
+            'usage': {'prompt_tokens': 100, 'completion_tokens': 20, 'total_tokens': 120},
+            'choices': [{'message': {'content': None, 'tool_calls': [{'id': 'lectura', 'type': 'function', 'function': {'name': 'consultar_sistema', 'arguments': json.dumps({'recurso': 'equipos'})}}]}}],
+        }, request=peticion)
+        for fallo in (httpx.Response(429, json={'error': 'detalle-privado'}, request=peticion), httpx.ConnectError('detalle-privado', request=peticion)):
+            with self.subTest(fallo=type(fallo).__name__):
+                cliente = MagicMock()
+                cliente.post = AsyncMock(side_effect=[primera, fallo])
+                contexto = MagicMock()
+                contexto.__aenter__ = AsyncMock(return_value=cliente)
+                contexto.__aexit__ = AsyncMock(return_value=False)
+                with patch.object(chat.settings, 'groq_model', 'openai/gpt-oss-20b'), patch.object(chat.settings, 'groq_api_key', 'clave-ficticia'), patch.object(chat.httpx, 'AsyncClient', return_value=contexto), patch.object(consultas, 'ejecutar_seguro', new=AsyncMock(return_value={'recurso': 'equipos', 'total': 28, 'items': []})):
+                    respuesta = await chat.responder_groq('Solo lectura', 'Lista los equipos y recomienda una mejora', [], [], usuario={'rol': 'administrador'})
+                self.assertFalse(respuesta['disponible'])
+                self.assertEqual(respuesta['uso']['total'], 120)
+                self.assertNotIn('detalle-privado', respuesta['texto'])
+                self.assertEqual(cliente.post.await_count, 2)
+
     def test_ranking_no_se_deduce_de_muestra_ni_inventa_estado(self):
         resultado = consultas.ajustar_intencion({'recurso': 'tickets', 'estado': 'cerrado'}, 'Qué equipo tuvo más incidencias entre el 15 y el 20 de octubre')
         self.assertEqual(resultado, {'recurso': 'ranking_equipos'})

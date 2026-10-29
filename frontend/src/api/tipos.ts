@@ -80,8 +80,8 @@ export type ResumenTickets = Respuestas.RespuestaTicketsResumen & {
   en_atencion: number
   resueltos: number
 }
-export type ListaTickets = Respuestas.RespuestaTickets
-export type TicketResumen = ListaTickets['items'][number]
+export type ListaTickets = Omit<Respuestas.RespuestaTickets, 'items'> & { items: TicketResumen[] }
+export type TicketResumen = Respuestas.RespuestaTickets['items'][number] & { reporte_para?: 'propio' | 'companero' | 'oficina' | null }
 export type TicketCreado = {
   ticket: Pick<TicketResumen, 'id' | 'codigo' | 'estado' | 'prioridad' | 'tiene_chat'>
   mensaje?: string

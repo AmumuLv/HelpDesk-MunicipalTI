@@ -3805,6 +3805,11 @@ export interface components {
         };
         /** TicketActualizar */
         TicketActualizar: {
+            /**
+             * Corregir Origen
+             * @default false
+             */
+            corregir_origen: boolean;
             /** Version Esperada */
             version_esperada?: string | null;
             /** Alcance Incidencia */
@@ -7596,7 +7601,9 @@ export interface operations {
     };
     opciones_vinculo_api_tickets__ticket_id__vinculos_get: {
         parameters: {
-            query?: never;
+            query?: {
+                corregir_origen?: boolean;
+            };
             header?: never;
             path: {
                 ticket_id: string;

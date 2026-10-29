@@ -78,6 +78,19 @@ class ConversacionesChatbotTest(unittest.IsolatedAsyncioTestCase):
                 await pendiente
         self.assertEqual((await chats.obtener(identificador, self.usuario))['consumo']['consultas'], 1)
 
+    async def test_tokens_confirmados_se_guardan_aunque_falle_la_respuesta_final(self):
+        with patch.object(chats.chatbot_service, 'responder', new=AsyncMock(return_value={'disponible': False, 'texto': 'Cuota temporalmente agotada.', 'fuentes': [], 'uso': {'total': 120}})):
+            fallida = await chats.consultar(self.pregunta(), self.usuario)
+        identificador = fallida['conversacion_id']
+        guardada = await chats.obtener(identificador, self.usuario)
+        self.assertEqual(guardada['consumo'], {'consultas': 1, 'tokens': 120, 'conTokens': 1})
+        self.assertEqual(guardada['mensajes'], [])
+        with patch.object(chats.chatbot_service, 'responder', new=AsyncMock(return_value={'disponible': True, 'texto': 'Respuesta recuperada.', 'fuentes': [], 'uso': {'total': 30}})):
+            await chats.consultar(self.pregunta(identificador), self.usuario)
+        guardada = await chats.obtener(identificador, self.usuario)
+        self.assertEqual(guardada['consumo'], {'consultas': 2, 'tokens': 150, 'conTokens': 2})
+        self.assertEqual(len(guardada['mensajes']), 2)
+
     async def test_borrado_durante_respuesta_no_recrea_documento(self):
         identificador = (await chats.crear(self.usuario))['id']
         async def proveedor(*args, **kwargs):

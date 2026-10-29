@@ -29,8 +29,8 @@ import {
   TabsPanel,
 } from '../../componentes/base/Estructura'
 import { fechaCorta, numero } from '../../dominio/formato'
-import { useAvisos } from '../../estado/Avisos'
-import { useSesion } from '../../estado/Sesion'
+import { useAvisos } from '../../estado/useAvisos'
+import { useSesion } from '../../estado/useSesion'
 
 export function Conocimiento() {
   const sesion = useSesion()

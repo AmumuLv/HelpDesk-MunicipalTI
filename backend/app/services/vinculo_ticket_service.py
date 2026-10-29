@@ -34,7 +34,8 @@ async def resolver(ticket, datos, usuario, *, creacion=False):
                 'conjunto_nombre': None, 'activo_no_identificado': None, 'alcance_incidencia': 'pendiente',
                 'sistema_afectado': normalizar_texto(datos.get('sistema_afectado')) or None,
                 'vinculo_origen': None}
-    opciones = await opciones_ticket(ticket)
+    corregir_origen = not creacion and datos.get('corregir_origen') is True
+    opciones = await opciones_ticket(ticket, corregir_origen=corregir_origen)
     equipos = {e['id']: e for e in opciones['equipos']}
     conjuntos = {c['id']: c for c in opciones['conjuntos']}
     activo_id = datos.get('activo_id', ticket.get('activo_id'))

@@ -1,4 +1,5 @@
 from bson import ObjectId
+import pytest
 from tests.test_tickets_horarios import _mundo
 
 
@@ -19,6 +20,64 @@ async def test_perfil_tecnico_solo_desde_ticket_autorizado_y_datos_acotados(db, 
     assert perfil.json()['especialidades'] == ['Redes']
     ajeno = await _sesion(api, 'companero-perfil-tecnico@prueba.local')
     assert (await api.get(ruta, headers=ajeno)).status_code in (403, 404)
+
+
+async def test_ti_corrige_reporte_personal_al_identificar_impresora_compartida(db, api):
+    m = await _mundo(api, 'corregir-destino')
+    _, equipos = await patrimonio(db, m)
+    creado = await api.post('/api/tickets', headers=m['usuario'], json={
+        'reporte_para': 'propio', 'tipo_problema': 'Impresora',
+        'descripcion': 'La impresora no imprime mis documentos',
+    })
+    assert creado.status_code == 201, creado.text
+    ruta = '/api/tickets/' + creado.json()['ticket']['id']
+    antes = (await api.get(ruta, headers=m['admin'])).json()
+    assert antes['reporte_para'] == 'propio'  # La categoría no adivina el destino.
+    datos = {'activo_id': str(equipos['Impresora']), 'conjunto_id': None}
+    rechazado = await api.patch(ruta, headers=m['usuario'], json=datos)
+    assert rechazado.status_code == 403
+    corregido = await api.patch(ruta, headers=m['admin'], json=datos)
+    assert corregido.status_code == 200, corregido.text
+    despues = corregido.json()
+    assert despues['reporte_para'] == 'oficina'
+    assert despues['activo_id'] == str(equipos['Impresora'])
+    assert despues['reportante_id'] == antes['reportante_id']
+    assert despues['afectado_id'] == antes['afectado_id']
+    assert despues['oficina_id'] == antes['oficina_id']
+
+
+@pytest.mark.parametrize('companero', [False, True])
+async def test_ti_confirma_destino_en_ambos_sentidos_sin_cambiar_reportante(db, api, companero):
+    m = await _mundo(api, 'confirmar-' + str(companero))
+    _, equipos = await patrimonio(db, m)
+    persona = m['companero_id'] if companero else m['usuario_id']
+    creado = await api.post('/api/tickets', headers=m['usuario'], json={
+        'reporte_para': 'companero' if companero else 'oficina',
+        'persona': {'es_para_mi': not companero, 'afectado_id': persona},
+        'tipo_problema': 'Otro', 'descripcion': 'Necesito ayuda para continuar trabajando',
+    })
+    assert creado.status_code == 201, creado.text
+    ruta = '/api/tickets/' + creado.json()['ticket']['id']
+    opciones = await api.get(ruta + '/vinculos?corregir_origen=true', headers=m['admin'])
+    assert opciones.status_code == 200, opciones.text
+    assert opciones.json()['grupo_bloqueado'] is None
+    assert {e['grupo'] for e in opciones.json()['equipos']} == {'propios', 'oficina'}
+    assert (await api.get(ruta + '/vinculos?corregir_origen=true', headers=m['usuario'])).status_code == 403
+    personal = equipos['Monitor'] if companero else equipos['Mouse']
+    ajeno = equipos['Mouse'] if companero else equipos['Monitor']
+    for equipo, destino in [(personal, 'companero' if companero else 'propio'), (equipos['Impresora'], 'oficina'), (personal, 'companero' if companero else 'propio')]:
+        datos = {'activo_id': str(equipo), 'conjunto_id': None, 'corregir_origen': True}
+        assert (await api.patch(ruta, headers=m['usuario'], json=datos)).status_code == 403
+        respuesta = await api.patch(ruta, headers=m['admin'], json=datos)
+        assert respuesta.status_code == 200, respuesta.text
+        ticket = respuesta.json()
+        assert ticket['reporte_para'] == destino
+        assert ticket['reportante_id'] == m['usuario_id']
+        assert ticket['afectado_id'] == persona
+        assert ticket['oficina_id'] == m['oficina']['id']
+        assert ticket['activo_id'] == str(equipo)
+    prohibido = await api.patch(ruta, headers=m['admin'], json={'activo_id': str(ajeno), 'conjunto_id': None, 'corregir_origen': True})
+    assert prohibido.status_code == 422
 
 
 async def test_oficina_agrupa_tipos_y_ti_identifica_sin_adivinar_equipo(db, api):

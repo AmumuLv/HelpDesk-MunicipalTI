@@ -12,7 +12,7 @@ import { NavLink } from 'react-router-dom'
 
 import { NAVEGACION_PORTAL } from '../../dominio/navegacion'
 import { cn } from '../../lib/cn'
-import { useSesion } from '../../estado/Sesion'
+import { useSesion } from '../../estado/useSesion'
 import { AvatarCuenta } from '../dominio/AvatarCuenta'
 import { BotonTema } from '../base/BotonTema'
 import { LogoMesa } from '../base/LogoMesa'

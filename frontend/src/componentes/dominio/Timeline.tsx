@@ -16,7 +16,7 @@ import { useTicket } from '../../api/hooks'
 import { fechaHora } from '../../dominio/formato'
 import { cn } from '../../lib/cn'
 import { hitosDelTicket, type EventoTicket } from '../../dominio/historial-ticket'
-import { useSesion } from '../../estado/Sesion'
+import { useSesion } from '../../estado/useSesion'
 import { Panel, Skeleton } from '../base/Estructura'
 
 export function Timeline({ ticketId }: { ticketId: string }) {

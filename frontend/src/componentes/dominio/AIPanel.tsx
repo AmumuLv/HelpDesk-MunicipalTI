@@ -19,7 +19,7 @@ import { useState } from 'react'
 import { api } from '../../api/cliente'
 import type { DecisionIA, SugerenciasTicket } from '../../api/tipos'
 import { ConfianzaIABadge, EtiquetaIA } from './Badge'
-import { useAvisos } from '../../estado/Avisos'
+import { useAvisos } from '../../estado/useAvisos'
 import { cn } from '../../lib/cn'
 import { limitarTextoIA, TEXTOS_IA } from '../../dominio/textos-ia'
 

@@ -52,6 +52,29 @@ def resumen_ranking_equipos(datos):
     return f'Entre el {desde} y el {hasta}, {principal} {cobertura}'
 
 
+def resumen_total_equipos(datos, pregunta):
+    """Answer only a simple inventory count, from the authorized full total.
+
+    Never infer a total from the limited sample, answer a compound question,
+    or turn a denied read into a successful response.
+    """
+    texto = ''.join(c for c in unicodedata.normalize('NFD', pregunta.lower()) if not unicodedata.combining(c))
+    total = datos.get('total')
+    if (datos.get('error') or datos.get('recurso') != 'equipos'
+            or not isinstance(total, int) or isinstance(total, bool) or total < 0):
+        return None
+    if not re.search(r'\b(?:cuantos equipos(?: activos)? (?:hay|estan registrados)|total (?:actual )?de equipos|cantidad (?:actual )?de equipos)\b', texto):
+        return None
+    # A deliberately small vocabulary keeps this fast path from answering a
+    # historical, conditional or compound request with the current global total.
+    permitidas = set('consulta consultar el la los las inventario actual actuales actualmente y dime exactamente cuantos equipos activos hay estan registrados registradas necesito total real no una estimacion estimaciones cantidad numero de en sistema nuestro nuestra mi base datos por favor web proyecto mesa ayuda municipalidad municipal provincial casma'.split())
+    if (re.search(r'\d|\bpor\b(?!\s+favor\b)|\bno\b(?!\s+(?:una\s+)?estimaci(?:on|ones)\b)', texto)
+            or set(re.findall(r'[a-z]+', texto)) - permitidas):
+        return None
+    equipo = 'equipo activo registrado' if total == 1 else 'equipos activos registrados'
+    return f'Hay **{total} {equipo}** en la consulta actual.'
+
+
 class Lectura(BaseModel):
     model_config = ConfigDict(extra='forbid')
     recurso: str

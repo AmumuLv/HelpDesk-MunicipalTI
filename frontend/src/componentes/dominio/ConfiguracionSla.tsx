@@ -3,8 +3,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { api } from '../../api/cliente'
 import { useConfiguracion } from '../../api/hooks'
-import { useAvisos } from '../../estado/Avisos'
-import { useSesion } from '../../estado/Sesion'
+import { useAvisos } from '../../estado/useAvisos'
+import { useSesion } from '../../estado/useSesion'
 import { Button } from '../base/Button'
 import { Checkbox, Input } from '../base/Campo'
 import { Nota, Panel } from '../base/Estructura'
@@ -23,6 +23,8 @@ export function ConfiguracionSla() {
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState('')
   const ultimoFormulario = useRef<string | null>(null)
+  const formularioActual = useRef('')
+  formularioActual.current = JSON.stringify([reglas, dias, tramos, pausa])
   useEffect(() => {
     const sla = config.data?.sla
     if (!sla) return
@@ -30,7 +32,7 @@ export function ConfiguracionSla() {
       const regla = sla.reglas.find(r => r.prioridad === prioridad)
       return { prioridad, responder: String(regla?.horas_responder ?? 2 ** indice), resolver: String(regla?.horas_resolver ?? 2 ** (indice + 1)) }
     })
-    const actual = JSON.stringify([reglas, dias, tramos, pausa])
+    const actual = formularioActual.current
     const nuevo = JSON.stringify([nuevasReglas, sla.calendario.dias_laborables, sla.calendario.tramos, sla.pausa_fuera_de_horario])
     const editando = ultimoFormulario.current !== null && actual !== ultimoFormulario.current
     ultimoFormulario.current = nuevo

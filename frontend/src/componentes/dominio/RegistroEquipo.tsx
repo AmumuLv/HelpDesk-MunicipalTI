@@ -41,8 +41,8 @@ import { Combobox } from '../base/Combobox'
 import { Checkbox, Input, Select } from '../base/Campo'
 import { PiePasos, Stepper } from '../base/Stepper'
 import { Nota, Panel } from '../base/Estructura'
-import { useAvisos } from '../../estado/Avisos'
-import { useSesion } from '../../estado/Sesion'
+import { useAvisos } from '../../estado/useAvisos'
+import { useSesion } from '../../estado/useSesion'
 import { IconoTipoEquipo } from './IconoTipoEquipo'
 
 const PASOS = [
@@ -385,7 +385,7 @@ export function RegistroEquipo({ alGuardar }: { alCerrar: () => void; alGuardar:
       {paso === 'ubicacion' ? (
         <div className="flex flex-col gap-4">
           {zonas.isError ? <Nota tono="peligro" titulo="No pudimos cargar las zonas"><Button tamano="sm" onClick={() => void zonas.refetch()}>Reintentar zonas</Button></Nota> : null}
-          {!zonas.isPending && !zonas.isError && zonasActivas.length === 0 ? <AltaUbicacion tipo="zona" alCrear={id => { setZonaId(id); setOficinaId(''); setResponsableId(''); setConjuntoId(''); setNombreConjunto('') }} /> : null}
+          {zonas.data && zonasActivas.length === 0 ? <AltaUbicacion tipo="zona" alCrear={id => { setZonaId(id); setOficinaId(''); setResponsableId(''); setConjuntoId(''); setNombreConjunto('') }} /> : null}
           <Select
             etiqueta="Zona"
             requerido
@@ -409,7 +409,7 @@ export function RegistroEquipo({ alGuardar }: { alCerrar: () => void; alGuardar:
           />
 
           {zonaId && oficinas.isError ? <Nota tono="peligro" titulo="No pudimos cargar las oficinas"><Button tamano="sm" onClick={() => void oficinas.refetch()}>Reintentar oficinas</Button></Nota> : null}
-          {zonaId && !oficinas.isFetching && !oficinas.isError && oficinas.data?.items.length === 0 ? <AltaUbicacion key={zonaId} tipo="oficina" zonaId={zonaId} alCrear={id => { setOficinaId(id); setResponsableId(''); setConjuntoId(''); setNombreConjunto('') }} /> : null}
+          {zonaId && oficinas.data?.items.length === 0 ? <AltaUbicacion key={zonaId} tipo="oficina" zonaId={zonaId} alCrear={id => { setOficinaId(id); setResponsableId(''); setConjuntoId(''); setNombreConjunto('') }} /> : null}
 
           <Select
             etiqueta="Oficina"

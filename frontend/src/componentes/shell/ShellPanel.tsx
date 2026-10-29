@@ -37,7 +37,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 
 import { cn } from '../../lib/cn'
 import { useTiempoReal } from '../../api/tiempoReal'
-import { useSesion } from '../../estado/Sesion'
+import { useSesion } from '../../estado/useSesion'
 import { Button } from '../base/Button'
 import { InsigniaRol } from '../base/Estructura'
 import { AvatarCuenta } from '../dominio/AvatarCuenta'
@@ -65,7 +65,7 @@ const CLAVE_BARRA = 'ma.barra'
 const COLOR_ICONOS: Record<string, string> = { resumen: '#7dd3fc', tickets: '#facc15', equipos: '#67e8f9', organizacion: '#c4b5fd', usuarios: '#86efac', 'equipo-ti': '#fdba74', analisis: '#f0abfc', reportes: '#5eead4', mas: '#fda4af' }
 
 /** El menú, en el orden en que se recorre trabajando. */
-export function menuDelPanel(permisos: string[], esAdmin: boolean, contadores: Record<string, number> = {}): Entrada[] {
+function menuDelPanel(permisos: string[], esAdmin: boolean, contadores: Record<string, number> = {}): Entrada[] {
   const puede = (permiso?: string) => !permiso || esAdmin || permisos.includes(permiso)
   const tickets = [
     { clave: 'todos', texto: 'Abiertos', ruta: '/panel/tickets', icono: ClipboardList, permiso: 'tickets.operar' },

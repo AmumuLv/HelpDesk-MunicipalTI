@@ -5,9 +5,26 @@ test.setTimeout(90_000)
 
 test('equipos de oficina pagina responsables sin separar sus componentes ni alterar el total', async ({ page }) => {
   await portal(page, false, 'administrador')
+  await page.route('**/api/tickets?*', ruta => ruta.fulfill({ json: { items: [{ id: 'caso', codigo: 'TKT-2026-000001', asunto: 'Impresora compartida', estado: 'nuevo', prioridad: 'media', reporte_para: 'oficina', afectado_nombre: 'Ana Prueba', oficina_nombre: 'Soporte' }], total: 1, pagina: 1, total_paginas: 1 } }))
   const grupos = Array.from({ length: 6 }, (_, i) => ({ responsable_id: `responsable-${i}`, responsable: i === 5 ? 'Verónica Sánchez' : `Responsable ${i}`, equipos: Array.from({ length: i === 5 ? 4 : 3 }, (_, j) => ({ id: `equipo-${i}-${j}`, nombre: i === 5 ? ['CPU Verónica', 'Monitor Verónica', 'Mouse Verónica', 'Teclado Verónica'][j] : `Dispositivo ${i}-${j}`, tipo: ['CPU', 'Monitor', 'Mouse', 'Teclado'][j], estado: 'OPERATIVO' })) }))
   await page.route('**/api/oficinas/oficina', ruta => ruta.fulfill({ json: { id: 'oficina', nombre: 'Soporte', zona_id: 'zona', zona_nombre: 'Palacio', zona_color_indice: 1, total_equipos: 19, total_usuarios: 6, tickets_abiertos: 0, completitud_inventario: 100, usuarios: [], equipos_por_usuario: grupos, equipos_uso_comun: [], tendencia: [], incidencias_recurrentes: [] } }))
   await page.goto('/panel/oficinas/oficina')
+  await expect(page.getByRole('heading', { name: 'Historial de tickets', exact: true })).toBeVisible()
+  await expect(page.getByLabel('Mostrar tickets')).toHaveValue('todos')
+  await expect(page.getByLabel('Mostrar tickets').getByRole('option', { name: 'Solo cerrados', exact: true })).toHaveCount(1)
+  await expect(page.getByRole('table').getByText('Reporte de oficina', { exact: true })).toBeVisible()
+  const cerrados = page.waitForRequest(peticion => {
+    const url = new URL(peticion.url())
+    return url.pathname === '/api/tickets' && url.searchParams.get('oficina_id') === 'oficina' && url.searchParams.get('vista') === 'cerrados' && url.searchParams.get('direccion') === 'desc'
+  })
+  await page.getByLabel('Mostrar tickets').selectOption('cerrados')
+  await cerrados
+  const abiertos = page.waitForRequest(peticion => {
+    const url = new URL(peticion.url())
+    return url.pathname === '/api/tickets' && url.searchParams.get('solo_abiertos') === 'true' && !url.searchParams.has('vista')
+  })
+  await page.getByLabel('Mostrar tickets').selectOption('abiertos')
+  await abiertos
   await page.getByRole('tab', { name: /Equipos asignados/ }).click()
   const panel = page.getByRole('tabpanel').filter({ has: page.getByRole('heading', { name: 'Equipos asignados', exact: true }) })
   await expect(panel.getByText('Verónica Sánchez', { exact: true })).toHaveCount(0)
@@ -274,12 +291,30 @@ for (const rol of ['administrador', 'tecnico'] as const) test(`mi cuenta conserv
   }
 })
 
+for (const reportePara of ['propio', 'oficina'] as const) test(`detalle distingue destino ${reportePara} sin duplicar el nombre`, async ({ page }) => {
+  await portal(page, false, 'administrador')
+  await page.route('**/api/tickets/caso', ruta => ruta.fulfill({ json: {
+    id: 'caso', codigo: 'TKT-2026-000001', asunto: 'No imprime', descripcion: 'No imprime los documentos',
+    estado: 'nuevo', prioridad: 'media', origen: 'usuario', reporte_para: reportePara,
+    reportante_id: 'persona', afectado_id: 'persona', reportante_nombre: 'Ana Prueba', afectado_nombre: 'Ana Prueba',
+    oficina_id: 'oficina', oficina_nombre: 'SOPORTE', creado_en: '2026-10-17T14:00:00Z', tiene_chat: true, adjuntos: [],
+  } }))
+  await page.goto('/panel/tickets/caso')
+  const incidencia = page.getByLabel('Incidencia reportada', { exact: true })
+  await expect(incidencia.getByText('Ana Prueba', { exact: true })).toHaveCount(1)
+  await expect(incidencia.getByText(reportePara === 'oficina' ? 'La oficina · equipo compartido' : 'Para sí mismo', { exact: true })).toBeVisible()
+  if (reportePara === 'oficina') await expect(page.getByText('Reportado para la oficina', { exact: true })).toBeVisible()
+})
+
 test('oficina muestra tipos compactos y reporta sin vincular un dispositivo', async ({ page }) => {
   const api = await portal(page)
   await page.route('**/api/portal/equipos-oficina-tipos', ruta => ruta.fulfill({ json: { tipos: ['Impresora', 'Monitor'] } }))
   await page.setViewportSize({ width: 390, height: 900 })
   await page.goto('/reportar?tipo=Impresora')
+  await expect(page.getByRole('button', { name: 'Para mí', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByText('¿La impresora la comparten en tu oficina?', { exact: true })).toHaveCount(0)
   await page.getByRole('button', { name: 'Para la oficina', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Para la oficina', exact: true })).toHaveAttribute('aria-pressed', 'true')
   const opciones = page.getByRole('group', { name: 'Tipo de equipo de la oficina', exact: true })
   await expect(opciones.getByRole('button', { name: 'Impresora', exact: true })).toHaveCount(1)
   await opciones.getByRole('button', { name: 'Impresora', exact: true }).click()
@@ -575,6 +610,51 @@ test('chatbot guarda y recupera conversaciones tras recargar y permite eliminarl
   await expect(page.getByRole('log').getByText('Respuesta guardada de inventario.')).toHaveCount(0)
 })
 
+test('chatbot conserva el detalle mas reciente sin releerlo por un historial atrasado', async ({ page }) => {
+  await portal(page, false, 'tecnico')
+  const consumo = { consultas: 1, tokens: 40, conTokens: 1 }
+  let lecturas = 0
+  await page.route('**/api/ia/chatbot/estado', ruta => ruta.fulfill({ json: { configurado: true, limite_consultas: 15 } }))
+  await page.route('**/api/ia/chatbot/conversaciones', ruta => ruta.fulfill({ json: { items: [{ id: 'chat-actualizado', titulo: 'Inventario', consumo, limite: 15 }] } }))
+  await page.route('**/api/ia/chatbot/conversaciones/chat-actualizado', ruta => {
+    lecturas++
+    return ruta.fulfill({ json: { id: 'chat-actualizado', mensajes: [{ rol: 'assistant', texto: 'Respuesta mas reciente del servidor.' }], consumo: { consultas: 2, tokens: 80, conTokens: 2 }, limite: 15 } })
+  })
+  await page.goto('/panel')
+  await page.getByRole('button', { name: 'Abrir asistente TI' }).click()
+  await expect(page.getByRole('log').getByText('Respuesta mas reciente del servidor.')).toBeVisible()
+  await expect(page.getByText(/2\/15 consultas/)).toBeVisible()
+  await page.waitForTimeout(600)
+  expect(lecturas).toBe(1)
+  await expect(page.getByLabel('Tu consulta al asistente TI')).toBeEnabled()
+})
+
+test('un fallo al refrescar el historial no borra el chat recien creado', async ({ page }) => {
+  await portal(page, false, 'tecnico')
+  let consultas = 0
+  const conversaciones: (string | undefined)[] = []
+  await page.route('**/api/ia/chatbot/estado', ruta => ruta.fulfill({ json: { configurado: true, limite_consultas: 15 } }))
+  await page.route('**/api/ia/chatbot/conversaciones', ruta => consultas
+    ? ruta.fulfill({ status: 503, json: { mensaje: 'Historial temporalmente no disponible' } })
+    : ruta.fulfill({ json: { items: [] } }))
+  await page.route('**/api/ia/chatbot', ruta => {
+    consultas++
+    conversaciones.push(ruta.request().postDataJSON().conversacion_id)
+    return ruta.fulfill({ json: { disponible: true, texto: `Respuesta conservada ${consultas}.`, fuentes: [], conversacion_id: 'chat-persistente', consumo: { consultas, tokens: consultas * 40, conTokens: consultas }, limite: 15 } })
+  })
+  await page.goto('/panel')
+  await page.getByRole('button', { name: 'Abrir asistente TI' }).click()
+  await page.getByLabel('Tu consulta al asistente TI').fill('Consulta inicial')
+  await page.getByRole('dialog').getByRole('button', { name: 'Enviar', exact: true }).click()
+  await expect(page.getByRole('log').getByText('Respuesta conservada 1.')).toBeVisible()
+  await page.waitForTimeout(600)
+  await page.getByLabel('Tu consulta al asistente TI').fill('Continua con la misma consulta')
+  await page.getByRole('dialog').getByRole('button', { name: 'Enviar', exact: true }).click()
+  await expect(page.getByRole('log').getByText('Respuesta conservada 2.')).toBeVisible()
+  await expect(page.getByRole('log').getByText('Respuesta conservada 1.')).toBeVisible()
+  expect(conversaciones).toEqual([undefined, 'chat-persistente'])
+})
+
 test('chatbot bloquea al tecnico en quince consultas y permite iniciar otro chat', async ({ page }) => {
   await portal(page, false, 'tecnico')
   const chat = { id: 'chat-lleno', titulo: 'Conversación terminada', mensajes: [{ rol: 'assistant', texto: 'Última respuesta guardada.' }], consumo: { consultas: 15, tokens: 900, conTokens: 15 }, limite: 15 }
@@ -693,7 +773,7 @@ async function portal(page: Page, fallarPrimerEnvio = false, rol = 'usuario', re
     ], urgencias: [], categorias: ['Hardware', 'Impresora', 'Sistema / Programa', 'Software instalado', 'Correo / Cuenta', 'Formateo'] }
     else if (camino === '/tickets/caso' && ruta.request().method() === 'PATCH') { const datos = ruta.request().postDataJSON(); asuntoActual = datos.asunto; categoriaActual = datos.categoria; creado = true; vinculo = { ...datos, activo_nombre: datos.activo_id ? 'PC Soporte' : null, conjunto_id: datos.activo_id ? 'conjunto' : datos.conjunto_id, conjunto_nombre: datos.activo_id || datos.conjunto_id ? 'Computadora N°1' : null }; cuerpo = ticket() }
     else if (camino === '/activos') cuerpo = { items: [{ id: 'pc', nombre_equipo: 'PC Soporte', tipo: 'CPU' }], total: 1 }
-    else if (camino === '/tickets/caso/vinculos') cuerpo = { equipos: [{ id: 'pc', nombre: 'PC Soporte', tipo: 'CPU', conjunto_id: 'conjunto', grupo: 'propios' }, ...(!vinculo.activo_id && !vinculo.conjunto_id ? [{ id: 'comun', nombre: 'Impresora oficina', grupo: 'oficina' }] : [])], conjuntos: [{ id: 'conjunto', nombre: 'Computadora N°1', grupo: 'propios' }], grupo_bloqueado: vinculo.activo_id || vinculo.conjunto_id ? 'propios' : null }
+    else if (camino === '/tickets/caso/vinculos') cuerpo = { equipos: [{ id: 'pc', nombre: 'PC Soporte', tipo: 'CPU', conjunto_id: 'conjunto', grupo: 'propios' }, ...((url.searchParams.get('corregir_origen') === 'true' || !vinculo.activo_id && !vinculo.conjunto_id) ? [{ id: 'comun', nombre: 'Impresora oficina', grupo: 'oficina' }] : [])], conjuntos: [{ id: 'conjunto', nombre: 'Computadora N°1', grupo: 'propios' }], grupo_bloqueado: url.searchParams.get('corregir_origen') === 'true' ? null : vinculo.activo_id || vinculo.conjunto_id ? 'propios' : null }
     else if (/^\/usuarios\/[^/]+\/destinos-ticket$/.test(camino)) cuerpo = { equipos: [{ id: camino.includes('/companero/') ? 'de-luis' : 'propio', nombre: 'Mi computadora', tipo: 'CPU', grupo: 'propios', conjunto_id: 'conjunto' }, { id: 'comun', nombre: 'Impresora compartida', tipo: 'Impresora', grupo: 'oficina' }], conjuntos: [{ id: 'conjunto', nombre: 'Computadora N°1', grupo: 'propios' }] }
     else if (camino === '/usuarios/buscar') cuerpo = { items: [{ id: 'persona', nombre: 'Ana Prueba', oficina_nombre: 'SOPORTE' }] }
     else if (camino === '/tickets/manual' && ruta.request().method() === 'POST') { solicitudes.push(ruta.request().postDataJSON()); creado = true; cuerpo = { ticket: ticket() } }
@@ -1007,6 +1087,57 @@ test('Mis reportes pagina de 25 en 25 y los filtros vuelven a la primera página
     await expect(tarjetas.first()).toContainText('TKT-1')
   }
   expect(consultas.every(url => url.searchParams.get('por_pagina') === '25')).toBe(true)
+})
+
+test('TI edita programas con el selector habitual sin opciones adicionales de servicio', async ({ page }) => {
+  await portal(page, false, 'administrador')
+  await page.goto('/panel/tickets/caso')
+  const ficha = page.getByLabel('Incidencia reportada', { exact: true })
+  await ficha.getByRole('button', { name: 'Editar', exact: true }).click()
+  await ficha.getByLabel('Categoría', { exact: true }).selectOption('Sistema / Programa')
+  await expect(ficha.getByRole('button', { name: 'Servicio de la oficina', exact: true })).toHaveCount(0)
+  await expect(ficha.getByRole('button', { name: 'En una computadora', exact: true })).toHaveCount(0)
+  await expect(ficha.getByLabel('Computadora afectada')).toHaveValue('pc:conjunto')
+  await ficha.getByLabel('Programa, sistema o correo').fill('Office')
+  const solicitud = page.waitForRequest(peticion => new URL(peticion.url()).pathname === '/api/tickets/caso' && peticion.method() === 'PATCH')
+  await ficha.getByRole('button', { name: 'Guardar cambios', exact: true }).click()
+  expect((await solicitud).postDataJSON()).toMatchObject({ alcance_incidencia: 'programa', conjunto_id: 'conjunto', activo_id: null, sistema_afectado: 'Office' })
+  await expect(ficha.getByRole('button', { name: 'Editar', exact: true })).toBeVisible()
+})
+
+test('TI separa equipos personales y compartidos con tarjetas y listas filtradas', async ({ page }) => {
+  await portal(page, false, 'administrador')
+  await page.goto('/panel/tickets/caso')
+  const ficha = page.getByLabel('Incidencia reportada', { exact: true })
+  await ficha.getByRole('button', { name: 'Editar', exact: true }).click()
+  await expect(ficha.getByRole('button', { name: 'Equipo de la persona', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  const lista = ficha.getByLabel('Equipo o computadora afectada')
+  await expect(lista.getByRole('option', { name: 'PC Soporte', exact: true })).toHaveCount(1)
+  await expect(lista.getByRole('option', { name: 'Impresora oficina', exact: true })).toHaveCount(0)
+  await lista.selectOption('equipo:pc')
+  await ficha.getByRole('button', { name: 'Equipo compartido de la oficina', exact: true }).click()
+  await expect(lista).toHaveValue('')
+  await expect(lista.getByRole('option', { name: 'PC Soporte', exact: true })).toHaveCount(0)
+  await expect(lista.getByRole('option', { name: 'Impresora oficina', exact: true })).toHaveCount(1)
+  await lista.selectOption('equipo:comun')
+  await expect(lista).toHaveValue('equipo:comun')
+  const guardado = page.waitForRequest(peticion => new URL(peticion.url()).pathname === '/api/tickets/caso' && peticion.method() === 'PATCH')
+  await ficha.getByRole('button', { name: 'Guardar cambios', exact: true }).click()
+  expect((await guardado).postDataJSON()).toMatchObject({ activo_id: 'comun', corregir_origen: true })
+  await expect(ficha.getByRole('button', { name: 'Editar', exact: true })).toBeVisible()
+})
+
+test('inventario filtra equipos compartidos y permite volver a todos', async ({ page }) => {
+  await portal(page, false, 'administrador')
+  await page.route('**/api/activos?*', ruta => ruta.fulfill({ json: { items: [], total: 0, pagina: 1, por_pagina: 25, total_paginas: 1 } }))
+  await page.goto('/panel/equipos')
+  const consulta = page.waitForRequest(peticion => new URL(peticion.url()).pathname === '/api/activos' && new URL(peticion.url()).searchParams.get('solo_uso_comun') === 'true')
+  await page.getByLabel('Asignación', { exact: true }).selectOption('comun')
+  await consulta
+  await expect(page).toHaveURL(/solo_uso_comun=1/)
+  await page.getByLabel('Asignación', { exact: true }).selectOption('todos')
+  await expect(page.getByLabel('Asignación', { exact: true })).toHaveValue('todos')
+  await expect(page).not.toHaveURL(/solo_uso_comun/)
 })
 
 test('TI conserva el equipo elegido y programas se vinculan a la PC sin preguntas redundantes', async ({ page }) => {

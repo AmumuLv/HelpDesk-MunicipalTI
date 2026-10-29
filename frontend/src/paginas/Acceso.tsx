@@ -11,14 +11,14 @@ import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 
 import { useConfiguracionPublica, useEstadoInstalacion } from '../api/hooks'
-import { useSesion } from '../estado/Sesion'
+import { useSesion } from '../estado/useSesion'
 import { cn } from '../lib/cn'
 import { Button } from '../componentes/base/Button'
 import { BotonTema } from '../componentes/base/BotonTema'
 import { LogoMesa } from '../componentes/base/LogoMesa'
 import { Input } from '../componentes/base/Campo'
 import { Nota } from '../componentes/base/Estructura'
-import { useAvisos } from '../estado/Avisos'
+import { useAvisos } from '../estado/useAvisos'
 
 type UbicacionConEstado = { state?: { desde?: string } }
 

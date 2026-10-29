@@ -27,8 +27,8 @@ import { ConfirmDialog, DialogModal } from '../../componentes/base/Sobreposicion
 import { EmptyState, ErrorState, PageHeader, Panel } from '../../componentes/base/Estructura'
 import { desdeHace, fechaCorta } from '../../dominio/formato'
 import { ESTADOS, PRIORIDADES, estadoDe, tonoUrgenciaTicket } from '../../dominio/estados'
-import { useAvisos } from '../../estado/Avisos'
-import { useSesion } from '../../estado/Sesion'
+import { useAvisos } from '../../estado/useAvisos'
+import { useSesion } from '../../estado/useSesion'
 import { Ubicacion } from '../../componentes/dominio/Ubicacion'
 import { cn } from '../../lib/cn'
 
@@ -439,7 +439,7 @@ export function Bandeja({
         meta: { celdaLibre: true, ancho: '12%' },
         cell: ({ row }) => (
           <span className="block min-w-0">
-            <span className="block truncate" title={row.original.afectado_nombre}>{row.original.afectado_nombre}</span>
+            <span className="block truncate" title={row.original.reporte_para === 'oficina' ? 'Equipo compartido de la oficina' : row.original.afectado_nombre}>{row.original.reporte_para === 'oficina' ? 'Reporte de oficina' : row.original.afectado_nombre}</span>
             {/* Oficina con su raya y debajo la pastilla de zona, siempre en ese
                 orden y siempre en dos líneas. Antes el reparto dependía del hueco
                 que dejaba la columna de estado, y la misma celda se leía de una
@@ -1014,7 +1014,7 @@ export function Bandeja({
                   </p>
                 </div>
                 <p className="mt-1 flex min-w-0 items-center gap-1 text-sm text-muted-foreground">
-                  <span className="min-w-0 max-w-[45%] truncate" title={ticket.afectado_nombre}>{ticket.afectado_nombre}</span>
+                  <span className="min-w-0 max-w-[45%] truncate" title={ticket.reporte_para === 'oficina' ? 'Equipo compartido de la oficina' : ticket.afectado_nombre}>{ticket.reporte_para === 'oficina' ? 'Reporte de oficina' : ticket.afectado_nombre}</span>
                   <span aria-hidden="true">·</span>
                   <span className="min-w-0 flex-1 truncate" title={ticket.oficina_nombre ?? 'Sin oficina'}>{ticket.oficina_nombre ?? 'Sin oficina'}</span>
                   <span className="shrink-0">· {desdeHace(ticket.actualizado_en)}</span>

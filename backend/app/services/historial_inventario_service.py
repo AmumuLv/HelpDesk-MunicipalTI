@@ -26,7 +26,7 @@ async def inventario_persona(usuario_id):
     return equipos, conjuntos
 
 
-async def opciones_ticket(ticket):
+async def opciones_ticket(ticket, *, corregir_origen=False):
     db = get_db()
     persona = ticket.get('afectado_id') or ticket.get('reportante_id')
     oficina = ticket.get('oficina_id')
@@ -55,8 +55,8 @@ async def opciones_ticket(ticket):
             continue
         if conjunto['_id'] not in ajenos:
             permitidos.append(conjunto)
-    grupo_bloqueado = ticket.get('vinculo_origen')
-    if not grupo_bloqueado and (ticket.get('activo_id') or ticket.get('conjunto_id')):
+    grupo_bloqueado = None if corregir_origen else ticket.get('vinculo_origen')
+    if not corregir_origen and not grupo_bloqueado and (ticket.get('activo_id') or ticket.get('conjunto_id')):
         origen = await db.activos.find_one({'_id': ticket['activo_id']}) if ticket.get('activo_id') else await db.conjuntos.find_one({'_id': ticket.get('conjunto_id')})
         if origen:
             grupo_bloqueado = 'propios' if origen.get('responsable_id') == persona or any(e.get('conjunto_id') == origen['_id'] and e.get('responsable_id') == persona for e in equipos) else 'oficina'

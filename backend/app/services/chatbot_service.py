@@ -137,6 +137,10 @@ async def responder_groq(instruccion, pregunta, historial, fuentes, *, usuario=N
                         fuente = {'titulo': 'Datos reales · ' + str(argumentos.get('recurso', 'consulta')), 'ruta': '/panel/tickets' if 'ticket' in str(argumentos.get('recurso')) or str(argumentos.get('recurso', '')).startswith('ranking_') else '/panel'}
                         if fuente not in fuentes:
                             fuentes.append(fuente)
+                if len(llamadas) == 1:
+                    resumen_total = consultas_chatbot.resumen_total_equipos(resultado, pregunta)
+                    if resumen_total:
+                        return {'disponible': True, 'texto': resumen_total, 'fuentes': fuentes, 'uso': uso_acumulado if tiene_uso else None}
                 # Para una comparación simple, redactar desde la agregación
                 # validada evita inventar estados o ignorar tickets sin vínculo.
                 if (len(llamadas) == 1 and argumentos.get('recurso') == 'ranking_equipos'
@@ -154,7 +158,7 @@ async def responder_groq(instruccion, pregunta, historial, fuentes, *, usuario=N
                 texto = f'Groq rechazó la consulta ({codigo}). Revisa la clave, el modelo y el tamaño de la conversación en la configuración del servidor.'
             else:
                 texto = 'Groq no está disponible en este momento. Inténtalo nuevamente en unos minutos.'
-            return {'disponible': False, 'texto': texto, 'fuentes': []}
+            return {'disponible': False, 'texto': texto, 'fuentes': [], **({'uso': uso_acumulado} if tiene_uso else {})}
         datos = respuesta.json()
         texto = texto_presentable(datos['choices'][0]['message'].get('content') or '')
         uso = datos.get('usage') or {}
@@ -166,7 +170,7 @@ async def responder_groq(instruccion, pregunta, historial, fuentes, *, usuario=N
                       'total': int(uso['total_tokens'])}
         return {'disponible': bool(texto.strip()), 'texto': texto.strip()[:12000] or 'No se obtuvo una respuesta. Reformula tu consulta.', 'fuentes': fuentes, 'uso': uso_acumulado if tiene_uso else tokens}
     except (httpx.HTTPError, ValueError, KeyError, TypeError, IndexError):
-        return {'disponible': False, 'texto': 'No se pudo contactar con Groq. Inténtalo nuevamente.', 'fuentes': []}
+        return {'disponible': False, 'texto': 'No se pudo contactar con Groq. Inténtalo nuevamente.', 'fuentes': [], **({'uso': uso_acumulado} if tiene_uso else {})}
 
 
 def exigir_ti(usuario):

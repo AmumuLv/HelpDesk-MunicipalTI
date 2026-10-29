@@ -33,6 +33,7 @@ export function hitosDelTicket(eventos: EventoTicket[]): HitoTicket[] {
       const campos = Array.isArray(detalle.campos) ? detalle.campos as string[] : Object.keys(despues || {})
       const cambio = (campo: string) => campos.includes(campo) && (!antes || !despues || JSON.stringify(antes[campo] ?? null) !== JSON.stringify(despues[campo] ?? null))
       const etiquetas = [
+        ...(cambio('reporte_para') ? ['destino del reporte'] : []),
         ...(cambio('activo_id') || cambio('conjunto_id') ? ['equipo afectado'] : []),
         ...(cambio('sistema_afectado') ? ['programa o sistema'] : []),
         ...(cambio('asunto') ? ['título'] : []),

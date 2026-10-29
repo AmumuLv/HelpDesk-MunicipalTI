@@ -31,6 +31,7 @@ import { Link, useParams } from 'react-router-dom'
 
 import { api } from '../../api/cliente'
 import { useTickets } from '../../api/hooks'
+import { Select } from '../../componentes/base/Campo'
 import { TicketsAtencion } from '../../componentes/dominio/TicketsAtencion'
 import { Button } from '../../componentes/base/Button'
 import {
@@ -49,7 +50,7 @@ import { Paginacion } from '../../componentes/dominio/DataTable'
 import { EnlaceOficina } from '../../componentes/dominio/EnlaceOficina'
 import { TarjetaPerfil } from '../../componentes/dominio/TarjetaPerfil'
 import { fechaCorta, numero, plural } from '../../dominio/formato'
-import { useSesion } from '../../estado/Sesion'
+import { useSesion } from '../../estado/useSesion'
 
 
 
@@ -227,7 +228,8 @@ export function PerfilOficina() {
   const [pestana, setPestana] = useState('personas')
   const [paginaComun, setPaginaComun] = useState(1)
   const [paginaTickets, setPaginaTickets] = useState(1)
-  const ticketsOficina = useTickets({ oficina_id: id, solo_abiertos: true, pagina: paginaTickets, por_pagina: 25 }, Boolean(id))
+  const [estadoTickets, setEstadoTickets] = useState('todos')
+  const ticketsOficina = useTickets({ oficina_id: id, solo_abiertos: estadoTickets === 'abiertos', ...(estadoTickets === 'cerrados' ? { vista: 'cerrados' } : {}), orden: 'antiguedad', direccion: 'desc', pagina: paginaTickets, por_pagina: 25 }, Boolean(id))
   if (datos.isLoading) return <SkeletonPanel />
   if (!datos.data) return <ErrorState mensaje="No pudimos cargar la oficina." alReintentar={() => void datos.refetch()} />
   const oficina = datos.data
@@ -450,7 +452,8 @@ export function PerfilOficina() {
       </TabsPanel>
 
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
-      <Panel titulo="Tickets abiertos">
+      <Panel titulo="Historial de tickets" descripcion="Reportes de esta oficina y de sus trabajadores, del más reciente al más antiguo.">
+        <div className="mb-4"><Select etiqueta="Mostrar tickets" value={estadoTickets} onChange={evento => { setEstadoTickets(evento.target.value); setPaginaTickets(1) }} opciones={[{ valor: 'todos', etiqueta: 'Abiertos y cerrados' }, { valor: 'abiertos', etiqueta: 'Solo abiertos' }, { valor: 'cerrados', etiqueta: 'Solo cerrados' }]} /></div>
         {ticketsOficina.isPending ? <SkeletonPanel filas={4} /> : ticketsOficina.isError ? <ErrorState compacto mensaje="No pudimos cargar los tickets de la oficina." alReintentar={() => void ticketsOficina.refetch()} /> : <><TicketsAtencion tickets={ticketsOficina.data?.items ?? []} /><Paginacion pagina={paginaTickets} totalPaginas={ticketsOficina.data?.total_paginas ?? 1} total={ticketsOficina.data?.total ?? 0} porPagina={25} alCambiar={setPaginaTickets} /></>}
       </Panel>
       <aside className="flex min-w-0 flex-col gap-4">

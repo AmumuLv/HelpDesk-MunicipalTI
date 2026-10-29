@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { api, erroresDeValidacion } from '../../api/cliente'
-import { useAvisos } from '../../estado/Avisos'
+import { useAvisos } from '../../estado/useAvisos'
 import { Button } from '../base/Button'
 import { CampoPassword } from '../base/CampoPassword'
 import { Nota } from '../base/Estructura'
-import { useSesion } from '../../estado/Sesion'
+import { useSesion } from '../../estado/useSesion'
 import { useNavigate } from 'react-router-dom'
 
 export function RestablecerPassword({ usuarioId, nombre }: { usuarioId: string; nombre: string }) {

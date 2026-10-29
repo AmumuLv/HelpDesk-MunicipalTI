@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { api } from '../../api/cliente'
-import { useAvisos } from '../../estado/Avisos'
+import { useAvisos } from '../../estado/useAvisos'
 import { Button } from '../base/Button'
 import { ConfirmDialog } from '../base/Sobreposiciones'
 import { Nota } from '../base/Estructura'

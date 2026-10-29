@@ -1113,6 +1113,13 @@ async def actualizar(ticket_id: ObjectId, datos: dict[str, Any], *, usuario: dic
         cambios.update(await sla_service.recalcular_prioridad(ticket, nueva))
     from app.services.vinculo_ticket_service import resolver
     cambios.update(await resolver(ticket, datos, usuario))
+    # La identificación de TI confirma el destino, sin alterar quién dio el aviso.
+    # La categoría por sí sola nunca decide si un equipo es personal o compartido.
+    if es_tecnico and cambios.get('vinculo_origen') and (datos.get('activo_id') or datos.get('conjunto_id')):
+        if cambios['vinculo_origen'] == 'oficina':
+            cambios['reporte_para'] = 'oficina'
+        elif ticket.get('reporte_para') == 'oficina':
+            cambios['reporte_para'] = 'propio' if ticket.get('reportante_id') == ticket.get('afectado_id') else 'companero'
     if not cambios:
         return await obtener(ticket_id, usuario=usuario)
     cambios["actualizado_en"] = utcnow()

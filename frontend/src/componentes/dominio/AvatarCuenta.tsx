@@ -1,6 +1,6 @@
 import { useMiPerfil } from '../../api/hooks'
 import { useFotoUsuario } from '../../api/fotos'
-import { useSesion } from '../../estado/Sesion'
+import { useSesion } from '../../estado/useSesion'
 import { Avatar } from '../base/Estructura'
 
 export function AvatarCuenta({ tamano = 'sm' }: { tamano?: 'sm' | 'md' | 'lg' }) {

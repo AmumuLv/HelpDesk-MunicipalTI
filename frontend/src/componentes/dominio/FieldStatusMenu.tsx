@@ -9,7 +9,6 @@
 
 import { useState } from 'react'
 
-import { api } from '../../api/cliente'
 import { ESTADOS_CAMPO, estadoCampoDe, type EstadoCampo } from '../../dominio/estados'
 import { PopoverSimple } from '../base/Sobreposiciones'
 import { Button } from '../base/Button'
@@ -81,9 +80,4 @@ export function FieldStatusMenu({
       }
     />
   )
-}
-
-/** Marca varios campos del activo a la vez, con traza. */
-export async function marcarCampos(activoId: string, campos: string[], estado: string, motivo: string) {
-  await api.crear(`/activos/${activoId}/campos`, { campos, estado, motivo })
 }

@@ -28,7 +28,7 @@ import {
   Avatar,
 } from '../componentes/base/Estructura'
 import { ConfirmDialog, DialogModal, InfoTooltip, PopoverSimple, Sheet } from '../componentes/base/Sobreposiciones'
-import { useAvisos } from '../estado/Avisos'
+import { useAvisos } from '../estado/useAvisos'
 import {
   CompletitudBadge,
   ConfianzaIABadge,

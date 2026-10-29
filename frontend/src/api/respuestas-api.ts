@@ -9,8 +9,6 @@
  * la interfaz no podría leer un solo campo sin adivinar.
  */
 
-/* eslint-disable */
-
 /* ═══════════════════════ Respuestas ═══════════════════════ */
 
 /** Respuesta de `GET /activos/{activo_id}` */

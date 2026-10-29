@@ -7744,6 +7744,16 @@
             }
           },
           {
+            "name": "corregir_origen",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Corregir Origen"
+            }
+          },
+          {
             "name": "ma_csrf",
             "in": "cookie",
             "required": false,
@@ -18141,6 +18151,11 @@
       },
       "TicketActualizar": {
         "properties": {
+          "corregir_origen": {
+            "type": "boolean",
+            "title": "Corregir Origen",
+            "default": false
+          },
           "version_esperada": {
             "anyOf": [
               {

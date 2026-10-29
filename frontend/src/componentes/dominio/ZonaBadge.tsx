@@ -14,7 +14,7 @@
 import { Link } from 'react-router-dom'
 
 import { useZonas } from '../../api/hooks'
-import { useSesion } from '../../estado/Sesion'
+import { useSesion } from '../../estado/useSesion'
 
 export function ZonaBadge({ id, nombre, colorIndice }: { id?: string | null; nombre?: string | null; colorIndice?: number }) {
   const sesion = useSesion()

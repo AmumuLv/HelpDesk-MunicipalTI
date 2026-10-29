@@ -9,7 +9,7 @@ import { ArrowLeft, ChevronRight } from 'lucide-react'
 import { useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
-import { useSesion } from '../../estado/Sesion'
+import { useSesion } from '../../estado/useSesion'
 
 import { useArticulo } from '../../api/hooks'
 import { ErrorState, Nota, Panel, SkeletonPanel } from '../../componentes/base/Estructura'

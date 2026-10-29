@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, Check, MessageCircle, Send, ShieldCheck } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Building2, Check, MessageCircle, Send, ShieldCheck, UserRound, Users } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
@@ -9,7 +9,7 @@ import type { CuerpoTicket, TicketCreado } from '../../api/tipos'
 import { Button } from '../../componentes/base/Button'
 import { Select, Textarea } from '../../componentes/base/Campo'
 import { ErrorState, SkeletonPanel } from '../../componentes/base/Estructura'
-import { useSesion } from '../../estado/Sesion'
+import { useSesion } from '../../estado/useSesion'
 import { elementoIcono } from '../../dominio/iconos'
 import { URGENCIAS, type ClaveUrgencia } from '../../dominio/estados'
 import { cn } from '../../lib/cn'
@@ -94,14 +94,15 @@ export function Reportar() {
     </> : <form className="mt-6 flex flex-col gap-5" onSubmit={evento => { evento.preventDefault(); void enviar() }}>
       <fieldset disabled={enviando} className="contents">
         <div className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-surface px-4 py-3"><span className="flex min-w-0 items-center gap-3 font-semibold"><span className="shrink-0 text-info-strong">{elementoIcono(tipoElegido?.icono || 'message-circle')}</span>{tipoElegido?.titulo}</span><Button tamano="sm" variante="fantasma" onClick={() => setPaso(1)}>Cambiar</Button></div>
-        <section className="rounded-2xl border border-border bg-surface p-5 shadow-sm sm:p-6">
-          <Textarea etiqueta="¿Qué está pasando?" requerido filas={4} maxLength={3800} value={descripcion} onChange={evento => setDescripcion(evento.target.value)} placeholder="Por ejemplo: mi computadora se apaga cuando abro un documento. Empezó esta mañana." ayuda="Con una frase clara es suficiente. Mínimo 10 caracteres." />
-          <fieldset className="mt-6"><legend className="mb-3 text-base font-bold">¿Puedes seguir trabajando?</legend><div className="grid gap-2 sm:grid-cols-3">{URGENCIAS.map((opcion, indice) => <label key={opcion.clave} className={cn('flex min-h-24 cursor-pointer items-start gap-3 rounded-xl border p-3 text-sm transition-colors hover:border-warning', urgencia === opcion.clave ? 'border-accion bg-primary-soft ring-1 ring-accion' : 'border-border bg-surface')}><input className="mt-1 size-4 shrink-0 accent-accion" type="radio" name="urgencia" value={opcion.clave} checked={urgencia === opcion.clave} onChange={() => setUrgencia(opcion.clave)} required /><span><span className="block font-bold">{['Sí, puedo continuar', 'Con dificultad', 'No puedo trabajar'][indice]}</span><span className="mt-1 block text-xs text-muted-foreground">{opcion.descripcion}</span></span></label>)}</div></fieldset>
-        </section>
         <section className="rounded-2xl border border-border bg-surface p-5">
           <h2 className="mb-4 font-semibold">¿Para quién necesitas ayuda?</h2>
           <div className="flex flex-col gap-4">
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3" role="group" aria-label="A quién afecta el problema">{[{ valor: 'propio', titulo: 'Para mí' }, { valor: 'companero', titulo: 'Para un compañero' }, { valor: 'oficina', titulo: 'Para la oficina' }].map(opcion => <button key={opcion.valor} type="button" aria-pressed={reportePara === opcion.valor} className={cn('min-h-12 rounded-xl border px-3 py-2 text-sm font-semibold transition-colors', reportePara === opcion.valor ? 'border-accion bg-primary-soft text-primary-strong ring-1 ring-accion' : 'border-border hover:bg-muted')} onClick={() => { setReportePara(opcion.valor as typeof reportePara); setAfectadoId(''); setTipoOficina('') }}>{opcion.titulo}</button>)}</div>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3" role="group" aria-label="A quién afecta el problema">{[
+              { valor: 'propio', titulo: 'Para mí', detalle: 'Necesito ayuda para trabajar.', Icono: UserRound },
+              { valor: 'companero', titulo: 'Para un compañero', detalle: 'Otra persona necesita ayuda.', Icono: Users },
+              { valor: 'oficina', titulo: 'Para la oficina', detalle: 'Falla algo que compartimos.', Icono: Building2 },
+            ].map(({ Icono, ...opcion }) => <button key={opcion.valor} type="button" aria-label={opcion.titulo} aria-pressed={reportePara === opcion.valor} className={cn('flex min-h-24 items-center gap-3 rounded-xl border p-3 text-left transition-colors', reportePara === opcion.valor ? 'border-accion bg-primary-soft text-primary-strong ring-1 ring-accion' : 'border-border hover:bg-muted')} onClick={() => { setReportePara(opcion.valor as typeof reportePara); setAfectadoId(''); setTipoOficina('') }}><Icono size={26} className="shrink-0" aria-hidden="true" /><span><span className="block text-sm font-semibold">{opcion.titulo}</span><span className="mt-1 block text-xs text-muted-foreground">{opcion.detalle}</span></span></button>)}</div>
+            <p className="text-sm text-muted-foreground">No necesitas saber qué equipo es. Cuéntanos qué pasa y soporte se encarga.</p>
             {reportePara === 'companero' ? <Select etiqueta="Persona que necesita ayuda" value={afectadoId} placeholder="Elige a la persona" requerido onChange={evento => setAfectadoId(evento.target.value)} opciones={(companeros.data?.items ?? []).map(persona => ({ valor: persona.id, etiqueta: persona.nombre }))} /> : null}
             {reportePara === 'oficina' ? <div>
               <p className="mb-3 text-sm text-muted-foreground">¿Qué equipo de la oficina tiene el problema? Si no sabes, continúa con «No lo sé».</p>
@@ -111,6 +112,11 @@ export function Reportar() {
             </div> : null}
           </div>
         </section>
+        <section className="rounded-2xl border border-border bg-surface p-5 shadow-sm sm:p-6">
+          <Textarea etiqueta="¿Qué está pasando?" requerido filas={4} maxLength={3800} value={descripcion} onChange={evento => setDescripcion(evento.target.value)} placeholder="Por ejemplo: mi computadora se apaga cuando abro un documento. Empezó esta mañana." ayuda="Con una frase clara es suficiente. Mínimo 10 caracteres." />
+          <fieldset className="mt-6"><legend className="mb-3 text-base font-bold">¿Puedes seguir trabajando?</legend><div className="grid gap-2 sm:grid-cols-3">{URGENCIAS.map((opcion, indice) => <label key={opcion.clave} className={cn('flex min-h-24 cursor-pointer items-start gap-3 rounded-xl border p-3 text-sm transition-colors hover:border-warning', urgencia === opcion.clave ? 'border-accion bg-primary-soft ring-1 ring-accion' : 'border-border bg-surface')}><input className="mt-1 size-4 shrink-0 accent-accion" type="radio" name="urgencia" value={opcion.clave} checked={urgencia === opcion.clave} onChange={() => setUrgencia(opcion.clave)} required /><span><span className="block font-bold">{['Sí, puedo continuar', 'Con dificultad', 'No puedo trabajar'][indice]}</span><span className="mt-1 block text-xs text-muted-foreground">{opcion.descripcion}</span></span></label>)}</div></fieldset>
+        </section>
+
         <p className="flex items-start gap-2 text-sm text-muted-foreground"><MessageCircle size={19} className="mt-0.5 shrink-0 text-info-strong" />Después de enviar podrás escribir, mandar fotos o grabar un audio para soporte.</p>
       </fieldset>
       {error ? <div role="alert" className="rounded-xl border border-destructive-borde bg-destructive-soft p-4 text-sm text-destructive-strong">{error}<Link to="/mis-tickets" className="mt-2 block font-semibold underline">Ver mis reportes antes de volver a enviar</Link></div> : null}

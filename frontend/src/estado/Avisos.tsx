@@ -11,9 +11,10 @@
 
 import * as Toast from '@radix-ui/react-toast'
 import { AlertTriangle, CheckCircle2, CircleAlert, Info, X } from 'lucide-react'
-import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import { ErrorPeticion } from '../api/cliente'
+import { Contexto, type ValorContexto } from './useAvisos'
 
 export type TipoAviso = 'exito' | 'error' | 'aviso' | 'info'
 
@@ -23,17 +24,6 @@ type Aviso = {
   texto: string
   detalle?: string
 }
-
-type ValorContexto = {
-  exito: (texto: string, detalle?: string) => void
-  error: (texto: string, detalle?: string) => void
-  aviso: (texto: string, detalle?: string) => void
-  info: (texto: string, detalle?: string) => void
-  /** Traduce el error de la API a un aviso legible, sin perder el detalle. */
-  desdeError: (fallo: unknown, contexto?: string) => void
-}
-
-const Contexto = createContext<ValorContexto | null>(null)
 
 const ESTILO: Record<TipoAviso, string> = {
   exito: 'border-success/40 bg-success-soft text-success-strong',
@@ -115,12 +105,6 @@ export function ProveedorAvisos({ children }: { children: ReactNode }) {
       </Toast.Provider>
     </Contexto.Provider>
   )
-}
-
-export function useAvisos(): ValorContexto {
-  const valor = useContext(Contexto)
-  if (!valor) throw new Error('useAvisos debe usarse dentro de ProveedorAvisos')
-  return valor
 }
 
 /** Los detalles de validación del backend, en una frase legible. */

@@ -1,3 +1,4 @@
+import { ICONOS_DATOS, estadoDatoEquipo } from '../../dominio/datosEquipo'
     /** Ficha editable del inventario OTIC, con disponibilidad de cada dato. */
 
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -17,13 +18,13 @@ import { Input, Select, Textarea } from '../../componentes/base/Campo'
 import { ConfirmDialog } from '../../componentes/base/Sobreposiciones'
 import { ErrorState, Nota, PageHeader, Panel, PantallaFormulario, SkeletonPanel } from '../../componentes/base/Estructura'
 import { fechaCorta } from '../../dominio/formato'
-import { useAvisos } from '../../estado/Avisos'
-import { useSesion } from '../../estado/Sesion'
+import { useAvisos } from '../../estado/useAvisos'
+import { useSesion } from '../../estado/useSesion'
 import { ZonaBadge } from '../../componentes/dominio/ZonaBadge'
 import { IconoTipoEquipo } from '../../componentes/dominio/IconoTipoEquipo'
 import { BarraProgreso } from '../../componentes/dominio/BarraProgreso'
 import { TarjetaPerfil } from '../../componentes/dominio/TarjetaPerfil'
-import { ICONOS_DATOS, IndicadorDato, PresentacionEquipo, ResumenDisponibilidad, estadoDatoEquipo } from '../../componentes/dominio/PresentacionEquipo'
+import { IndicadorDato, PresentacionEquipo, ResumenDisponibilidad } from '../../componentes/dominio/PresentacionEquipo'
 
 const CAMPOS_OTIC = [
   { campo: 'nombre_equipo', etiqueta: 'Nombre del equipo', maximo: 160 },

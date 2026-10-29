@@ -14,8 +14,8 @@ import { Button } from '../../componentes/base/Button'
 import { Panel, Nota, EmptyState, PantallaFormulario } from '../../componentes/base/Estructura'
 import { cn } from '../../lib/cn'
 import { fechaCorta, numero } from '../../dominio/formato'
-import { useAvisos } from '../../estado/Avisos'
-import { useSesion } from '../../estado/Sesion'
+import { useAvisos } from '../../estado/useAvisos'
+import { useSesion } from '../../estado/useSesion'
 
 const PASOS = [
   { clave: 'archivo', titulo: 'Archivo' },

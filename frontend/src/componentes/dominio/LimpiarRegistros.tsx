@@ -1,7 +1,7 @@
 import { Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { api } from '../../api/cliente'
-import { useAvisos } from '../../estado/Avisos'
+import { useAvisos } from '../../estado/useAvisos'
 import { Button } from '../base/Button'
 import { ConfirmDialog } from '../base/Sobreposiciones'
 

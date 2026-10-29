@@ -8,7 +8,7 @@
 
 import { useEffect } from 'react'
 
-import { useSesion } from '../../estado/Sesion'
+import { useSesion } from '../../estado/useSesion'
 import { Bandeja } from './Bandeja'
 
 export function MisAsignaciones() {

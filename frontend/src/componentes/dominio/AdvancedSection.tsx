@@ -14,7 +14,7 @@ import { useState } from 'react'
 import { api } from '../../api/cliente'
 import { Button } from '../base/Button'
 import { Nota } from '../base/Estructura'
-import { useAvisos } from '../../estado/Avisos'
+import { useAvisos } from '../../estado/useAvisos'
 
 const CAMPOS = [
   ['placa_madre', 'Placa madre'], ['procesador_detalle', 'Detalle del procesador'],

@@ -1,3 +1,4 @@
+import { categoriaDePc } from '../../dominio/categoriaDePc'
 /**
  * Registrar ticket manual: el técnico atiende un caso que no viene del portal.
  *
@@ -17,11 +18,11 @@ import { api } from '../../api/cliente'
 import { useAjustesTicket, useBuscarUsuarios, useTecnicos } from '../../api/hooks'
 import type { CuerpoTicketManual, TicketCreado } from '../../api/tipos'
 import { Button } from '../../componentes/base/Button'
-import { SelectorDestinoIncidencia, categoriaDePc, type OpcionesDestino } from '../../componentes/dominio/DestinoIncidencia'
+import { SelectorDestinoIncidencia, type OpcionesDestino } from '../../componentes/dominio/DestinoIncidencia'
 import { claveSolicitud } from '../../api/solicitudes'
 import { Input, Select, Textarea } from '../../componentes/base/Campo'
 import { PageHeader, Panel, PantallaFormulario } from '../../componentes/base/Estructura'
-import { useAvisos } from '../../estado/Avisos'
+import { useAvisos } from '../../estado/useAvisos'
 import { PrioridadBadge } from '../../componentes/dominio/Badge'
 
 

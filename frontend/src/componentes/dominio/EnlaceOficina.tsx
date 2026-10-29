@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useZonas } from '../../api/hooks'
-import { useSesion } from '../../estado/Sesion'
+import { useSesion } from '../../estado/useSesion'
 
 export function EnlaceOficina({
   id,

@@ -10,11 +10,12 @@
  */
 
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { createContext, useCallback, useContext, useEffect, useMemo, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, type ReactNode } from 'react'
 
 import { api, ErrorPeticion, alExpirarSesion, fijarCsrf, guardarAcceso, limpiarAcceso } from '../api/cliente'
 import { claves } from '../api/consultas'
 import type { Rol, UsuarioSesion } from '../api/tipos'
+import { Contexto, type ValorContexto } from './useSesion'
 
 /** Lo que devuelve `POST /auth/login`: token + la misma sesión. */
 type RespuestaLogin = UsuarioSesion & {
@@ -22,23 +23,6 @@ type RespuestaLogin = UsuarioSesion & {
   token_type: string
   csrf_token: string | null
 }
-
-type ValorContexto = {
-  usuario: UsuarioSesion | null
-  permisos: string[]
-  rol: Rol | null
-  esAdmin: boolean
-  esTecnico: boolean
-  /** `true` si el rol lo permite por naturaleza o si se lo delegaron. */
-  puede: (permiso: string) => boolean
-  cargando: boolean
-  entrar: (correo: string, password: string, acceso?: 'usuario' | 'ti') => Promise<UsuarioSesion>
-  salir: () => Promise<void>
-  nombreInstitucion: string
-  zonaHoraria: string
-}
-
-const Contexto = createContext<ValorContexto | null>(null)
 
 const CLAVE_INSTITUCION = 'ma.institucion'
 const CLAVE_ACCESO_PREVIO = 'ma.acceso'
@@ -154,12 +138,6 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
   return <Contexto.Provider value={valor}>{children}</Contexto.Provider>
 }
 
-export function useSesion(): ValorContexto {
-  const valor = useContext(Contexto)
-  if (!valor) throw new Error('useSesion debe usarse dentro de ProveedorSesion')
-  return valor
-}
-
 /**
  * Normaliza el rol que llega en `GET /auth/sesion`.
  *
@@ -177,23 +155,4 @@ function normalizarRol(valor: unknown): Rol | null {
   if (texto === 'tecnico' || texto === 'técnico') return 'tecnico'
   if (texto === 'usuario') return 'usuario'
   return null
-}
-
-/** `true` cuando la consulta de sesión terminó con un error de permisos o red. */
-export function useErrorSesion(): ErrorPeticion | null {
-  const consulta = useQuery({
-    queryKey: ['error-sesion'],
-    queryFn: async () => {
-      if (!sessionStorage.getItem(CLAVE_ACCESO_PREVIO)) return null
-      try {
-        await api.obtener('/auth/sesion')
-        return null
-      } catch (fallo) {
-        return fallo instanceof ErrorPeticion && !fallo.esSesion ? fallo : null
-      }
-    },
-    enabled: false,
-    retry: false,
-  })
-  return consulta.data ?? null
 }

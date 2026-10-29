@@ -10,7 +10,7 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 
 import { ProveedorAvisos } from './estado/Avisos'
-import { useSesion } from './estado/Sesion'
+import { useSesion } from './estado/useSesion'
 import { ShellPanel } from './componentes/shell/ShellPanel'
 import { ShellPortal } from './componentes/shell/ShellPortal'
 import { ErrorState, NoPermission, SkeletonPanel } from './componentes/base/Estructura'

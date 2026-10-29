@@ -244,7 +244,7 @@ def exportar_inventario_por_zonas(
     corta pero no para el archivo del municipio: ese tiene cinco hojas, una por zona, y
     una hoja mezclada no se puede volver a subir ni comparar de un vistazo.
 
-    Los nombres de hoja se limpian de lo que Excel no admite (`: \ / ? * [ ]`) y se
+    Los nombres de hoja se limpian de lo que Excel no admite (`: \\ / ? * [ ]`) y se
     recortan a 31 caracteres, que es su límite. Si dos zonas se limpian al mismo nombre
     se añade un número, porque Excel no admite nombres repetidos y el archivo se
     rechazaría al abrirlo.
