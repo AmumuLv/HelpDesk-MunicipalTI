@@ -1,4 +1,5 @@
 ARG MONGO_VERSION=8.0.34
+ARG MONGO_BASE_IMAGE=mongo:${MONGO_VERSION}
 # Conserva MongoDB 8.0 y recompila sus utilidades con el toolchain corregido.
 FROM golang:1.26.9-alpine AS herramientas
 RUN apk add --no-cache git
@@ -20,7 +21,18 @@ RUN mkdir -p /out/js-yaml && wget -q https://registry.npmjs.org/js-yaml/-/js-yam
     && echo "7f005cf0b8ee639b4557e0e321dc067c1f2aa0a442d096e03f2ab53353738794  /tmp/js-yaml.tgz" | sha256sum -c - \
     && tar -xzf /tmp/js-yaml.tgz --strip-components=1 -C /out/js-yaml
 
-FROM mongo:${MONGO_VERSION} AS runtime
+FROM ${MONGO_BASE_IMAGE} AS runtime
+# Actualiza el decodificador Brotli sin cambiar MongoDB ni sus datos.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends --only-upgrade libbrotli1 \
+    && dpkg --compare-versions "$(dpkg-query -W -f='${Version}' libbrotli1)" ge '1.1.0-2ubuntu0.1' \
+    && rm -rf /var/lib/apt/lists/*
+# mongosh also embeds Node/Brotli; patching the OS library alone is insufficient.
+RUN apt-get -o Dir::Etc::sourcelist=/etc/apt/sources.list.d/mongodb-org.list \
+        -o Dir::Etc::sourceparts=- update \
+    && apt-get install -y --no-install-recommends --only-upgrade mongodb-mongosh=2.14.1 \
+    && dpkg --compare-versions "$(mongosh --nodb --quiet --eval 'print(process.versions.node)')" ge '24.22.1' \
+    && rm -rf /var/lib/apt/lists/*
 COPY --from=herramientas /out/bsondump /out/mongodump /out/mongoexport /out/mongofiles /out/mongoimport /out/mongorestore /out/mongostat /out/mongotop /usr/bin/
 COPY --from=herramientas /out/gosu /usr/local/bin/gosu
 COPY --from=herramientas /out/js-yaml/ /opt/js-yaml/

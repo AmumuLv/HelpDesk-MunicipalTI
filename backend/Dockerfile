@@ -45,6 +45,41 @@ RUN mkdir /licenses \
     && cp /build/libxml2-*/Copyright /licenses/libxml2-Copyright.txt \
     && cp /build/zlib-*/README /licenses/zlib-README.txt
 
+# Keep Debian's Expat ABI and patches, then apply the upstream security commits.
+RUN printf 'deb-src http://deb.debian.org/debian-security trixie-security main\n' > /etc/apt/sources.list.d/expat-security.list \
+    && apt-get update && apt-get install -y --no-install-recommends cmake \
+    && apt-get source expat=2.9.0-1~deb13u1 \
+    && curl -fsSL https://github.com/libexpat/libexpat/commit/bfc28346fa3efeb8ca56c17437d24a7344e5feab.patch -o expat-empty.patch \
+    && echo '96ea42cc30d4fd99ea62a7fd84d339bef7dc01135f5774b094a09274a0a54f49  expat-empty.patch' | sha256sum -c - \
+    && curl -fsSL https://github.com/libexpat/libexpat/commit/621cb2c78b253ee023a86bc91d6ddb048481c04c.patch -o expat-prefix.patch \
+    && echo '3b78184a2176ce725d21b233912033fa333466f4a5a2a17a10128002826f99fb  expat-prefix.patch' | sha256sum -c - \
+    && curl -fsSL https://github.com/libexpat/libexpat/commit/1bac53c4fc460a03cd9860f39501c7979f6750ae.patch -o expat-attributes.patch \
+    && echo '28ebac139e59e1909e50eecfd834fc4baf9dcf7dc627b4e3a81af872fd818f15  expat-attributes.patch' | sha256sum -c -
+RUN cd expat-*/expat && patch --batch --fuzz=0 -p2 < ../../expat-empty.patch \
+    && patch --batch --fuzz=0 -p2 < ../../expat-prefix.patch && patch --batch --fuzz=0 -p2 < ../../expat-attributes.patch \
+    && cmake -S . -B build -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_INSTALL_LIBDIR=lib \
+         -DEXPAT_BUILD_DOCS=OFF -DEXPAT_BUILD_EXAMPLES=OFF -DEXPAT_BUILD_TOOLS=OFF \
+         -DEXPAT_BUILD_TESTS=ON -DEXPAT_SHARED_LIBS=ON \
+    && cmake --build build -j2 && ctest --test-dir build --output-on-failure \
+    && DESTDIR=/patched cmake --install build \
+    && cp -L /patched/usr/lib/libexpat.so.1 /artifacts/libexpat.so.1 \
+    && cp COPYING /licenses/Expat-COPYING
+
+# CPython embeds Expat in pyexpat. Rebuild the extension against the patched
+# shared library as well; replacing libexpat alone would leave Python vulnerable.
+RUN test "$(python -c 'import platform; print(platform.python_version())')" = 3.12.16 \
+    && mkdir -p /build/cpython-expat/clinic \
+    && curl -fsSL https://raw.githubusercontent.com/python/cpython/v3.12.16/Modules/pyexpat.c -o /build/cpython-expat/pyexpat.c \
+    && echo 'fbde9f72de2e8eb0f8d2edcfb73276d4b4473834c1c3620908bc2e71ebec04ae  /build/cpython-expat/pyexpat.c' | sha256sum -c - \
+    && curl -fsSL https://raw.githubusercontent.com/python/cpython/v3.12.16/Modules/clinic/pyexpat.c.h -o /build/cpython-expat/clinic/pyexpat.c.h \
+    && echo '5e730198b2e3b644a96b411d5e594654d23146110b880a6ee9961fc919d90acb  /build/cpython-expat/clinic/pyexpat.c.h' | sha256sum -c - \
+    && sed -n '/^#define XML_/p' /patched/usr/include/expat_config.h > /build/cpython-expat/expat_config.h \
+    && cc -shared -fPIC -DPy_BUILD_CORE_MODULE $(python3-config --includes) \
+         -I/usr/local/include/python3.12/internal -I/patched/usr/include -I/build/expat-2.9.0/expat/build \
+         -L/patched/usr/lib $CFLAGS $LDFLAGS -o /artifacts/pyexpat.so /build/cpython-expat/pyexpat.c -lexpat \
+    && curl -fsSL https://raw.githubusercontent.com/python/cpython/v3.12.16/LICENSE -o /licenses/CPython-LICENSE \
+    && echo '3b2f81fe21d181c499c59a256c8e1968455d6689d269aa85373bfb6af41da3bf  /licenses/CPython-LICENSE' | sha256sum -c -
+
 # development / test / production share the same image; only the CMD changes.
 FROM python:3.12-slim-trixie AS base
 

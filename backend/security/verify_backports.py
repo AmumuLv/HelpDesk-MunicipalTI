@@ -20,6 +20,23 @@ def main():
         assert hashlib.sha256(path.read_bytes()).hexdigest() == item['sha256'], soname
         ctypes.CDLL(soname)
         assert str(path) in Path('/proc/self/maps').read_text(), soname
+    # Verify the distribution library and CPython's rebuilt extension.
+    import pyexpat
+    module = evidence['libexpat.so.1']['python_module']
+    assert Path(pyexpat.__file__).resolve() == Path(module['path'])
+    assert hashlib.sha256(Path(module['path']).read_bytes()).hexdigest() == module['sha256']
+    assert evidence['libexpat.so.1']['path'] in Path('/proc/self/maps').read_text()
+    instrucciones = []
+    parser = pyexpat.ParserCreate()
+    parser.ProcessingInstructionHandler = lambda target, data: instrucciones.append((target, data))
+    def entidad(context, base, system, public):
+        child = parser.ExternalEntityParserCreate(context)
+        child.Parse(b'', False)
+        child.Parse(b'<?target data?>', True)
+        return 1
+    parser.ExternalEntityRefHandler = entidad
+    parser.Parse(b'<!DOCTYPE root [<!ENTITY ext SYSTEM "external.dtd">]><root>&ext;</root>', True)
+    assert instrucciones == [('target', 'data')], 'Expat empty non-final entity regression'
     # This CVE requires the separate libxml2 Python SAX bindings, never lxml.
     import importlib.util
     assert importlib.util.find_spec('libxml2') is None
@@ -57,7 +74,7 @@ def main():
             output.writeframes(b'\0\0' * 8000)
         probe = subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'json', str(audio)], capture_output=True, text=True, check=True)
         assert float(json.loads(probe.stdout)['format']['duration']) == 1.0
-    print('PASS: hashes, loaded shared libraries, native XML/DTD, absent cJSON/Python SAX, zlib, PDF, Excel and ffprobe WAV')
+    print('PASS: hashes, loaded libraries, XML/DTD, patched Python Expat/entity regression, absent cJSON/Python SAX, zlib, PDF, Excel and ffprobe WAV')
 
 
 if __name__ == '__main__':

@@ -1,11 +1,24 @@
 # Compila la versión oficial con las correcciones de Go y x/net verificadas.
 FROM golang:1.26.9-alpine AS compilacion
 ENV CGO_ENABLED=0 GOTOOLCHAIN=local
+RUN apk add --no-cache patch
+COPY security/go-jose-v3-security.patch /security/go-jose-v3-security.patch
+RUN go mod download github.com/go-jose/go-jose/v3@v3.0.5 \
+    && cp -a /go/pkg/mod/github.com/go-jose/go-jose/v3@v3.0.5 /patched-jose-v3 \
+    && chmod -R u+w /patched-jose-v3 \
+    && cd /patched-jose-v3 && patch -p1 --fuzz=0 < /security/go-jose-v3-security.patch \
+    && gofmt -w jwk.go shared.go helpdesk_security_test.go \
+    && go test -p=2 ./... \
+    && mkdir /security-evidence \
+    && printf '%s\n' 'go-jose/v3 v3.0.5: backport of upstream a0111f82742fa92bceec9ede40845e73319e6230; RSA bounds and public-only header parsing; upstream suite and four regression tests passed.' > /security-evidence/proxy-security.txt \
+    && sha256sum jwk.go shared.go /security/go-jose-v3-security.patch >> /security-evidence/proxy-security.txt
 WORKDIR /src
 RUN go mod download github.com/caddyserver/caddy/v2@v2.11.7 \
     && cp -a /go/pkg/mod/github.com/caddyserver/caddy/v2@v2.11.7/. /src/ \
     && chmod -R u+w /src \
     && go mod edit -require=golang.org/x/net@v0.60.0 \
+    && go mod edit -require=github.com/go-jose/go-jose/v4@v4.1.6 \
+    && go mod edit -replace=github.com/go-jose/go-jose/v3=/patched-jose-v3 \
     && go build -mod=mod -p=2 -trimpath -ldflags="-s -w" -o /out/caddy ./cmd/caddy
 
 FROM alpine:3.24
@@ -14,6 +27,8 @@ RUN apk upgrade --no-cache \
     && mkdir -p /etc/caddy /config/caddy /data/caddy /srv
 ENV XDG_CONFIG_HOME=/config XDG_DATA_HOME=/data
 COPY --from=compilacion /out/caddy /usr/bin/caddy
+COPY --from=compilacion /security-evidence/ /usr/local/share/helpdesk/
+COPY --from=compilacion /patched-jose-v3/LICENSE /usr/local/share/helpdesk/licenses/go-jose-v3-LICENSE
 COPY Caddyfile /etc/caddy/Caddyfile
 WORKDIR /srv
 EXPOSE 80 443 443/udp

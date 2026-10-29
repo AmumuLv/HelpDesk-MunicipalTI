@@ -708,3 +708,40 @@ El antivirus aceptó contenido limpio y bloqueó EICAR mediante el flujo de la A
 La revisión de archivos publicables comprobó 416 archivos sin problemas de publicación ni coincidencias de credenciales del entorno. GitHub confirmó repositorio privado y permiso de escritura mediante la conexión Git local. El conector GitHub no tenía acceso a este repositorio y devolvió 404; no se cambiaron permisos ni visibilidad.
 
 No se modificaron registros ni archivos de producción. El dominio, HTTPS y la capacidad del entorno definitivo siguen pendientes de que el titular facilite ese entorno. Antes de publicarlo, revisar los avisos altos nuevos y repetir la auditoría tras aplicar sus correcciones.
+
+## Corrección de los avisos altos y validación posterior (29/10/2026)
+
+Esta sección sustituye el estado pendiente de los nueve hallazgos del análisis anterior. Se aplicaron correcciones de código y actualizaciones verificadas; no se cambiaron versiones de paquetes para engañar al escáner ni se excluyeron CVE.
+
+### Cambios aplicados
+
+- MongoDB: libbrotli1 actualizado a 1.1.0-2ubuntu0.1. También se actualizó mongosh de 2.13.0 a 2.14.1, con Node 24.22.1: el shell incorporaba su propia copia de Brotli y actualizar solo la biblioteca de Ubuntu no era suficiente. El ejecutable mongod sigue siendo 8.0.34 y su SHA-256 se conserva: b07e6a9f1802303add4aab26d78798396c9c243d39ce60bad51bc6ad5a8859b7. Referencia: https://ubuntu.com/security/CVE-2026-111497.
+- Proxy: go-jose/v4 actualizado a 4.1.6. Para v3.0.5, que no tenía una versión oficial corregida disponible, se adaptó el cambio oficial a0111f82742fa92bceec9ede40845e73319e6230: límites RSA, validación de primos y rechazo de material privado en las cabeceras JWK/EPK. Se conserva el identificador v3.0.5 y se usa una sustitución local con el código parcheado, no una versión ficticia. La batería completa de sus cinco paquetes y cuatro regresiones nuevas aprobaron. La imagen incorpora evidencia de fuentes y hashes en /usr/local/share/helpdesk/proxy-security.txt y la licencia correspondiente. Referencia: https://github.com/go-jose/go-jose/security/advisories/GHSA-mgcc-cww5-fp2q.
+- API/worker: Expat conserva los parches de Debian y añade las correcciones oficiales de CVE-2026-117610 y CVE-2026-118370, verificadas por SHA-256. Se recompiló también pyexpat de CPython 3.12.16 para enlazar la biblioteca corregida: la extensión original contenía una copia estática que no se arreglaba reemplazando solo libexpat del sistema. Aprobaron la batería nativa de Expat, la regresión de subparser vacío con manejador de instrucciones y las verificaciones de bibliotecas cargadas y hashes. Referencias: https://github.com/libexpat/libexpat/pull/1444 y https://github.com/libexpat/libexpat/pull/1450.
+- Se conservaron y verificaron las correcciones anteriores de libxml2 y zlib y la ausencia de cJSON y de los bindings Python SAX afectados. Las fuentes, licencias y hashes se incluyen en las imágenes.
+
+Las compilaciones se detienen si no coinciden los hashes descargados o la versión esperada de CPython. Al actualizar Python, Expat o go-jose debe revisarse el parche y repetirse la validación; estos backports requieren mantenimiento hasta poder utilizar paquetes oficiales corregidos. La construcción normal usa la imagen oficial mongo:8.0.34. En esta revisión se reutilizó como base la imagen local anterior de esa misma versión para evitar una descarga lenta, mediante MONGO_BASE_IMAGE; no es necesario ese alias en otra instalación.
+
+### Resultado y límites
+
+El escáner sigue reportando cinco hallazgos altos de versiones de paquetes Debian en API/worker (Expat, libxml2 y zlib), más uno de libxml2 en ClamAV. Sus binarios corregidos se verifican mediante los manifiestos y pruebas; el aviso del binding Python SAX corresponde a un módulo ausente. No debe confundirse una versión antigua del paquete con el contenido exacto del binario sustituido, ni presentar estos resultados como cero alertas o ausencia universal de vulnerabilidades.
+
+MongoDB y el proxy dejaron de mostrar los tres hallazgos altos de Brotli y go-jose en las imágenes candidatas verificadas. Web y Redis mantienen cero altos y críticos. El total agrupado pasa de 9 a 6 avisos altos brutos, sin críticos; API/worker se cuenta como un grupo porque sus capas son idénticas. El análisis no evalúa aquí los avisos medios o bajos.
+
+Aprobaron seis pruebas de reportes con una base ficticia y MongoDB actualizado; la prueba HTTPS aislada comprobó certificado mediante CA local, tres pantallas sin infracciones CSP, cookies Secure/HttpOnly, CSRF, rechazo de CORS ajeno, documentación cerrada, revocación HTTP y WebSocket y ausencia de tokens en el log. Se utilizaron las imágenes de producción candidatas de API y proxy. Esto no sustituye la validación del dominio y servidor definitivos.
+
+La verificación nativa volvió a aprobar en la API desplegada: hashes, XML/DTD, Expat de Python, compresión, PDF, Excel y WAV. El antivirus aceptó contenido limpio y bloqueó EICAR en memoria. Los volúmenes de MongoDB, API y worker permanecen idénticos a los registrados antes de la actualización; no se borraron cuentas, tickets, equipos ni archivos. La web y la API respondieron HTTP 200.
+
+### Imágenes finales y mantenimiento
+
+| Componente | SHA-256 de la imagen validada | Altos / críticos del escáner |
+| --- | --- | --- |
+| API | 1ded1ee7a198f9bb65676cad363c7246c2c87ee1bfca837f74b8a27c83af9808 | 5 / 0 |
+| Worker | 7feb4f491aecbf3c706313a1ce407ed615d49a144488b3f8a98dcf5d27c1b4ac | Mismas capas que API; no se duplica el total agrupado |
+| MongoDB | 4159926a86ded98aabafad0402ecc172d7fa635c3ff45942931c44ffa028087a | 0 / 0 |
+| Proxy | 098a9750f7412b676f5e2860896469730d052986c572944014a4c4389f242cbc | 0 / 0 |
+| ClamAV | 08f9b2d2a30a035c2403600fbd3c2786ce6585d4a3005cdf075e5f56a93b6760 | 1 / 0 |
+
+Web y Redis no cambiaron y se volvieron a revisar: 0 altos / 0 críticos. Se comprobó expresamente que la imagen desplegada de MongoDB corresponde a la candidata final y que utiliza mongosh 2.14.1, Node 24.22.1 y el motor anterior idéntico. Las seis alertas brutas restantes se mantienen visibles; no se añadió ninguna excepción al escáner.
+
+El entorno de pruebas, su base ficticia, volúmenes y configuración temporal se retiraron. No se generaron copias de los datos reales ni se conservaron capturas o informes de pruebas externos. Se conserva el código de las regresiones y las instrucciones de verificación.

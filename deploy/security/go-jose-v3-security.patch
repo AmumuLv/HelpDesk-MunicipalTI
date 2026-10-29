@@ -1,0 +1,161 @@
+--- a/jwk.go
++++ b/jwk.go
+@@ -175,11 +175,20 @@
+ }
+ 
+ // UnmarshalJSON reads a key from its JSON representation.
+-func (k *JSONWebKey) UnmarshalJSON(data []byte) (err error) {
++// Backport of upstream a0111f82742fa92bceec9ede40845e73319e6230.
++func (k *JSONWebKey) UnmarshalJSON(data []byte) error {
++	return k.unmarshalJSON(data, true)
++}
++
++func (k *JSONWebKey) unmarshalJSON(data []byte, allowPrivate bool) (err error) {
+ 	var raw rawJSONWebKey
+ 	err = json.Unmarshal(data, &raw)
+ 	if err != nil {
+ 		return err
++	}
++
++	if !allowPrivate && (raw.K != nil || raw.D != nil || raw.P != nil || raw.Q != nil || raw.Dp != nil || raw.Dq != nil || raw.Qi != nil) {
++		return errors.New("go-jose/go-jose: JWK contains private parameters")
+ 	}
+ 
+ 	certs, err := parseCertificateChain(raw.X5c)
+@@ -481,13 +490,20 @@
+ 	return true
+ }
+ 
++// MaxRSAModulusBits matches the upstream security limit.
++var MaxRSAModulusBits = 4096
++
+ func (key rawJSONWebKey) rsaPublicKey() (*rsa.PublicKey, error) {
+ 	if key.N == nil || key.E == nil {
+ 		return nil, fmt.Errorf("go-jose/go-jose: invalid RSA key, missing n/e values")
+ 	}
+ 
++	n := key.N.bigInt()
++	if n.BitLen() > MaxRSAModulusBits {
++		return nil, errors.New("go-jose/go-jose: invalid RSA key, modulus too large")
++	}
+ 	return &rsa.PublicKey{
+-		N: key.N.bigInt(),
++		N: n,
+ 		E: key.E.toInt(),
+ 	}, nil
+ }
+@@ -628,15 +644,23 @@
+ 		return nil, fmt.Errorf("go-jose/go-jose: invalid RSA private key, missing %s value(s)", strings.Join(missing, ", "))
+ 	}
+ 
++	n := key.N.bigInt()
++	if n.BitLen() > MaxRSAModulusBits {
++		return nil, errors.New("go-jose/go-jose: invalid RSA key, modulus too large")
++	}
++	p, q := key.P.bigInt(), key.Q.bigInt()
++	if p.BitLen()+q.BitLen() > n.BitLen()+1 || new(big.Int).Mul(p, q).Cmp(n) != 0 {
++		return nil, errors.New("go-jose/go-jose: invalid RSA private key, p * q != n")
++	}
+ 	rv := &rsa.PrivateKey{
+ 		PublicKey: rsa.PublicKey{
+-			N: key.N.bigInt(),
++			N: n,
+ 			E: key.E.toInt(),
+ 		},
+ 		D: key.D.bigInt(),
+ 		Primes: []*big.Int{
+-			key.P.bigInt(),
+-			key.Q.bigInt(),
++			p,
++			q,
+ 		},
+ 	}
+ 
+--- a/shared.go
++++ b/shared.go
+@@ -282,12 +282,12 @@
+ 	if v == nil {
+ 		return nil, nil
+ 	}
+-	var epk *JSONWebKey
+-	err := json.Unmarshal(*v, &epk)
++	var epk JSONWebKey
++	err := epk.unmarshalJSON(*v, false)
+ 	if err != nil {
+ 		return nil, err
+ 	}
+-	return epk, nil
++	return &epk, nil
+ }
+ 
+ // getAPU extracts parsed "apu" from the raw JSON.
+@@ -316,12 +316,12 @@
+ 	if v == nil {
+ 		return nil, nil
+ 	}
+-	var jwk *JSONWebKey
+-	err := json.Unmarshal(*v, &jwk)
++	var jwk JSONWebKey
++	err := jwk.unmarshalJSON(*v, false)
+ 	if err != nil {
+ 		return nil, err
+ 	}
+-	return jwk, nil
++	return &jwk, nil
+ }
+ 
+ // getCritical extracts parsed "crit" from the raw JSON. If omitted, it
+@@ -383,13 +383,13 @@
+ 		}
+ 		switch k {
+ 		case headerJWK:
+-			var jwk *JSONWebKey
+-			err = json.Unmarshal(*v, &jwk)
++			var jwk JSONWebKey
++			err = jwk.unmarshalJSON(*v, false)
+ 			if err != nil {
+ 				err = fmt.Errorf("failed to unmarshal JWK: %v: %#v", err, string(*v))
+ 				return
+ 			}
+-			h.JSONWebKey = jwk
++			h.JSONWebKey = &jwk
+ 		case headerKeyID:
+ 			var s string
+ 			err = json.Unmarshal(*v, &s)
+--- a/helpdesk_security_test.go
++++ b/helpdesk_security_test.go
+@@ -0,0 +1,34 @@
++package jose
++
++import (
++ "encoding/base64"
++ "encoding/json"
++ "math/big"
++ "testing"
++)
++
++func TestHelpdeskRejectsOversizedRSA(t *testing.T) {
++ n := new(big.Int).Lsh(big.NewInt(1), 8192)
++ raw := map[string]string{"kty":"RSA", "n":base64.RawURLEncoding.EncodeToString(n.Bytes()), "e":"Aw"}
++ data, _ := json.Marshal(raw)
++ var key JSONWebKey
++ if err := key.UnmarshalJSON(data); err == nil { t.Fatal("oversized modulus accepted") }
++}
++
++func TestHelpdeskRejectsMismatchedPrivatePrimes(t *testing.T) {
++ var key JSONWebKey
++ if err := key.UnmarshalJSON([]byte(`{"kty":"RSA","n":"Nw","e":"Aw","d":"AQ","p":"BQ","q":"DQ"}`)); err == nil { t.Fatal("mismatched primes accepted") }
++}
++
++func TestHelpdeskRejectsPrivateMaterialInHeaders(t *testing.T) {
++ var header rawHeader
++ if err := json.Unmarshal([]byte(`{"jwk":{"kty":"RSA","n":"Nw","e":"Aw","d":"AQ","p":"BQ","q":"Cw"},"epk":{"kty":"oct","k":"AQ"}}`), &header); err != nil { t.Fatal(err) }
++ if _, err := header.sanitized(); err == nil { t.Fatal("private JWK accepted") }
++ if _, err := header.getJWK(); err == nil { t.Fatal("private JWK accepted by getter") }
++ if _, err := header.getEPK(); err == nil { t.Fatal("private EPK accepted") }
++}
++
++func TestHelpdeskAllowsPublicKey(t *testing.T) {
++ var key JSONWebKey
++ if err := key.unmarshalJSON([]byte(`{"kty":"RSA","n":"Nw","e":"Aw"}`), false); err != nil { t.Fatal(err) }
++}
