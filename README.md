@@ -1,5 +1,7 @@
 # HelpDesk-MunicipalTI
 
+**¿Vas a otra PC?** Sigue la [lista de instalación en Windows](docs/NUEVA_PC.md).
+
 **Instalar, actualizar o trasladar a otro equipo:** consulta la [guía de instalación y traslado](docs/INSTALAR_Y_TRASLADAR.md).
 
 Archivos y espacio utilizado: [guía de almacenamiento](docs/ALMACENAMIENTO.md).
