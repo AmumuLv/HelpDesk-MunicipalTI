@@ -1,3 +1,4 @@
+import { puedeEditarCuenta, puedeRestablecerCuenta, puedeCambiarEstadoCuenta } from '../../dominio/cuentas'
 import { ListaEquiposPerfil } from '../../componentes/dominio/ListaEquiposPerfil'
 /** Perfil navegable de una persona del directorio y de los tickets. */
 
@@ -163,7 +164,7 @@ function ContenidoPerfilUsuario({ id }: { id?: string }) {
   }
 
   const datos = perfil.data
-  const puedeAdministrar = sesion.puede('usuarios.editar') && (datos.rol !== 'administrador' || sesion.esAdmin)
+  const puedeAdministrar = puedeEditarCuenta(sesion, datos)
   const equipos = datos.equipos_responsable ?? []
   const indiceZona = zonas.data?.items.find((zona) => zona.id === datos.zona_id)?.color_indice
   const colorZona = indiceZona && indiceZona >= 1 && indiceZona <= 8 ? `var(--zona-${indiceZona})` : 'var(--color-muted-foreground)'
@@ -175,7 +176,7 @@ function ContenidoPerfilUsuario({ id }: { id?: string }) {
     '--color-primary-strong': colorFuerte, '--color-primary-soft': colorSuave, '--color-primary-borde': colorBorde,
     '--rol-relleno': colorZona, '--rol-fuerte': colorFuerte, '--rol-suave': colorSuave, '--rol-borde': colorBorde,
   } as CSSProperties
-  const rolPerfil = etiquetaRol(datos.rol)
+  const rolPerfil = datos.administrador_principal ? 'Administrador principal' : etiquetaRol(datos.rol)
 
   return (
     <div className="flex min-w-0 flex-col gap-4" style={coloresPerfil}>
@@ -229,7 +230,7 @@ function ContenidoPerfilUsuario({ id }: { id?: string }) {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="flex min-w-0 items-center gap-2 break-all text-sm"><Mail size={16} className="shrink-0 text-muted-foreground" aria-hidden="true" />{datos.email ?? 'Sin correo registrado'}</p>
           <div className="flex items-center gap-2">
-            <InsigniaRol rol={datos.rol} />
+            <InsigniaRol rol={datos.rol} principal={datos.administrador_principal} />
             <EtiquetaEstadoActivo activo={datos.activo} />
           </div>
         </div>
@@ -307,7 +308,7 @@ function ContenidoPerfilUsuario({ id }: { id?: string }) {
           <Input error={errores.anexo} disabled={guardando} etiqueta="Anexo" maxLength={40} value={anexo} onChange={(evento) => setAnexo(evento.target.value)} />
           <p className="border-t border-border pt-4 text-sm font-semibold sm:col-span-2">Acceso, preferencias y ubicación</p>
           {sesion.esAdmin && datos.id !== sesion.usuario?.id ? (
-            <Select etiqueta="Rol de la cuenta" disabled={guardando} value={rolNuevo} opciones={ROLES}
+            <Select etiqueta="Rol de la cuenta" disabled={guardando} value={rolNuevo} opciones={ROLES.filter(opcion => opcion.valor !== 'administrador' || sesion.usuario?.administrador_principal || datos.rol === 'administrador')}
               ayuda="El rol determina a qué funciones puede acceder la persona."
               onChange={(evento) => setRolNuevo(evento.target.value)} />
           ) : null}
@@ -343,14 +344,14 @@ function ContenidoPerfilUsuario({ id }: { id?: string }) {
               )}
               <div className="mt-5 rounded-xl border border-dashed border-border bg-surface-2/50 p-4">
                 <p className="mb-3 text-sm font-semibold">Foto del perfil</p>
-                <ControlFoto usuarioId={datos.id} nombre={datos.nombre} puedeEditar={sesion.puede('usuarios.editar')}
+                <ControlFoto usuarioId={datos.id} nombre={datos.nombre} puedeEditar={puedeAdministrar}
                   alCambiar={() => { void perfil.refetch(); void invalidar.invalidateQueries({ queryKey: ['usuarios'] }); void invalidar.invalidateQueries({ queryKey: ['equipo-ti'] }) }} />
               </div>
             </Panel>
-            <Panel titulo="Restablecer contraseña" descripcion="Crea una clave nueva y revisa sus caracteres antes de guardarla.">
-              <RestablecerPassword key={datos.id} usuarioId={datos.id} nombre={datos.nombre} />
-            </Panel>
-            {sesion.esAdmin ? (
+            {puedeRestablecerCuenta(sesion, datos) ? <Panel titulo="Restablecer contraseña" descripcion="Crea una clave nueva y revisa sus caracteres antes de guardarla.">
+              <RestablecerPassword key={datos.id} usuarioId={datos.id} nombre={datos.nombre} permitido={puedeRestablecerCuenta(sesion, datos)} />
+            </Panel> : null}
+            {puedeCambiarEstadoCuenta(sesion, datos) ? (
               <Panel titulo="Estado de la cuenta">
                 <EstadoCuentaUsuario key={datos.id} usuarioId={datos.id} nombre={datos.nombre} activo={datos.activo} propia={datos.id === sesion.usuario?.id} />
               </Panel>

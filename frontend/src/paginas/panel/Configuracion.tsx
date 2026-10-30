@@ -339,7 +339,7 @@ function PermisosPorRol() {
   return (
     <Panel
       titulo="Permisos por rol"
-      descripcion="Permisos adicionales de cada técnico. Guarda los cambios de cada persona por separado."
+      descripcion="Los permisos amplían funciones del técnico; no cambian su rol. Guarda los cambios de cada persona por separado."
     >
       <div className="mb-4"><SearchInput etiqueta="Buscar permisos, roles o personas" valor={busqueda} alCambiar={valor => { setBusqueda(valor); setPagina(1) }} /></div>
       {fichas.length === 0 ? (

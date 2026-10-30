@@ -25,7 +25,7 @@ Abre `http://localhost`.
 
 ## 3. Elegir cómo empezar
 
-**Instalación nueva:** crea el administrador desde la web. La base estará vacía.
+**Instalación nueva:** crea el administrador desde `http://localhost/instalacion`. Esa primera cuenta es el administrador principal protegido y autoriza los siguientes administradores. La base estará vacía. Consulta [Roles y permisos](ROLES_Y_PERMISOS.md).
 
 **Conservar la información actual:** no crees el administrador ni registres datos en el destino. Sigue [Llevar los datos actuales a otro equipo](INSTALAR_Y_TRASLADAR.md#llevar-los-datos-actuales-a-otro-equipo). Esa operación incluye cuentas, inventario y adjuntos, y requiere un archivo privado fuera de GitHub. No copies las carpetas internas de Docker mientras MongoDB esté funcionando.
 

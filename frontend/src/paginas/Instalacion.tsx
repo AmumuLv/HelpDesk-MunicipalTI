@@ -135,7 +135,7 @@ export function Instalacion() {
       </Panel>
 
       {!datos?.hay_admin ? (
-        <Panel titulo="Crear el administrador inicial" descripcion="La primera cuenta que podrá delegar permisos y configurar el sistema">
+        <Panel titulo="Crear el administrador principal" descripcion="Primera cuenta protegida; autoriza nuevos administradores">
           <form onSubmit={crearAdmin} className="flex flex-col gap-4" noValidate>
             <Input
               etiqueta="Nombre completo"

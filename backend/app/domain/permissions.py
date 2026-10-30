@@ -110,8 +110,8 @@ PERMISOS_DELEGABLES: dict[str, dict[str, str]] = {
         "grupo": "Organizacion",
     },
     "usuarios.editar": {
-        "etiqueta": "Crear y editar usuarios",
-        "descripcion": "Alta, edicion y desactivacion de cuentas del directorio.",
+        "etiqueta": "Gestionar cuentas de usuarios",
+        "descripcion": "Crear, editar, desactivar y restablecer contraseñas de usuarios. No permite gestionar técnicos ni administradores.",
         "grupo": "Organizacion",
     },
     "tickets.reasignar": {
@@ -177,6 +177,10 @@ def es_admin(usuario: dict[str, Any] | None) -> bool:
     return bool(usuario) and usuario.get("rol") == ROL_ADMIN
 
 
+def es_admin_principal(usuario: dict[str, Any] | None) -> bool:
+    return es_admin(usuario) and usuario.get("administrador_principal") is True
+
+
 def es_tecnico(usuario: dict[str, Any] | None) -> bool:
     return bool(usuario) and usuario.get("rol") in (ROL_TECNICO, ROL_ADMIN)
 
@@ -193,7 +197,9 @@ def permisos_del_usuario(usuario: dict[str, Any] | None) -> set[str]:
     base = set(PERMISOS_BASE.get(rol, set()))
     if "*" in base:
         return set(CLAVES_PERMISOS) | base
-    delegables = usuario.get("permisos") or {}
+    # Marcar todas las casillas no cambia el rol. Solo los técnicos reciben
+    # permisos adicionales; una cuenta de usuario conserva su alcance personal.
+    delegables = (usuario.get("permisos") or {}) if rol == ROL_TECNICO else {}
     efectivos = base | {k for k, v in delegables.items() if v and k in PERMISOS_DELEGABLES}
     return efectivos
 

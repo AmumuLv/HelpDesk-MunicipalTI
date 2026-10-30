@@ -326,7 +326,7 @@ async def listar_usuarios(
 
 @router.post("/usuarios", status_code=201)
 async def crear_usuario(datos: UsuarioCrear, sesion: DependeUsuarioCsrf, _: DependeEditarUsuarios):
-    usuario = await usuario_service.crear(datos.model_dump(), usuario=sesion.como_dict())
+    usuario = await usuario_service.crear(datos.model_dump(), usuario=sesion.como_actor_cuentas())
     return usuario_service.publico(usuario, con_preferencias=True)
 
 
@@ -437,6 +437,7 @@ async def dispositivos_usuario(usuario_id: str, sesion: DependeUsuario):
     objetivo = id_requerido(usuario_id, 'usuario')
     if objetivo != sesion.id:
         sesion.exigir_admin()
+        usuario_service.exigir_gestion_cuenta(await usuario_service.obtener(objetivo), sesion.como_actor_cuentas())
     return await auth_service.dispositivos(objetivo, sesion.sesion.get('session_id'))
 
 
@@ -447,6 +448,7 @@ async def desconectar_usuario(usuario_id: str, session_id: str, sesion: DependeU
     objetivo = id_requerido(usuario_id, 'usuario')
     if objetivo != sesion.id:
         sesion.exigir_admin()
+        usuario_service.exigir_gestion_cuenta(await usuario_service.obtener(objetivo), sesion.como_actor_cuentas())
     await auth_service.cerrar(objetivo, session_id)
     return {'mensaje': 'Conexión cerrada.'}
 
@@ -502,7 +504,7 @@ async def subir_foto(
         await archivo.read(),
         nombre_original=archivo.filename or "foto",
         mime_declarado=archivo.content_type or "application/octet-stream",
-        usuario=sesion.como_dict(),
+        usuario=sesion.como_actor_cuentas(),
     )
 
 
@@ -513,7 +515,7 @@ async def borrar_foto(usuario_id: str, sesion: DependeUsuarioCsrf):
     objetivo = id_requerido(usuario_id, "usuario")
     if objetivo != sesion.id:
         sesion.exigir("usuarios.editar")
-    return await usuario_service.quitar_foto(objetivo, usuario=sesion.como_dict())
+    return await usuario_service.quitar_foto(objetivo, usuario=sesion.como_actor_cuentas())
 
 
 @router.patch("/usuarios/{usuario_id}")
@@ -534,7 +536,7 @@ async def actualizar_usuario(
         raise Prohibido("No puedes modificar la cuenta de otra persona.")
     elif "permisos" in cambios:
         sesion.exigir_admin()
-    elif "rol" in cambios or "activo" in cambios:
+    elif "rol" in cambios:
         sesion.exigir_admin()
     elif sesion.rol == "usuario":
         from app.core.errors import Prohibido
@@ -542,7 +544,7 @@ async def actualizar_usuario(
         raise Prohibido("No tienes permiso para modificar usuarios.")
     else:
         sesion.exigir("usuarios.editar")
-    usuario = await usuario_service.actualizar(objetivo, cambios, usuario=sesion.como_dict())
+    usuario = await usuario_service.actualizar(objetivo, cambios, usuario=sesion.como_actor_cuentas())
     return usuario_service.publico(usuario, con_preferencias=True)
 
 
@@ -558,7 +560,7 @@ async def restablecer_password(
     await usuario_service.restablecer_password(
         id_requerido(usuario_id, "usuario"),
         datos.password,
-        usuario=sesion.como_dict(),
+        usuario=sesion.como_actor_cuentas(),
     )
     return {"mensaje": "Contraseña restablecida. Entrega la nueva clave de forma segura."}
 
@@ -568,7 +570,7 @@ async def desactivar_usuario(usuario_id: str, sesion: DependeUsuarioCsrf):
     from app.core.ids import id_requerido
 
     sesion.exigir("usuarios.editar")
-    usuario = await usuario_service.desactivar(id_requerido(usuario_id, "usuario"), usuario=sesion.como_dict())
+    usuario = await usuario_service.desactivar(id_requerido(usuario_id, "usuario"), usuario=sesion.como_actor_cuentas())
     return usuario_service.publico(usuario, con_preferencias=True)
 
 
@@ -584,5 +586,5 @@ async def editar_mi_perfil(sesion: DependeUsuarioCsrf, datos: UsuarioActualizar)
     cambios = datos.model_dump(exclude_unset=True)
     for clave in ("rol", "permisos", "activo", "oficina_id", "zona_id"):
         cambios.pop(clave, None)
-    usuario = await usuario_service.actualizar(sesion.id, cambios, usuario=sesion.como_dict())
+    usuario = await usuario_service.actualizar(sesion.id, cambios, usuario=sesion.como_actor_cuentas())
     return usuario_service.publico(usuario, con_preferencias=True)

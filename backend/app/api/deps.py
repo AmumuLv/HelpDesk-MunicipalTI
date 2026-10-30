@@ -89,6 +89,14 @@ class SesionActual:
             "rol": self.usuario.get("rol", "usuario"),
         }
 
+    def como_actor_cuentas(self) -> dict[str, Any]:
+        """Autoridad de cuentas leída de la base; nunca de campos del formulario."""
+        return {
+            **self.como_dict(),
+            "administrador_principal": self.usuario.get("administrador_principal") is True,
+            "permisos": self.usuario.get("permisos") or {},
+        }
+
 
 def _ip(request: Request) -> str | None:
     # Uvicorn resuelve el proxy de confianza; las cabeceras del navegador no

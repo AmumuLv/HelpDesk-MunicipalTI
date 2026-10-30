@@ -6,6 +6,8 @@
 
 Archivos y espacio utilizado: [guía de almacenamiento](docs/ALMACENAMIENTO.md).
 
+Cuentas, autoridad del primer administrador y límites de técnicos: [roles y permisos](docs/ROLES_Y_PERMISOS.md).
+
 Inicio rápido en Windows con Git y Docker Desktop:
 
 ```bash

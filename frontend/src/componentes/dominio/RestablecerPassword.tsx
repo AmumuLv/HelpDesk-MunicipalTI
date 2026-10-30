@@ -7,7 +7,7 @@ import { Nota } from '../base/Estructura'
 import { useSesion } from '../../estado/useSesion'
 import { useNavigate } from 'react-router-dom'
 
-export function RestablecerPassword({ usuarioId, nombre }: { usuarioId: string; nombre: string }) {
+export function RestablecerPassword({ usuarioId, nombre, permitido }: { usuarioId: string; nombre: string; permitido?: boolean }) {
   const avisos = useAvisos()
   const sesion = useSesion()
   const navegar = useNavigate()
@@ -17,7 +17,7 @@ export function RestablecerPassword({ usuarioId, nombre }: { usuarioId: string; 
   const [error, setError] = useState<string | null>(null)
   const [exito, setExito] = useState(false)
   const valido = password.length >= 8 && password === confirmacion
-  if (!sesion.esAdmin) return <Nota tono="info">El restablecimiento de contraseñas lo realiza el administrador.</Nota>
+  if (!(permitido ?? sesion.esAdmin)) return <Nota tono="info">No tienes permiso para restablecer esta contraseña.</Nota>
 
   const guardar = async (evento: React.FormEvent) => {
     evento.preventDefault()

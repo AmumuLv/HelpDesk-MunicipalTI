@@ -96,7 +96,7 @@ export function EquipoTi() {
   return <>
     <PageHeader titulo="Equipo TI y horarios" descripcion="Disponibilidad, jornada y ausencias. Los datos personales se comparten con Usuarios."
       acciones={<>
-        {sesion.puede('usuarios.editar') ? <Button asChild variante="secundario"><Link to="/panel/usuarios?crear=tecnico">Registrar técnico</Link></Button> : null}
+        {sesion.esAdmin ? <Button asChild variante="secundario"><Link to="/panel/usuarios?crear=tecnico">Registrar técnico</Link></Button> : null}
         {puedeEditarTodos || puedeEditarPropio ? <Button variante="destacado" icono={<Plus size={16} />} onClick={() => {
           setTecnicoId(seleccionado); setInicio(hoy()); setFin(hoy()); setMotivo(''); setErrores({}); setErrorGeneral(null); setCreando(true)
         }}>Registrar ausencia</Button> : null}

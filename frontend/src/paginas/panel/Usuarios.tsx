@@ -1,3 +1,4 @@
+import { puedeEditarCuenta, puedeRestablecerCuenta, puedeCambiarEstadoCuenta } from '../../dominio/cuentas'
 /**
  * Directorio de usuarios.
  *
@@ -70,7 +71,7 @@ export function Usuarios() {
   const avisos = useAvisos()
   const invalidar = useQueryClient()
   const [parametros] = useSearchParams()
-  const rolInicial = parametros.get('crear') === 'tecnico' ? 'tecnico' : 'usuario'
+  const rolInicial = sesion.esAdmin && parametros.get('crear') === 'tecnico' ? 'tecnico' : 'usuario'
   const zonas = useZonas()
   const oficinas = useOficinas()
 
@@ -176,7 +177,7 @@ export function Usuarios() {
       accessorKey: 'rol',
       header: 'Rol',
       meta: { ancho: '11%' },
-      cell: ({ row }) => <span>{etiquetaRol(row.original.rol)}</span>,
+      cell: ({ row }) => <span>{row.original.administrador_principal ? 'Administrador principal' : etiquetaRol(row.original.rol)}</span>,
     },
     {
       id: 'ubicacion',
@@ -451,7 +452,7 @@ export function Usuarios() {
                   </div>
                 </div>
                 <p className="mt-1.5 text-sm text-muted-foreground">
-                  {etiquetaRol(usuario.rol)} · {usuario.oficina_nombre ?? 'Sin oficina'}
+                  {usuario.administrador_principal ? 'Administrador principal' : etiquetaRol(usuario.rol)} · {usuario.oficina_nombre ?? 'Sin oficina'}
                 </p>
                 <div className="mt-2 flex items-center gap-1.5">
                   <EtiquetaEstadoActivo activo={usuario.activo} />
@@ -476,13 +477,13 @@ export function Usuarios() {
         pie={detalle.data ? (
           <div className="flex w-full flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap gap-2">
-              {sesion.puede('usuarios.editar') && (detalle.data.rol !== 'administrador' || sesion.esAdmin) ? (
+              {puedeRestablecerCuenta(sesion, detalle.data) ? (
                 <Button variante="secundario" icono={<KeyRound size={16} />} onClick={() => {
                   setMostrarPassword(!mostrarPassword)
                   requestAnimationFrame(() => passwordRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }))
                 }}>Restablecer contraseña</Button>
               ) : null}
-              {sesion.esAdmin && detalle.data.id !== sesion.usuario?.id ? (
+              {puedeCambiarEstadoCuenta(sesion, detalle.data) ? (
                 <Button variante="destructivo" onClick={() => setCambiandoActivo({
                   usuario: { id: detalle.data!.id, nombre: detalle.data!.nombre } as UsuarioResumen,
                   activar: detalle.data!.activo === false,
@@ -510,7 +511,7 @@ export function Usuarios() {
                 <ControlFoto
                   usuarioId={detalle.data.id}
                   nombre={detalle.data.nombre}
-                  puedeEditar={sesion.puede('usuarios.editar') && (detalle.data.rol !== 'administrador' || sesion.esAdmin)}
+                  puedeEditar={puedeEditarCuenta(sesion, detalle.data)}
                   alCambiar={(tiene) => {
                     /*
                       La foto vive en un caché de módulo aparte del de React Query,
@@ -524,14 +525,14 @@ export function Usuarios() {
                     if (tiene) avisos.exito('Foto actualizada', 'Ya se ve en su avatar.')
                   }}
                 />
-                {sesion.puede('usuarios.editar') && (detalle.data.rol !== 'administrador' || sesion.esAdmin) ? (
+                {puedeRestablecerCuenta(sesion, detalle.data) ? (
                   <>
                     <details ref={passwordRef} open={mostrarPassword} onToggle={(evento) => setMostrarPassword(evento.currentTarget.open)} className="group rounded-xl border border-border bg-surface p-3">
                       <summary className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-primary-strong focus-visible:outline-2 focus-visible:outline-ring">
                         <KeyRound size={17} aria-hidden="true" />Restablecer contraseña
                         <ChevronDown size={16} aria-hidden="true" className="ml-auto transition-transform group-open:rotate-180" />
                       </summary>
-                      <div className="mt-4"><RestablecerPassword key={detalle.data.id} usuarioId={detalle.data.id} nombre={detalle.data.nombre} /></div>
+                      <div className="mt-4"><RestablecerPassword key={detalle.data.id} usuarioId={detalle.data.id} nombre={detalle.data.nombre} permitido={puedeRestablecerCuenta(sesion, detalle.data)} /></div>
                     </details>
                   </>
                 ) : null}
@@ -669,7 +670,7 @@ export function Usuarios() {
               value={rolNuevo}
               error={errores.rol}
               onChange={(evento) => setRolNuevo(evento.target.value)}
-              opciones={ROLES.filter((opcion) => sesion.usuario?.rol === 'administrador' || opcion.valor !== 'administrador')}
+              opciones={ROLES.filter((opcion) => sesion.esAdmin ? opcion.valor !== 'administrador' || sesion.usuario?.administrador_principal : opcion.valor === 'usuario')}
             />
             <Select
               etiqueta="Zona"

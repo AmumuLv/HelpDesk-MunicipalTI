@@ -160,6 +160,7 @@ class UsuarioActualizar(Base):
 
 
 class UsuarioResumen(Base):
+    administrador_principal: bool = False
     id: Id
     nombre: str
     email: str | None = None
@@ -194,6 +195,7 @@ class UsuarioSesion(Base):
     """Lo que el frontend necesita saber de la cuenta con la que entra."""
 
     id: Id
+    administrador_principal: bool = False
     nombre: str
     email: str | None = None
     rol: str

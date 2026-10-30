@@ -207,7 +207,7 @@ async def permisos_tecnicos(sesion: DependeUsuario):
 async def aplicar_permisos(usuario_id: str, datos: AplicarPermisosTecnico, sesion: DependeUsuarioCsrf):
     sesion.exigir_admin()
     permisos = await usuario_service.aplicar_permisos(
-        id_requerido(usuario_id, "usuario"), datos.cambios, usuario=sesion.como_dict()
+        id_requerido(usuario_id, "usuario"), datos.cambios, usuario=sesion.como_actor_cuentas()
     )
     return {"permisos": permisos}
 

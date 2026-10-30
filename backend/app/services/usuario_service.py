@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from bson import ObjectId
+from pymongo.errors import DuplicateKeyError
 
 from app.core.audit import registrar
 from app.core.config import settings
@@ -17,11 +18,32 @@ from app.core.ids import clave, clave_oscura, id_requerido, normalizar_texto
 from app.core.security import hash_password, necesita_rehash, verify_password
 from app.core.time import utcnow
 from app.domain.constants import ROL_ADMIN, ROL_TECNICO
-from app.domain.permissions import CLAVES_PERMISOS, matriz_inicial
+from app.domain.permissions import CLAVES_PERMISOS, matriz_inicial, es_admin_principal, tiene_permiso
 from app.services import config_service, org_service
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 SIN_ESPACIOS = {"_id", "password_hash", "token_version"}
+
+
+def exigir_gestion_cuenta(objetivo: dict[str, Any], actor: dict[str, Any], *, permitir_propio: bool = True) -> None:
+    """Los permisos delegados nunca autorizan gestionar una cuenta superior."""
+    if permitir_propio and objetivo.get("_id") == actor.get("_id"):
+        return
+    if es_admin_principal(objetivo):
+        raise Prohibido("La cuenta principal solo puede modificarla su titular.")
+    if actor.get("rol") == ROL_ADMIN:
+        return
+    if actor.get("rol") == ROL_TECNICO and objetivo.get("rol") == "usuario" and tiene_permiso(actor, "usuarios.editar"):
+        return
+    raise Prohibido("Un técnico autorizado solo puede gestionar cuentas de usuarios.")
+
+
+def _version_jerarquia(cuenta: dict[str, Any]) -> dict[str, Any]:
+    # Evita editar una cuenta que se elevó de rol después de autorizar la petición.
+    return {
+        "_id": cuenta["_id"], "rol": cuenta.get("rol", "usuario"),
+        "administrador_principal": True if es_admin_principal(cuenta) else {"$ne": True},
+    }
 
 
 def iniciales(nombre: str) -> str:
@@ -43,6 +65,7 @@ def publico(usuario: dict[str, Any], *, con_preferencias: bool = False) -> dict[
         "anexo": usuario.get("anexo"),
         "cargo": usuario.get("cargo"),
         "rol": usuario.get("rol", "usuario"),
+        "administrador_principal": es_admin_principal(usuario),
         "activo": bool(usuario.get("activo", True)),
         "zona_id": usuario.get("zona_id"),
         "zona_nombre": usuario.get("zona_nombre"),
@@ -98,8 +121,10 @@ async def crear(datos: dict[str, Any], *, usuario: dict[str, Any], es_primer_adm
     if rol not in {"usuario", ROL_TECNICO, ROL_ADMIN}:
         raise Validacion("Rol no valido.")
     if rol == ROL_ADMIN and not es_primer_admin:
-        if usuario.get("rol") != ROL_ADMIN:
-            raise Prohibido("Solo un administrador puede crear cuentas de administrador.")
+        if not es_admin_principal(usuario):
+            raise Prohibido("Solo el administrador principal puede crear administradores.")
+    if usuario.get("rol") == ROL_TECNICO and rol != "usuario":
+        raise Prohibido("Un técnico solo puede crear cuentas de usuarios.")
 
     permisos = matriz_inicial()
     if datos.get("permisos") and usuario.get("rol") != ROL_ADMIN:
@@ -122,6 +147,7 @@ async def crear(datos: dict[str, Any], *, usuario: dict[str, Any], es_primer_adm
         "anexo": normalizar_texto(datos.get("anexo")) or None,
         "cargo": normalizar_texto(datos.get("cargo")) or None,
         "rol": rol,
+        "administrador_principal": bool(es_primer_admin and rol == ROL_ADMIN),
         "activo": bool(datos.get("activo", True)),
         "zona_id": zona_id,
         "zona_nombre": zona_nombre,
@@ -138,7 +164,10 @@ async def crear(datos: dict[str, Any], *, usuario: dict[str, Any], es_primer_adm
     }
     if password is None:
         doc["debe_cambiar_password"] = True
-    resultado = await db["usuarios"].insert_one(doc)
+    try:
+        resultado = await db["usuarios"].insert_one(doc)
+    except DuplicateKeyError as exc:
+        raise Conflicto("La cuenta o el administrador principal ya existe.") from exc
     doc["_id"] = resultado.inserted_id
     if rol in (ROL_TECNICO, ROL_ADMIN):
         await _asegurar_perfil_tecnico(doc["_id"])
@@ -181,8 +210,9 @@ async def actualizar(usuario_id: ObjectId, datos: dict[str, Any], *, usuario: di
     antes = await db["usuarios"].find_one({"_id": usuario_id})
     if antes is None:
         raise NoEncontrado("Usuario no encontrado.")
-    if antes.get("rol") == ROL_ADMIN and usuario.get("rol") != ROL_ADMIN:
-        raise Prohibido("Solo un administrador puede modificar una cuenta de administrador.")
+    exigir_gestion_cuenta(antes, usuario, permitir_propio=not any(c in datos for c in ("rol", "activo", "permisos")))
+    if es_admin_principal(antes) and (datos.get("activo") is False or datos.get("rol") not in (None, ROL_ADMIN)):
+        raise Prohibido("No se puede desactivar ni cambiar el rol de la cuenta principal.")
     cambios: dict[str, Any] = {}
 
     if datos.get("nombre"):
@@ -204,8 +234,11 @@ async def actualizar(usuario_id: ObjectId, datos: dict[str, Any], *, usuario: di
             cambios[campo] = normalizar_texto(datos.get(campo)) or None
     if datos.get("rol"):
         nuevo_rol = datos["rol"]
-        if nuevo_rol == ROL_ADMIN and usuario.get("rol") != ROL_ADMIN:
-            raise Prohibido("Solo un administrador puede crear cuentas de administrador.")
+        if nuevo_rol != antes.get("rol"):
+            if usuario.get("rol") != ROL_ADMIN:
+                raise Prohibido("Solo un administrador puede cambiar roles.")
+            if nuevo_rol == ROL_ADMIN and not es_admin_principal(usuario):
+                raise Prohibido("Solo el administrador principal puede crear administradores.")
         if antes.get("rol") == ROL_ADMIN and antes.get("activo", True) and nuevo_rol != ROL_ADMIN:
             otros = await db["usuarios"].count_documents(
                 {"rol": ROL_ADMIN, "activo": True, "_id": {"$ne": usuario_id}}
@@ -240,6 +273,8 @@ async def actualizar(usuario_id: ObjectId, datos: dict[str, Any], *, usuario: di
     if "permisos" in datos and datos["permisos"] is not None:
         if usuario.get("rol") != ROL_ADMIN:
             raise Prohibido("Solo un administrador cambia permisos delegables.")
+        if cambios.get("rol", antes.get("rol")) != ROL_TECNICO:
+            raise Validacion("Los permisos adicionales se asignan únicamente a técnicos.")
         permisos = dict(antes.get("permisos") or matriz_inicial())
         for clave_permiso, valor in (datos["permisos"] or {}).items():
             if clave_permiso in CLAVES_PERMISOS:
@@ -248,7 +283,9 @@ async def actualizar(usuario_id: ObjectId, datos: dict[str, Any], *, usuario: di
     if not cambios:
         return antes
     cambios["actualizado_en"] = utcnow()
-    await db["usuarios"].update_one({"_id": usuario_id}, {"$set": cambios})
+    resultado = await db["usuarios"].update_one(_version_jerarquia(antes), {"$set": cambios})
+    if not resultado.matched_count:
+        raise Conflicto("El rol de la cuenta cambió. Actualiza antes de continuar.")
     if cambios.get("rol") in (ROL_TECNICO, ROL_ADMIN):
         await _asegurar_perfil_tecnico(usuario_id)
     despues = await db["usuarios"].find_one({"_id": usuario_id})
@@ -584,16 +621,13 @@ async def restablecer_password(
     *,
     usuario: dict[str, Any],
 ) -> None:
-    if usuario.get('rol') != ROL_ADMIN:
-        raise Prohibido('Solo un administrador puede restablecer contraseñas.')
     db = get_db()
     objetivo = await db["usuarios"].find_one({"_id": usuario_id})
     if objetivo is None:
         raise NoEncontrado("Usuario no encontrado.")
-    if objetivo.get("rol") == ROL_ADMIN and usuario.get("rol") != ROL_ADMIN:
-        raise Prohibido("Solo un administrador puede restablecer la contraseña de otro administrador.")
-    await db["usuarios"].update_one(
-        {"_id": usuario_id},
+    exigir_gestion_cuenta(objetivo, usuario, permitir_propio=False)
+    resultado = await db["usuarios"].update_one(
+        _version_jerarquia(objetivo),
         {
             "$set": {
                 "password_hash": hash_password(password),
@@ -603,6 +637,8 @@ async def restablecer_password(
             }
         },
     )
+    if not resultado.matched_count:
+        raise Conflicto("El rol de la cuenta cambió. Actualiza antes de continuar.")
     await db["sesiones"].update_many({"usuario_id": usuario_id, "revocado": False}, {"$set": {"revocado": True}})
     await registrar(
         "usuario.password",
@@ -634,10 +670,15 @@ async def asegurar_admin_activo() -> None:
 
 
 async def aplicar_permisos(usuario_id: ObjectId, cambios: dict[str, bool], *, usuario: dict[str, Any]) -> dict[str, Any]:
+    if usuario.get("rol") != ROL_ADMIN:
+        raise Prohibido("Solo un administrador cambia permisos delegables.")
     db = get_db()
     antes = await db["usuarios"].find_one({"_id": usuario_id})
     if antes is None:
         raise NoEncontrado("Usuario no encontrado.")
+    exigir_gestion_cuenta(antes, usuario, permitir_propio=False)
+    if antes.get("rol") != ROL_TECNICO:
+        raise Validacion("Los permisos adicionales se asignan únicamente a técnicos.")
     permisos = dict(antes.get("permisos") or matriz_inicial())
     aplicados: dict[str, bool] = {}
     for clave_permiso, valor in cambios.items():
@@ -761,8 +802,10 @@ async def guardar_foto(
     from app.services import adjuntos_service
 
     db = get_db()
-    if await db["usuarios"].find_one({"_id": usuario_id}) is None:
+    objetivo = await db["usuarios"].find_one({"_id": usuario_id})
+    if objetivo is None:
         raise NoEncontrado("Usuario no encontrado.")
+    exigir_gestion_cuenta(objetivo, usuario)
     if len(contenido) > MAX_FOTO_BYTES:
         raise Validacion(
             f"La foto supera los {settings.max_upload_mb} MB.",
@@ -832,6 +875,7 @@ async def quitar_foto(usuario_id: ObjectId, *, usuario: dict[str, Any]) -> dict[
     documento = await db["usuarios"].find_one({"_id": usuario_id})
     if documento is None:
         raise NoEncontrado("Usuario no encontrado.")
+    exigir_gestion_cuenta(documento, usuario)
     for viejo in (Path(settings.upload_dir) / "fotos").glob(f"{usuario_id}.*"):
         viejo.unlink(missing_ok=True)
     await db["usuarios"].update_one({"_id": usuario_id}, {"$unset": {"foto": ""}})
