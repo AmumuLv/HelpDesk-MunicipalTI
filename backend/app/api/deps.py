@@ -87,7 +87,6 @@ class SesionActual:
             "_id": self.usuario.get("_id"),
             "nombre": self.usuario.get("nombre", ""),
             "rol": self.usuario.get("rol", "usuario"),
-            "superadministrador": self.usuario.get("superadministrador") is True,
         }
 
 

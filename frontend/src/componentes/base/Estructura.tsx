@@ -271,7 +271,7 @@ export function Avatar({
 }
 
 /** Insignia de rol: identidad por color + icono + texto, nunca un permiso. */
-export function InsigniaRol({ rol, superadministrador = false, className }: { rol: string | null | undefined; superadministrador?: boolean; className?: string }) {
+export function InsigniaRol({ rol, className }: { rol: string | null | undefined; className?: string }) {
   const icono = rol === 'administrador' ? Crown : rol === 'tecnico' ? Wrench : User
   const Icono = icono
   return (
@@ -283,7 +283,7 @@ export function InsigniaRol({ rol, superadministrador = false, className }: { ro
       )}
     >
       <Icono size={12} aria-hidden="true" className="shrink-0" />
-      {superadministrador && rol === 'administrador' ? 'Superadministrador' : textoRol(rol)}
+      {textoRol(rol)}
     </span>
   )
 }

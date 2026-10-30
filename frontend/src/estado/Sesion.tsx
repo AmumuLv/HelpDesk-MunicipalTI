@@ -116,7 +116,6 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
       permisos,
       rol,
       esAdmin,
-      esSuperadmin: esAdmin && usuario?.superadministrador === true,
       // El administrador entra también al panel: ve todo lo que ve un técnico
       esTecnico: esAdmin || rol === 'tecnico',
       puede: (permiso: string) => esAdmin || permisos.includes(permiso),

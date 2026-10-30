@@ -176,7 +176,7 @@ export function Usuarios() {
       accessorKey: 'rol',
       header: 'Rol',
       meta: { ancho: '11%' },
-      cell: ({ row }) => <span>{row.original.superadministrador ? 'Superadministrador' : etiquetaRol(row.original.rol)}</span>,
+      cell: ({ row }) => <span>{etiquetaRol(row.original.rol)}</span>,
     },
     {
       id: 'ubicacion',
@@ -451,7 +451,7 @@ export function Usuarios() {
                   </div>
                 </div>
                 <p className="mt-1.5 text-sm text-muted-foreground">
-                  {usuario.superadministrador ? 'Superadministrador' : etiquetaRol(usuario.rol)} · {usuario.oficina_nombre ?? 'Sin oficina'}
+                  {etiquetaRol(usuario.rol)} · {usuario.oficina_nombre ?? 'Sin oficina'}
                 </p>
                 <div className="mt-2 flex items-center gap-1.5">
                   <EtiquetaEstadoActivo activo={usuario.activo} />
@@ -476,13 +476,13 @@ export function Usuarios() {
         pie={detalle.data ? (
           <div className="flex w-full flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap gap-2">
-              {sesion.puede('usuarios.editar') && (detalle.data.id === sesion.usuario?.id || detalle.data.rol !== 'administrador' || sesion.esSuperadmin && !detalle.data.superadministrador) ? (
+              {sesion.puede('usuarios.editar') && (detalle.data.rol !== 'administrador' || sesion.esAdmin) ? (
                 <Button variante="secundario" icono={<KeyRound size={16} />} onClick={() => {
                   setMostrarPassword(!mostrarPassword)
                   requestAnimationFrame(() => passwordRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }))
                 }}>Restablecer contraseña</Button>
               ) : null}
-              {sesion.esAdmin && detalle.data.id !== sesion.usuario?.id && !detalle.data.superadministrador && (detalle.data.rol !== 'administrador' || sesion.esSuperadmin) ? (
+              {sesion.esAdmin && detalle.data.id !== sesion.usuario?.id ? (
                 <Button variante="destructivo" onClick={() => setCambiandoActivo({
                   usuario: { id: detalle.data!.id, nombre: detalle.data!.nombre } as UsuarioResumen,
                   activar: detalle.data!.activo === false,
@@ -510,7 +510,7 @@ export function Usuarios() {
                 <ControlFoto
                   usuarioId={detalle.data.id}
                   nombre={detalle.data.nombre}
-                  puedeEditar={sesion.puede('usuarios.editar') && (detalle.data.id === sesion.usuario?.id || detalle.data.rol !== 'administrador' || sesion.esSuperadmin && !detalle.data.superadministrador)}
+                  puedeEditar={sesion.puede('usuarios.editar') && (detalle.data.rol !== 'administrador' || sesion.esAdmin)}
                   alCambiar={(tiene) => {
                     /*
                       La foto vive en un caché de módulo aparte del de React Query,
@@ -524,7 +524,7 @@ export function Usuarios() {
                     if (tiene) avisos.exito('Foto actualizada', 'Ya se ve en su avatar.')
                   }}
                 />
-                {sesion.puede('usuarios.editar') && (detalle.data.id === sesion.usuario?.id || detalle.data.rol !== 'administrador' || sesion.esSuperadmin && !detalle.data.superadministrador) ? (
+                {sesion.puede('usuarios.editar') && (detalle.data.rol !== 'administrador' || sesion.esAdmin) ? (
                   <>
                     <details ref={passwordRef} open={mostrarPassword} onToggle={(evento) => setMostrarPassword(evento.currentTarget.open)} className="group rounded-xl border border-border bg-surface p-3">
                       <summary className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-primary-strong focus-visible:outline-2 focus-visible:outline-ring">
@@ -669,7 +669,7 @@ export function Usuarios() {
               value={rolNuevo}
               error={errores.rol}
               onChange={(evento) => setRolNuevo(evento.target.value)}
-              opciones={ROLES.filter((opcion) => sesion.esSuperadmin || opcion.valor !== 'administrador')}
+              opciones={ROLES.filter((opcion) => sesion.usuario?.rol === 'administrador' || opcion.valor !== 'administrador')}
             />
             <Select
               etiqueta="Zona"

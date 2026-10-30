@@ -339,7 +339,7 @@ function PermisosPorRol() {
   return (
     <Panel
       titulo="Permisos por rol"
-      descripcion={sesion.esSuperadmin ? "Permisos adicionales de cada técnico. Guarda los cambios de cada persona por separado." : "Solo el superadministrador puede cambiar los permisos."}
+      descripcion="Permisos adicionales de cada técnico. Guarda los cambios de cada persona por separado."
     >
       <div className="mb-4"><SearchInput etiqueta="Buscar permisos, roles o personas" valor={busqueda} alCambiar={valor => { setBusqueda(valor); setPagina(1) }} /></div>
       {fichas.length === 0 ? (
@@ -361,7 +361,7 @@ function PermisosPorRol() {
                           <input
                             type="checkbox"
                             checked={Boolean(yaAsignados[permiso.clave])}
-                            disabled={guardando || ficha.rol === 'administrador' || !sesion.esSuperadmin}
+                            disabled={guardando || ficha.rol === 'administrador' || !sesion.esAdmin}
                             onChange={() => alternar(ficha.usuario_id, permiso.clave)}
                             className="size-4 accent-primary"
                           />

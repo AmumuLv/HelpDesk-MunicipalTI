@@ -117,7 +117,7 @@ function ContenidoPerfilUsuario({ id }: { id?: string }) {
         zona_id: zonaId || null,
         oficina_id: oficinaId || null,
         recomendaciones_ia: ayudaIa,
-        ...(sesion.esSuperadmin && id !== sesion.usuario?.id ? { rol: rolNuevo } : {}),
+        ...(sesion.esAdmin && id !== sesion.usuario?.id ? { rol: rolNuevo } : {}),
       })
       await Promise.all([
         invalidar.invalidateQueries({ queryKey: claves.usuario(id) }),
@@ -163,7 +163,7 @@ function ContenidoPerfilUsuario({ id }: { id?: string }) {
   }
 
   const datos = perfil.data
-  const puedeAdministrar = sesion.puede('usuarios.editar') && (datos.id === sesion.usuario?.id || datos.rol !== 'administrador' || sesion.esSuperadmin && !datos.superadministrador)
+  const puedeAdministrar = sesion.puede('usuarios.editar') && (datos.rol !== 'administrador' || sesion.esAdmin)
   const equipos = datos.equipos_responsable ?? []
   const indiceZona = zonas.data?.items.find((zona) => zona.id === datos.zona_id)?.color_indice
   const colorZona = indiceZona && indiceZona >= 1 && indiceZona <= 8 ? `var(--zona-${indiceZona})` : 'var(--color-muted-foreground)'
@@ -175,7 +175,7 @@ function ContenidoPerfilUsuario({ id }: { id?: string }) {
     '--color-primary-strong': colorFuerte, '--color-primary-soft': colorSuave, '--color-primary-borde': colorBorde,
     '--rol-relleno': colorZona, '--rol-fuerte': colorFuerte, '--rol-suave': colorSuave, '--rol-borde': colorBorde,
   } as CSSProperties
-  const rolPerfil = datos.superadministrador ? 'Superadministrador' : etiquetaRol(datos.rol)
+  const rolPerfil = etiquetaRol(datos.rol)
 
   return (
     <div className="flex min-w-0 flex-col gap-4" style={coloresPerfil}>
@@ -229,7 +229,7 @@ function ContenidoPerfilUsuario({ id }: { id?: string }) {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="flex min-w-0 items-center gap-2 break-all text-sm"><Mail size={16} className="shrink-0 text-muted-foreground" aria-hidden="true" />{datos.email ?? 'Sin correo registrado'}</p>
           <div className="flex items-center gap-2">
-            <InsigniaRol rol={datos.rol} superadministrador={datos.superadministrador} />
+            <InsigniaRol rol={datos.rol} />
             <EtiquetaEstadoActivo activo={datos.activo} />
           </div>
         </div>
@@ -306,7 +306,7 @@ function ContenidoPerfilUsuario({ id }: { id?: string }) {
           <Input error={errores.telefono} disabled={guardando} etiqueta="Teléfono" maxLength={40} value={telefono} onChange={(evento) => setTelefono(evento.target.value)} />
           <Input error={errores.anexo} disabled={guardando} etiqueta="Anexo" maxLength={40} value={anexo} onChange={(evento) => setAnexo(evento.target.value)} />
           <p className="border-t border-border pt-4 text-sm font-semibold sm:col-span-2">Acceso, preferencias y ubicación</p>
-          {sesion.esSuperadmin && datos.id !== sesion.usuario?.id && !datos.superadministrador ? (
+          {sesion.esAdmin && datos.id !== sesion.usuario?.id ? (
             <Select etiqueta="Rol de la cuenta" disabled={guardando} value={rolNuevo} opciones={ROLES}
               ayuda="El rol determina a qué funciones puede acceder la persona."
               onChange={(evento) => setRolNuevo(evento.target.value)} />
@@ -350,7 +350,7 @@ function ContenidoPerfilUsuario({ id }: { id?: string }) {
             <Panel titulo="Restablecer contraseña" descripcion="Crea una clave nueva y revisa sus caracteres antes de guardarla.">
               <RestablecerPassword key={datos.id} usuarioId={datos.id} nombre={datos.nombre} />
             </Panel>
-            {sesion.esAdmin && !datos.superadministrador ? (
+            {sesion.esAdmin ? (
               <Panel titulo="Estado de la cuenta">
                 <EstadoCuentaUsuario key={datos.id} usuarioId={datos.id} nombre={datos.nombre} activo={datos.activo} propia={datos.id === sesion.usuario?.id} />
               </Panel>

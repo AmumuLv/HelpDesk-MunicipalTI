@@ -94,42 +94,6 @@ La herramienta admite el MongoDB incluido en Compose y adjuntos dentro de
 `/data/`. Para bases de datos externas se debe utilizar el respaldo propio del
 servidor. No uses `docker compose down -v` en producción: elimina los volúmenes.
 
-## Superadministrador
-
-En una instalación vacía, la primera cuenta creada en `/instalacion` es el
-superadministrador. Solo esta cuenta puede crear administradores, cambiar roles y
-delegar permisos. Un administrador normal conserva la operación de tickets,
-inventario y cuentas de usuarios y técnicos, pero no puede intervenir otras
-cuentas administrativas ni gestionar sus contraseñas, fotos o sesiones.
-
-La cuenta titular puede editar sus propios datos, foto y contraseña; desde la web
-no se puede desactivar ni degradar su rol. El indicador protegido no se acepta
-como una opción de alta o edición. Se conserva el rol operativo `administrador`
-para no cambiar el acceso a los módulos; la autoridad superior es un indicador
-adicional validado por el servidor y un índice único de MongoDB.
-
-Al actualizar una instalación anterior con un solo administrador activo, la
-migración lo convierte en superadministrador. Si hay varios, no escoge uno
-arbitrariamente: una persona con acceso a la consola del servidor debe designar
-al titular existente mediante:
-
-```bash
-docker compose exec api python -m app.scripts.superadmin_designar --email correo-del-titular@ejemplo.pe
-```
-
-Este comando no crea cuentas, queda auditado y rechaza sustituir a un titular ya
-designado. Las demás cuentas no pueden ejecutar esta operación desde la web.
-Mientras no se designe al titular, la gestión reservada queda bloqueada, pero la
-operación habitual continúa. Reingresa para actualizar la interfaz de sesión.
-
-La validación del 30/10/2026 aprobó 55 casos del servidor sobre jerarquía, roles,
-permisos, perfiles, fotos y flujos de usuarios y gobernanza, y dos recorridos en
-Chromium con superadministrador y administrador normal. Incluye intento de
-autoasignarse el indicador, protección de credenciales y sesiones, unicidad del
-titular y designación por consola auditada. Aprobaron lint de los archivos de
-interfaz modificados y la compilación de producción dentro de Docker. Los ensayos
-utilizan cuentas y almacenamiento ficticios separados de la instalación real.
-
 ## Actualizar el código
 
 ```bash

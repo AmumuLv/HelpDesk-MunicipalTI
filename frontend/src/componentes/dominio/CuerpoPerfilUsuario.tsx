@@ -157,7 +157,7 @@ export function CuerpoPerfilUsuario({
               <span className="truncate">{usuario.email || 'Sin correo registrado'}</span>
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              <InsigniaRol rol={usuario.rol} superadministrador={usuario.superadministrador} />
+              <InsigniaRol rol={usuario.rol} />
               <EtiquetaEstadoActivo activo={usuario.activo} />
               {usuario.zona_nombre || usuario.oficina_nombre ? (
                 <ZonaBadge id={usuario.zona_id} nombre={usuario.zona_nombre} />

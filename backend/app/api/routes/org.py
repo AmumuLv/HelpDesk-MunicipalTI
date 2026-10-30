@@ -437,7 +437,6 @@ async def dispositivos_usuario(usuario_id: str, sesion: DependeUsuario):
     objetivo = id_requerido(usuario_id, 'usuario')
     if objetivo != sesion.id:
         sesion.exigir_admin()
-        usuario_service.exigir_gestion_cuenta(await usuario_service.obtener(objetivo), sesion.como_dict())
     return await auth_service.dispositivos(objetivo, sesion.sesion.get('session_id'))
 
 
@@ -448,7 +447,6 @@ async def desconectar_usuario(usuario_id: str, session_id: str, sesion: DependeU
     objetivo = id_requerido(usuario_id, 'usuario')
     if objetivo != sesion.id:
         sesion.exigir_admin()
-        usuario_service.exigir_gestion_cuenta(await usuario_service.obtener(objetivo), sesion.como_dict())
     await auth_service.cerrar(objetivo, session_id)
     return {'mensaje': 'Conexión cerrada.'}
 

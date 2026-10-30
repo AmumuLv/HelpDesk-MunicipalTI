@@ -83,7 +83,6 @@ VALIDADORES: dict[str, dict[str, Any]] = {
                 "nombre": {"bsonType": "string", "minLength": 1, "maxLength": 160},
                 "nombre_busqueda": {"bsonType": "string"},
                 "rol": {"enum": ["usuario", "tecnico", "administrador"]},
-                "superadministrador": {"bsonType": "bool"},
                 "activo": {"bsonType": "bool"},
                 "zona_id": {"bsonType": ["objectId", "null"]},
                 "oficina_id": {"bsonType": ["objectId", "null"]},

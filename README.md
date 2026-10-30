@@ -296,7 +296,7 @@ Las reglas se explican en el código donde se aplican. Las cinco más importante
    motivo, sin borrar nada.
 
 3. **Los permisos delegables empiezan todos apagados** y los activa el
-   superadministrador uno por uno. Cada cambio queda en la auditoría con el valor
+   administrador uno por uno. Cada cambio queda en la auditoría con el valor
    anterior. La interfaz oculta lo que no está permitido, pero la validación
    real siempre es del servidor.
 

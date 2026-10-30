@@ -135,7 +135,7 @@ export function Instalacion() {
       </Panel>
 
       {!datos?.hay_admin ? (
-        <Panel titulo="Crear el superadministrador" descripcion="Cuenta principal para gestionar administradores y permisos">
+        <Panel titulo="Crear el administrador inicial" descripcion="La primera cuenta que podrá delegar permisos y configurar el sistema">
           <form onSubmit={crearAdmin} className="flex flex-col gap-4" noValidate>
             <Input
               etiqueta="Nombre completo"
@@ -178,7 +178,7 @@ export function Instalacion() {
             ) : null}
 
             <Button type="submit" variante="primario" tamano="tactil" cargando={enviando} anchoCompleto>
-              Crear superadministrador
+              Crear administrador
             </Button>
           </form>
         </Panel>

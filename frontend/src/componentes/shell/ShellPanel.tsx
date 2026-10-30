@@ -306,7 +306,7 @@ export function ShellPanel({ children }: { children: ReactNode }) {
                 <AvatarCuenta tamano="sm" />
                 <span className="hidden min-w-0 text-left sm:block">
                   <span className="block truncate text-sm font-semibold">{sesion.usuario?.nombre}</span>
-                  <span className="block truncate text-2xs text-nav-muted">{sesion.esSuperadmin ? 'Superadministrador' : textoRol(sesion.rol)}</span>
+                  <span className="block truncate text-2xs text-nav-muted">{textoRol(sesion.rol)}</span>
                 </span>
               </button>
             }
@@ -318,7 +318,7 @@ contenido={
                     <p className="truncate text-base font-semibold text-foreground">{sesion.usuario?.nombre}</p>
                     <p className="truncate text-xs text-muted-foreground">{sesion.usuario?.email}</p>
                     <div className="mt-1.5">
-                      <InsigniaRol rol={sesion.rol} superadministrador={sesion.esSuperadmin} />
+                      <InsigniaRol rol={sesion.rol} />
                     </div>
                   </div>
                 </div>

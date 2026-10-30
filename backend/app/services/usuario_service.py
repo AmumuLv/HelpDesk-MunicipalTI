@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Any
 
 from bson import ObjectId
-from pymongo.errors import DuplicateKeyError
 
 from app.core.audit import registrar
 from app.core.config import settings
@@ -18,19 +17,11 @@ from app.core.ids import clave, clave_oscura, id_requerido, normalizar_texto
 from app.core.security import hash_password, necesita_rehash, verify_password
 from app.core.time import utcnow
 from app.domain.constants import ROL_ADMIN, ROL_TECNICO
-from app.domain.permissions import CLAVES_PERMISOS, matriz_inicial, es_superadmin
+from app.domain.permissions import CLAVES_PERMISOS, matriz_inicial
 from app.services import config_service, org_service
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 SIN_ESPACIOS = {"_id", "password_hash", "token_version"}
-
-
-def exigir_gestion_cuenta(objetivo: dict[str, Any], actor: dict[str, Any]) -> None:
-    """Nadie administra una cuenta superior; el titular conserva su perfil."""
-    if objetivo.get("rol") != ROL_ADMIN or objetivo.get("_id") == actor.get("_id"):
-        return
-    if es_superadmin(objetivo) or not es_superadmin(actor):
-        raise Prohibido("Esta cuenta solo puede ser administrada por su titular o el superadministrador.")
 
 
 def iniciales(nombre: str) -> str:
@@ -52,7 +43,6 @@ def publico(usuario: dict[str, Any], *, con_preferencias: bool = False) -> dict[
         "anexo": usuario.get("anexo"),
         "cargo": usuario.get("cargo"),
         "rol": usuario.get("rol", "usuario"),
-        "superadministrador": es_superadmin(usuario),
         "activo": bool(usuario.get("activo", True)),
         "zona_id": usuario.get("zona_id"),
         "zona_nombre": usuario.get("zona_nombre"),
@@ -108,12 +98,12 @@ async def crear(datos: dict[str, Any], *, usuario: dict[str, Any], es_primer_adm
     if rol not in {"usuario", ROL_TECNICO, ROL_ADMIN}:
         raise Validacion("Rol no valido.")
     if rol == ROL_ADMIN and not es_primer_admin:
-        if not es_superadmin(usuario):
-            raise Prohibido("Solo el superadministrador puede crear administradores.")
+        if usuario.get("rol") != ROL_ADMIN:
+            raise Prohibido("Solo un administrador puede crear cuentas de administrador.")
 
     permisos = matriz_inicial()
-    if datos.get("permisos") and not es_superadmin(usuario):
-        raise Prohibido("Solo el superadministrador asigna permisos.")
+    if datos.get("permisos") and usuario.get("rol") != ROL_ADMIN:
+        raise Prohibido("Solo un administrador asigna permisos delegables.")
     for clave_permiso, valor in (datos.get("permisos") or {}).items():
         if clave_permiso in CLAVES_PERMISOS:
             permisos[clave_permiso] = bool(valor)
@@ -132,7 +122,6 @@ async def crear(datos: dict[str, Any], *, usuario: dict[str, Any], es_primer_adm
         "anexo": normalizar_texto(datos.get("anexo")) or None,
         "cargo": normalizar_texto(datos.get("cargo")) or None,
         "rol": rol,
-        "superadministrador": bool(es_primer_admin and rol == ROL_ADMIN),
         "activo": bool(datos.get("activo", True)),
         "zona_id": zona_id,
         "zona_nombre": zona_nombre,
@@ -149,10 +138,7 @@ async def crear(datos: dict[str, Any], *, usuario: dict[str, Any], es_primer_adm
     }
     if password is None:
         doc["debe_cambiar_password"] = True
-    try:
-        resultado = await db["usuarios"].insert_one(doc)
-    except DuplicateKeyError as exc:
-        raise Conflicto("La cuenta o el superadministrador ya existe.") from exc
+    resultado = await db["usuarios"].insert_one(doc)
     doc["_id"] = resultado.inserted_id
     if rol in (ROL_TECNICO, ROL_ADMIN):
         await _asegurar_perfil_tecnico(doc["_id"])
@@ -195,9 +181,8 @@ async def actualizar(usuario_id: ObjectId, datos: dict[str, Any], *, usuario: di
     antes = await db["usuarios"].find_one({"_id": usuario_id})
     if antes is None:
         raise NoEncontrado("Usuario no encontrado.")
-    exigir_gestion_cuenta(antes, usuario)
-    if es_superadmin(antes) and (datos.get("activo") is False or datos.get("rol") not in (None, ROL_ADMIN)):
-        raise Prohibido("No se puede desactivar ni cambiar el rol del superadministrador.")
+    if antes.get("rol") == ROL_ADMIN and usuario.get("rol") != ROL_ADMIN:
+        raise Prohibido("Solo un administrador puede modificar una cuenta de administrador.")
     cambios: dict[str, Any] = {}
 
     if datos.get("nombre"):
@@ -219,8 +204,8 @@ async def actualizar(usuario_id: ObjectId, datos: dict[str, Any], *, usuario: di
             cambios[campo] = normalizar_texto(datos.get(campo)) or None
     if datos.get("rol"):
         nuevo_rol = datos["rol"]
-        if nuevo_rol != antes.get("rol") and not es_superadmin(usuario):
-            raise Prohibido("Solo el superadministrador puede cambiar roles.")
+        if nuevo_rol == ROL_ADMIN and usuario.get("rol") != ROL_ADMIN:
+            raise Prohibido("Solo un administrador puede crear cuentas de administrador.")
         if antes.get("rol") == ROL_ADMIN and antes.get("activo", True) and nuevo_rol != ROL_ADMIN:
             otros = await db["usuarios"].count_documents(
                 {"rol": ROL_ADMIN, "activo": True, "_id": {"$ne": usuario_id}}
@@ -253,8 +238,8 @@ async def actualizar(usuario_id: ObjectId, datos: dict[str, Any], *, usuario: di
     if "recomendaciones_ia" in datos and datos["recomendaciones_ia"] is not None:
         cambios["preferencias.recomendaciones_ia"] = bool(datos["recomendaciones_ia"])
     if "permisos" in datos and datos["permisos"] is not None:
-        if not es_superadmin(usuario):
-            raise Prohibido("Solo el superadministrador cambia permisos.")
+        if usuario.get("rol") != ROL_ADMIN:
+            raise Prohibido("Solo un administrador cambia permisos delegables.")
         permisos = dict(antes.get("permisos") or matriz_inicial())
         for clave_permiso, valor in (datos["permisos"] or {}).items():
             if clave_permiso in CLAVES_PERMISOS:
@@ -605,7 +590,8 @@ async def restablecer_password(
     objetivo = await db["usuarios"].find_one({"_id": usuario_id})
     if objetivo is None:
         raise NoEncontrado("Usuario no encontrado.")
-    exigir_gestion_cuenta(objetivo, usuario)
+    if objetivo.get("rol") == ROL_ADMIN and usuario.get("rol") != ROL_ADMIN:
+        raise Prohibido("Solo un administrador puede restablecer la contraseña de otro administrador.")
     await db["usuarios"].update_one(
         {"_id": usuario_id},
         {
@@ -648,13 +634,10 @@ async def asegurar_admin_activo() -> None:
 
 
 async def aplicar_permisos(usuario_id: ObjectId, cambios: dict[str, bool], *, usuario: dict[str, Any]) -> dict[str, Any]:
-    if not es_superadmin(usuario):
-        raise Prohibido("Solo el superadministrador cambia permisos.")
     db = get_db()
     antes = await db["usuarios"].find_one({"_id": usuario_id})
     if antes is None:
         raise NoEncontrado("Usuario no encontrado.")
-    exigir_gestion_cuenta(antes, usuario)
     permisos = dict(antes.get("permisos") or matriz_inicial())
     aplicados: dict[str, bool] = {}
     for clave_permiso, valor in cambios.items():
@@ -778,10 +761,8 @@ async def guardar_foto(
     from app.services import adjuntos_service
 
     db = get_db()
-    objetivo = await db["usuarios"].find_one({"_id": usuario_id})
-    if objetivo is None:
+    if await db["usuarios"].find_one({"_id": usuario_id}) is None:
         raise NoEncontrado("Usuario no encontrado.")
-    exigir_gestion_cuenta(objetivo, usuario)
     if len(contenido) > MAX_FOTO_BYTES:
         raise Validacion(
             f"La foto supera los {settings.max_upload_mb} MB.",
@@ -851,7 +832,6 @@ async def quitar_foto(usuario_id: ObjectId, *, usuario: dict[str, Any]) -> dict[
     documento = await db["usuarios"].find_one({"_id": usuario_id})
     if documento is None:
         raise NoEncontrado("Usuario no encontrado.")
-    exigir_gestion_cuenta(documento, usuario)
     for viejo in (Path(settings.upload_dir) / "fotos").glob(f"{usuario_id}.*"):
         viejo.unlink(missing_ok=True)
     await db["usuarios"].update_one({"_id": usuario_id}, {"$unset": {"foto": ""}})
