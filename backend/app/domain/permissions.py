@@ -177,6 +177,11 @@ def es_admin(usuario: dict[str, Any] | None) -> bool:
     return bool(usuario) and usuario.get("rol") == ROL_ADMIN
 
 
+def es_superadmin(usuario: dict[str, Any] | None) -> bool:
+    """Autoridad de cuentas; el indicador solo se asigna al instalar o por consola."""
+    return es_admin(usuario) and usuario.get("superadministrador") is True
+
+
 def es_tecnico(usuario: dict[str, Any] | None) -> bool:
     return bool(usuario) and usuario.get("rol") in (ROL_TECNICO, ROL_ADMIN)
 

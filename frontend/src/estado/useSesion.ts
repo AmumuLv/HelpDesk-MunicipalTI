@@ -8,6 +8,7 @@ export type ValorContexto = {
   permisos: string[]
   rol: Rol | null
   esAdmin: boolean
+  esSuperadmin: boolean
   esTecnico: boolean
   /** `true` si el rol lo permite por naturaleza o si se lo delegaron. */
   puede: (permiso: string) => boolean
