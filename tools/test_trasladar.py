@@ -34,6 +34,14 @@ class TrasladoTest(unittest.TestCase):
                     raise ValueError('fallo simulado')
             self.assertEqual(ejecutar.call_args.args, ('start', 'api', 'worker'))
 
+    def test_intenta_reanudar_si_la_parada_falla_a_medias(self):
+        with patch.object(trasladar, 'ejecutar') as ejecutar:
+            ejecutar.side_effect = ['api\nworker\nmongo', ValueError('parada parcial'), '']
+            with self.assertRaisesRegex(ValueError, 'parada parcial'):
+                with trasladar.sin_escrituras():
+                    self.fail('No debe copiar si la parada no terminó.')
+            self.assertEqual(ejecutar.call_args.args, ('start', 'api', 'worker'))
+
     def test_respaldo_corrupto_no_modifica_el_destino(self):
         with tempfile.TemporaryDirectory() as carpeta:
             ruta = Path(carpeta) / 'corrupto.zip'

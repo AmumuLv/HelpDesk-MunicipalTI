@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from datetime import timedelta
 import math
 from pathlib import Path
 from typing import Any
@@ -67,6 +68,9 @@ def publico(usuario: dict[str, Any], *, con_preferencias: bool = False) -> dict[
         "rol": usuario.get("rol", "usuario"),
         "administrador_principal": es_admin_principal(usuario),
         "activo": bool(usuario.get("activo", True)),
+        "archivado": bool(usuario.get("archivado", False)),
+        "desactivado_en": usuario.get("desactivado_en"),
+        "archivado_en": usuario.get("archivado_en"),
         "zona_id": usuario.get("zona_id"),
         "zona_nombre": usuario.get("zona_nombre"),
         "oficina_id": usuario.get("oficina_id"),
@@ -149,6 +153,8 @@ async def crear(datos: dict[str, Any], *, usuario: dict[str, Any], es_primer_adm
         "rol": rol,
         "administrador_principal": bool(es_primer_admin and rol == ROL_ADMIN),
         "activo": bool(datos.get("activo", True)),
+        "archivado": False,
+        "desactivado_en": utcnow() if datos.get("activo") is False else None,
         "zona_id": zona_id,
         "zona_nombre": zona_nombre,
         "oficina_id": oficina_id,
@@ -210,7 +216,11 @@ async def actualizar(usuario_id: ObjectId, datos: dict[str, Any], *, usuario: di
     antes = await db["usuarios"].find_one({"_id": usuario_id})
     if antes is None:
         raise NoEncontrado("Usuario no encontrado.")
-    exigir_gestion_cuenta(antes, usuario, permitir_propio=not any(c in datos for c in ("rol", "activo", "permisos")))
+    campos_gestion = {"rol", "activo", "permisos"}
+    if usuario.get("rol") != ROL_ADMIN:
+        # Editar el perfil propio no autoriza cambiar el alcance de su oficina.
+        campos_gestion.update({"oficina_id", "zona_id"})
+    exigir_gestion_cuenta(antes, usuario, permitir_propio=not campos_gestion.intersection(datos))
     if es_admin_principal(antes) and (datos.get("activo") is False or datos.get("rol") not in (None, ROL_ADMIN)):
         raise Prohibido("No se puede desactivar ni cambiar el rol de la cuenta principal.")
     cambios: dict[str, Any] = {}
@@ -255,6 +265,12 @@ async def actualizar(usuario_id: ObjectId, datos: dict[str, Any], *, usuario: di
             if otros == 0:
                 raise Prohibido("Debe quedar al menos un administrador activo.")
         cambios["activo"] = activo
+        if activo:
+            cambios.update(archivado=False, archivado_en=None, desactivado_en=None)
+        elif antes.get("activo", True):
+            cambios["desactivado_en"] = utcnow()
+            cambios["sesiones_activas"] = []
+            cambios["token_version"] = int(antes.get("token_version", 1)) + 1
     if "oficina_id" in datos or "zona_id" in datos:
         zona_id, oficina_id, zona_nombre, oficina_nombre = await _resolucion_ubicacion({
             "oficina_id": datos.get("oficina_id"),
@@ -286,6 +302,9 @@ async def actualizar(usuario_id: ObjectId, datos: dict[str, Any], *, usuario: di
     resultado = await db["usuarios"].update_one(_version_jerarquia(antes), {"$set": cambios})
     if not resultado.matched_count:
         raise Conflicto("El rol de la cuenta cambió. Actualiza antes de continuar.")
+    if cambios.get("activo") is False:
+        from app.services.auth_service import invalidar_todas
+        await invalidar_todas(usuario_id)
     if cambios.get("rol") in (ROL_TECNICO, ROL_ADMIN):
         await _asegurar_perfil_tecnico(usuario_id)
     despues = await db["usuarios"].find_one({"_id": usuario_id})
@@ -334,13 +353,18 @@ async def listar(
     oficina_id: ObjectId | None = None,
     rol: str | None = None,
     solo_activos: bool = True,
+    estado: str | None = None,
     texto: str | None = None,
     pagina: int = 1,
     por_pagina: int = 25,
 ) -> dict[str, Any]:
     db = get_db()
     consulta: dict[str, Any] = {}
-    if solo_activos:
+    if estado == "archivados":
+        consulta.update(activo=False, archivado=True)
+    elif estado == "desactivados":
+        consulta.update(activo=False, archivado={"$ne": True})
+    elif estado == "activos" or (estado is None and solo_activos):
         consulta["activo"] = True
     if zona_id:
         consulta["zona_id"] = zona_id
@@ -385,7 +409,7 @@ async def buscar_para_afectado(
 ) -> list[dict[str, Any]]:
     """Compañeros de una misma oficina (paso 2 del reporte)."""
     db = get_db()
-    consulta: dict[str, Any] = {"zona_id": zona_id}
+    consulta: dict[str, Any] = {"zona_id": zona_id, "archivado": {"$ne": True}}
     if not incluir_inactivos:
         consulta["activo"] = True
     if texto:
@@ -742,6 +766,8 @@ async def resolver_solicitante_no_registrado(
     Si el formulario pide crear usuario y hay datos suficientes, crea la cuenta.
     Si no, devuelve un descriptor sin persistir: el ticket guarda el nombre.
     """
+    if datos.get("crear_usuario") and not tiene_permiso(usuario, "usuarios.editar"):
+        raise Prohibido("No tienes permiso para crear cuentas de usuarios.")
     nombre = normalizar_texto(datos.get("nombre"))
     if len(nombre) < 3:
         raise Validacion("Escribe el nombre de la persona afectada (minimo 3 caracteres).")
@@ -898,3 +924,31 @@ def archivo_foto(usuario: dict[str, Any]) -> Path | None:
         return None
     ruta = Path(settings.upload_dir) / "fotos" / nombre
     return ruta if ruta.is_file() else None
+
+
+async def archivar_desactivados() -> dict[str, int]:
+    """Archiva cuentas tras 30 días completos de baja, conservando sus referencias."""
+    db = get_db()
+    ahora = utcnow()
+    # Cuentas antiguas sin fecha: iniciar el plazo hoy, sin adivinar su baja.
+    await db.usuarios.update_many(
+        {"activo": False, "archivado": {"$ne": True}, "desactivado_en": None},
+        {"$set": {"desactivado_en": ahora}},
+    )
+    candidatos = await db.usuarios.find({
+        "activo": False, "archivado": {"$ne": True},
+        "administrador_principal": {"$ne": True},
+        "desactivado_en": {"$lte": ahora - timedelta(days=30)},
+    }).to_list(None)
+    total = 0
+    for cuenta in candidatos:
+        resultado = await db.usuarios.update_one({
+            **_version_jerarquia(cuenta), "activo": False, "archivado": {"$ne": True},
+            "desactivado_en": cuenta["desactivado_en"],
+        }, {"$set": {"archivado": True, "archivado_en": ahora, "actualizado_en": ahora}})
+        if resultado.modified_count:
+            total += 1
+            await registrar("usuario.archivar", usuario_nombre="Sistema", rol="sistema",
+                            entidad="usuario", entidad_id=cuenta["_id"],
+                            resumen=f"Cuenta archivada tras 30 días de baja: {cuenta.get('nombre', '')}")
+    return {"archivados": total}

@@ -16,19 +16,26 @@ import urllib.request
 from verificar_resiliencia import compose, RAIZ
 
 
-def ejecutar():
-    api = json.loads(compose('--profile', 'seguridad', 'config', '--format', 'json', salida=True))['services']['api-seguridad']
-    assert api['environment']['MONGO_DB'] == 'helpdesk_test_navegador'
-    preparar = """import asyncio
+PREPARAR_CUENTA_SEGURIDAD = """import asyncio
 from app.core.db import get_db,close_connections
 from app.services import usuario_service
 async def main():
- db=get_db(); assert db.name=='helpdesk_test_navegador'
- if not await db.usuarios.find_one({'email':'seguridad.admin@demo.local'}):
-  await usuario_service.crear({'nombre':'Administrador ficticio de seguridad','email':'seguridad.admin@demo.local','rol':'administrador','password':'Demo12345'},usuario={'nombre':'Ensayo','rol':'administrador'})
- await close_connections()
+ try:
+  db=get_db(); assert db.name=='helpdesk_test_navegador'
+  if not await db.usuarios.find_one({'email':'seguridad.admin@demo.local'}):
+   principal=await db.usuarios.find_one({'rol':'administrador','administrador_principal':True,'activo':True,'archivado':{'$ne':True}})
+   if principal is None:
+    raise RuntimeError('Falta el administrador principal de la instalación ficticia. Prepara primero la base de navegador.')
+   await usuario_service.crear({'nombre':'Administrador ficticio de seguridad','email':'seguridad.admin@demo.local','rol':'administrador','password':'Demo12345'},usuario=principal)
+ finally:
+  await close_connections()
 asyncio.run(main())"""
-    compose('exec', '-T', 'api-seguridad', 'python', '-c', preparar)
+
+
+def ejecutar():
+    api = json.loads(compose('--profile', 'seguridad', 'config', '--format', 'json', salida=True))['services']['api-seguridad']
+    assert api['environment']['MONGO_DB'] == 'helpdesk_test_navegador'
+    compose('exec', '-T', 'api-seguridad', 'python', '-c', PREPARAR_CUENTA_SEGURIDAD)
     contenedor = compose('ps', '-q', 'proxy-seguridad', salida=True)
     assert contenedor
     with tempfile.TemporaryDirectory(prefix='helpdesk-tls-ficticio-') as carpeta:

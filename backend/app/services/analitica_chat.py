@@ -111,7 +111,7 @@ async def herramienta_equipos_de_usuario(filtros: dict[str, Any], argumentos: di
         {"nombre": 1, "oficina_nombre": 1, "email": 1},
     ).to_list(5)
     if not usuarios:
-        return {"encontrado": False, "consulta": nombre, "mensaje": "No hay ninguna persona con ese nombre en el directorio."}
+        return {"encontrado": False, "consulta": nombre, "mensaje": "No encontré una persona activa con ese nombre. Para revisar cuentas desactivadas o archivadas, consulta Usuarios > Estado."}
     exactos = [u for u in usuarios if clave_oscura(u.get("nombre", "")) == clave_oscura(nombre)]
     candidatos = exactos or usuarios
     if len(candidatos) != 1:

@@ -13,6 +13,7 @@ from app.core.errors import AppError, Prohibido, Validacion
 from app.core.time import business_tz
 from app.domain.permissions import tiene_permiso
 from app.services import analitica_service, ticket_service
+from app.services.conocimiento_proyecto import ALCANCE_DIRECTORIO
 
 
 def ajustar_intencion(argumentos, pregunta):
@@ -190,7 +191,8 @@ async def consultar(argumentos, usuario, filtros_pagina=None):
             consulta['$or'] = [{c: {'$regex': re.escape(datos.consulta), '$options': 'i'}} for c in buscables]
         proyeccion = {campo: 1 for campo in campos}
         items = await db[coleccion].find(consulta, proyeccion).sort('_id', -1).limit(20).max_time_ms(5000).to_list(20)
-        return {'recurso': datos.recurso, 'total': await db[coleccion].count_documents(consulta, maxTimeMS=5000), 'items': items, 'limite': 20, 'nota': 'Registros actuales, no una fotografía histórica.'}
+        nota = ALCANCE_DIRECTORIO if datos.recurso == 'usuarios' else 'Registros actuales, no una fotografía histórica.'
+        return {'recurso': datos.recurso, 'total': await db[coleccion].count_documents(consulta, maxTimeMS=5000), 'items': items, 'limite': 20, 'nota': nota}
     if datos.recurso not in ('tickets', 'ranking_equipos', 'ranking_oficinas', 'ranking_estados'):
         raise Validacion('Consulta no disponible.')
     if not tiene_permiso(usuario, 'tickets.ver_propios'):

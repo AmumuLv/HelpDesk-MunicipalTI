@@ -46,7 +46,7 @@ from app.domain.constants import (
 )
 from app.domain.permissions import tiene_permiso
 from app.domain.schemas_db import CONTADOR_TICKETS
-from app.services import config_service, inventario_service, notificaciones_service, sla_service, usuario_service
+from app.services import config_service, inventario_service, notificaciones_service, sla_service
 
 CAMPOS_VISIBLES_USUARIO = {
     "codigo", "asunto", "descripcion", "estado", "prioridad", "categoria", "origen",
@@ -520,6 +520,12 @@ def _nombre_activo(activo: dict[str, Any]) -> str:
 async def crear_manual(datos: dict[str, Any], *, usuario: dict[str, Any], ip: str | None = None) -> dict[str, Any]:
     """Registro manual por tecnico o administrador (2 pasos, sin chat)."""
     db = get_db()
+    # El formulario actual selecciona personas registradas. Una petición heredada
+    # no debe crear cuentas como efecto lateral de un ticket que puede rechazarse.
+    if ((datos.get("persona") or {}).get("persona_no_registrada") or {}).get("crear_usuario"):
+        if not tiene_permiso(usuario, "usuarios.editar"):
+            raise Prohibido("No tienes permiso para crear cuentas de usuarios.")
+        raise Validacion("Registra primero a la persona en Usuarios y selecciona su cuenta al crear el ticket.")
     solicitud_original = deepcopy(datos)
     repetido = await _repetido(solicitud_original, usuario, 'manual')
     if repetido:
@@ -544,13 +550,6 @@ async def crear_manual(datos: dict[str, Any], *, usuario: dict[str, Any], ip: st
             "telefono": normalizar_texto(datos_no_registrados.get("telefono")) or None,
             "anexo": normalizar_texto(datos_no_registrados.get("anexo")) or None,
         }
-        if datos_no_registrados.get("crear_usuario"):
-            nuevo_id_usuario, _ = await usuario_service.resolver_solicitante_no_registrado(
-                {**datos_no_registrados, "rol": "usuario"}, usuario=usuario
-            )
-            if nuevo_id_usuario:
-                afectado = await db["usuarios"].find_one({"_id": nuevo_id_usuario})
-
     zona_id = afectado.get("zona_id") if afectado else a_id((persona.get("persona_no_registrada") or {}).get("zona_id"))
     zona_nombre = afectado.get("zona_nombre") if afectado else None
     oficina_id = afectado.get("oficina_id") if afectado else a_id((persona.get("persona_no_registrada") or {}).get("oficina_id"))

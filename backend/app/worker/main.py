@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 async def startup(ctx: dict[str, Any]) -> None:
     configurar_logging(settings.log_level)
     logger.info("Worker ARQ iniciado")
+    await archivar_cuentas(ctx)
     await ml_service.invalidar_cache()
 
 
@@ -71,6 +72,11 @@ async def limpiar_sesiones(ctx: dict[str, Any]) -> dict[str, Any]:
     return {"sesiones_eliminadas": resultado.deleted_count}
 
 
+async def archivar_cuentas(ctx: dict[str, Any]) -> dict[str, int]:
+    from app.services.usuario_service import archivar_desactivados
+    return await archivar_desactivados()
+
+
 async def limpiar_auditoria(ctx: dict[str, Any]) -> dict[str, Any]:
     from datetime import timedelta
     from app.core.time import utcnow
@@ -104,6 +110,7 @@ class WorkerSettings:
         cron(refrescar_modelos, hour={3}, minute=40),
         # Limpieza diaria
         cron(limpiar_exportaciones, hour={4}, minute=0),
+        cron(archivar_cuentas, minute=15),
         cron(limpiar_sesiones, hour={4}, minute=30),
         cron(limpiar_auditoria, hour={4}, minute=45),
     ]

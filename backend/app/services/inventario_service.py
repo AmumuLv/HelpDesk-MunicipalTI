@@ -41,6 +41,16 @@ from app.services import catalogo_service
 PREFIJO_CLAVE = "activo"
 
 
+async def _responsable_para_asignacion(responsable_id: ObjectId) -> dict[str, Any]:
+    """Validar nuevas asignaciones sin impedir la consulta del historial de bajas."""
+    from app.services import usuario_service
+
+    persona = await usuario_service.obtener(responsable_id)
+    if persona.get("activo") is False or persona.get("archivado"):
+        raise Validacion("Selecciona una persona activa. No se pueden asignar equipos a una cuenta desactivada o archivada.")
+    return persona
+
+
 async def recalcular_faltantes(consulta: dict[str, Any]) -> None:
     from pymongo import UpdateOne
     db = get_db()
@@ -227,9 +237,7 @@ async def crear_conjunto(datos: dict[str, Any], *, usuario: dict[str, Any]) -> d
     responsable_id = id_requerido(datos["responsable_id"], "responsable") if datos.get("responsable_id") else None
     responsable_nombre = None
     if responsable_id:
-        from app.services import usuario_service
-
-        persona = await usuario_service.obtener(responsable_id)
+        persona = await _responsable_para_asignacion(responsable_id)
         if persona.get("oficina_id") and persona["oficina_id"] != oficina_id:
             raise Validacion(
                 "El responsable pertenece a otra oficina. Confirma la transferencia o el prestamo.",
@@ -277,6 +285,10 @@ async def actualizar_conjunto(conjunto_id: ObjectId, datos: dict[str, Any], *, u
     antes = await db["conjuntos"].find_one({"_id": conjunto_id})
     if antes is None:
         raise NoEncontrado("Conjunto no encontrado.")
+    if datos.get("responsable_id"):
+        responsable_id = id_requerido(datos["responsable_id"], "responsable")
+        if responsable_id != antes.get("responsable_id"):
+            await _responsable_para_asignacion(responsable_id)
     cambios: dict[str, Any] = {}
     if datos.get("nombre"):
         sufijo = re.search(r'(?:n[°º.]?\s*|[-_\s]+)(\d+)\s*$', normalizar_texto(datos['nombre']), re.IGNORECASE)
@@ -391,10 +403,10 @@ async def crear_activo(
         responsable_id = conjunto.get("responsable_id")
     responsable_nombre = None
     if responsable_id:
-        from app.services import usuario_service
-
-        persona = await usuario_service.obtener(responsable_id)
+        persona = await _responsable_para_asignacion(responsable_id)
         responsable_nombre = persona.get("nombre")
+    if conjunto and conjunto.get("responsable_id") and conjunto["responsable_id"] != responsable_id:
+        await _responsable_para_asignacion(conjunto["responsable_id"])
 
     campos_estado = _construir_campos_estado(datos.get("campos_estado") or {}, usuario)
     nombre_conjunto = conjunto.get("nombre") if conjunto else None
@@ -518,6 +530,10 @@ async def actualizar_activo(activo_id: ObjectId, datos: dict[str, Any], *, usuar
     antes = await db["activos"].find_one({"_id": activo_id})
     if antes is None:
         raise NoEncontrado("Equipo no encontrado.")
+    if datos.get("responsable_id"):
+        responsable_id = id_requerido(datos["responsable_id"], "responsable")
+        if responsable_id != antes.get("responsable_id"):
+            await _responsable_para_asignacion(responsable_id)
     datos = _conexion_impresora(datos, datos.get('tipo') or antes.get('tipo') or '', antes)
     cambios = _normalizar_campos(datos)
     if "observaciones" in datos:
@@ -555,6 +571,8 @@ async def actualizar_activo(activo_id: ObjectId, datos: dict[str, Any], *, usuar
         oficina_del_equipo = cambios.get("oficina_id") or antes.get("oficina_id")
         if conjunto is not None and conjunto.get("oficina_id") != oficina_del_equipo:
             raise Validacion("El conjunto pertenece a otra oficina.")
+        if conjunto and conjunto_id != antes.get("conjunto_id") and conjunto.get("responsable_id"):
+            await _responsable_para_asignacion(conjunto["responsable_id"])
         cambios["conjunto_id"] = conjunto_id
         cambios["conjunto_nombre"] = conjunto.get("nombre") if conjunto else None
         if conjunto_id != antes.get('conjunto_id'):
@@ -562,6 +580,8 @@ async def actualizar_activo(activo_id: ObjectId, datos: dict[str, Any], *, usuar
         if conjunto:
             cambios["uso_comun"] = bool(conjunto.get("uso_comun"))
             if conjunto.get("responsable_id") and "responsable_id" not in datos:
+                if conjunto["responsable_id"] != antes.get("responsable_id"):
+                    await _responsable_para_asignacion(conjunto["responsable_id"])
                 cambios["responsable_id"] = conjunto["responsable_id"]
                 cambios["responsable_nombre"] = conjunto.get("responsable_nombre")
     await _aplicar_detalle_avanzado(activo_id, antes, datos, cambios, usuario)
@@ -1280,22 +1300,26 @@ async def _registrar_historial_responsable(
 ) -> None:
     db = get_db()
     filtro = {"activo_id": entidad_id} if tipo == "activo" else {"conjunto_id": entidad_id}
-    if responsable_id:
-        abierto = await db["historial_responsables"].find_one(filtro, sort=[("fecha", -1)])
-        if abierto and abierto.get("responsable_id") == responsable_id and not abierto.get("fin"):
-            return
-        if abierto:
-            await db["historial_responsables"].update_one({"_id": abierto["_id"]}, {"$set": {"fin": utcnow()}})
+    abierto = await db["historial_responsables"].find_one(
+        {**filtro, "fin": None}, sort=[("fecha", -1), ("_id", -1)]
+    )
+    if abierto and abierto.get("responsable_id") == responsable_id:
+        return
+    ahora = utcnow()
+    if abierto:
+        await db["historial_responsables"].update_one(
+            {"_id": abierto["_id"]}, {"$set": {"fin": ahora}}
+        )
     documento = {
         **filtro,
         "responsable_id": responsable_id,
         "responsable_nombre": responsable_nombre,
-        "inicio": utcnow(),
+        "inicio": ahora,
         "fin": None,
         "motivo": normalizar_texto(motivo) or None,
         "usuario_id": usuario.get("_id"),
         "usuario_nombre": usuario.get("nombre", ""),
-        "fecha": utcnow(),
+        "fecha": ahora,
     }
     await db["historial_responsables"].insert_one(documento)
 
@@ -1314,11 +1338,18 @@ async def cambiar_responsable(
     entidad = await db[coleccion].find_one({"_id": entidad_id})
     if entidad is None:
         raise NoEncontrado("Equipo no encontrado." if tipo == "activo" else "Conjunto no encontrado.")
-    nombre = None
-    if responsable_id:
+    responsable_id = id_requerido(responsable_id, "responsable") if responsable_id else None
+    persona = None
+    if responsable_id and responsable_id == entidad.get("responsable_id"):
         from app.services import usuario_service
 
         persona = await usuario_service.obtener(responsable_id)
+        if persona.get("activo") is False or persona.get("archivado"):
+            # Conservar el responsable histórico sin propagar la baja a otros equipos.
+            return entidad
+    nombre = None
+    if responsable_id:
+        persona = persona or await _responsable_para_asignacion(responsable_id)
         if persona.get("oficina_id") and entidad.get("oficina_id") and persona["oficina_id"] != entidad["oficina_id"]:
             if not confirmar_transferencia:
                 raise Validacion(
@@ -1559,16 +1590,26 @@ async def cambio_masivo(datos: dict[str, Any], *, usuario: dict[str, Any]) -> di
         cambios["observaciones"] = normalizar_texto(datos["observaciones"])
     nuevo_oficina = datos.get("oficina_id")
     nuevo_responsable = datos.get("responsable_id")
+    # Validar antes de modificar otros campos del lote, para evitar cambios
+    # parciales si se eliminó la oficina o se dio de baja al responsable.
+    oficina = None
+    if nuevo_oficina:
+        nuevo_oficina = id_requerido(nuevo_oficina, "oficina")
+        oficina = await db["oficinas"].find_one({"_id": nuevo_oficina})
+        if oficina is None:
+            raise NoEncontrado("La oficina indicada no existe.")
+    nombre = None
+    if nuevo_responsable:
+        nuevo_responsable = id_requerido(nuevo_responsable, "responsable")
+        persona = await _responsable_para_asignacion(nuevo_responsable)
+        nombre = persona.get("nombre")
     actualizados = 0
     if cambios:
         cambios["actualizado_en"] = utcnow()
         cambios["actualizado_por"] = usuario.get("nombre", "")
         resultado = await db["activos"].update_many({"_id": {"$in": ids}}, {"$set": cambios})
         actualizados += resultado.modified_count
-    if nuevo_oficina:
-        oficina = await db["oficinas"].find_one({"_id": nuevo_oficina})
-        if oficina is None:
-            raise NoEncontrado("La oficina indicada no existe.")
+    if oficina is not None:
         await db["activos"].update_many(
             {"_id": {"$in": ids}},
             {
@@ -1583,12 +1624,6 @@ async def cambio_masivo(datos: dict[str, Any], *, usuario: dict[str, Any]) -> di
         )
         actualizados += len(ids)
     if "responsable_id" in datos:
-        from app.services import usuario_service
-
-        nombre = None
-        if nuevo_responsable:
-            persona = await usuario_service.obtener(nuevo_responsable)
-            nombre = persona.get("nombre")
         await db["activos"].update_many(
             {"_id": {"$in": ids}},
             {"$set": {"responsable_id": nuevo_responsable, "responsable_nombre": nombre, "uso_comun": not nuevo_responsable}},

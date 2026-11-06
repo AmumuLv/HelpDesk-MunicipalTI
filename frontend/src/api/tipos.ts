@@ -43,6 +43,9 @@ export type EstadoInstalacion = Omit<Respuestas.RespuestaInstalacion, 'pasos'> &
 }
 export type PreferenciaIa = Respuestas.RespuestaAuthPreferenciaIa
 export type MiPerfil = Omit<Respuestas.RespuestaMiPerfil, 'equipos_responsable'> & {
+  archivado?: boolean
+  desactivado_en?: string | null
+  archivado_en?: string | null
   administrador_principal?: boolean
   tiene_foto?: boolean
   equipos_responsable: { id: string; nombre: string; tipo: string; codigo_patrimonial: string | null }[]
@@ -191,9 +194,9 @@ export type OficinasRespuesta = Respuestas.RespuestaOficinas
 export type ItemOficina = OficinasRespuesta['items'][number]
 export type Oficina = NonNullable<OficinasRespuesta['items']>[number]
 export type OficinaDetalle = Respuestas.RespuestaOficinasPoroficina_id
-export type FiltrosUsuarios = Respuestas.ConsultaUsuarios
+export type FiltrosUsuarios = Respuestas.ConsultaUsuarios & { estado?: "activos" | "desactivados" | "archivados" | "todos" }
 export type UsuariosRespuesta = Omit<Respuestas.RespuestaUsuarios, 'items'> & { items: UsuarioResumen[] }
-export type UsuarioResumen = NonNullable<Respuestas.RespuestaUsuarios['items']>[number] & { tiene_foto?: boolean; administrador_principal?: boolean }
+export type UsuarioResumen = NonNullable<Respuestas.RespuestaUsuarios['items']>[number] & { tiene_foto?: boolean; archivado?: boolean; desactivado_en?: string | null; archivado_en?: string | null; administrador_principal?: boolean }
 /*
   `tiene_foto` no está en el archivo generado porque se añadió al backend después de
   la última generación. Se declara aquí, como ya se hizo con `MiPerfil`, en vez de
@@ -201,6 +204,9 @@ export type UsuarioResumen = NonNullable<Respuestas.RespuestaUsuarios['items']>[
 */
 export type UsuarioDetalle = Omit<Respuestas.RespuestaUsuariosPorusuario_id, 'equipos_responsable'> & {
   administrador_principal?: boolean
+  archivado?: boolean
+  desactivado_en?: string | null
+  archivado_en?: string | null
   /**
    * El archivo generado lo deja como `unknown[]`; aquí se declara lo que el backend
    * devuelve de verdad, como ya se hacía con `MiPerfil`.

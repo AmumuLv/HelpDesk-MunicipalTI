@@ -72,7 +72,7 @@ test('fichas de organización paginan todas sus listas sin ocultar registros', a
   await page.getByRole('tab', { name: 'Uso común' }).click()
   await avanzar('Equipos de uso común', 'Dispositivo 12')
   // La tabla actual consulta y pagina 25 tickets en su propia API.
-  await expect(page.getByRole('heading', { name: 'Tickets abiertos', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Historial de tickets', exact: true })).toBeVisible()
   await avanzar('Tendencia de los últimos 30 días', '12 oct 2026')
   await avanzar('Incidencias recurrentes', 'Categoria 12')
   await page.route('**/api/zonas/paginada', route => route.fulfill({ json: { ...base, nombre: 'Zona paginada', color_indice: 0, total_oficinas: 26, oficinas: Array.from({ length: 26 }, (_, i) => ({ id: `oficina-${i}`, nombre: `Oficina ${i + 1}`, total_usuarios: 0, total_equipos: 0 })),

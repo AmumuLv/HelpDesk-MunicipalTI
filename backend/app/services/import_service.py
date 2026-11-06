@@ -40,6 +40,7 @@ from app.domain.constants import (
     PATRON_CONJUNTO_SEP,
     SINONIMOS_BASE_CONJUNTO,
 )
+from app.domain.permissions import tiene_permiso
 from app.services import catalogo_service, excel_service, inventario_service, org_service, usuario_service
 
 # Claves logicas -> posibles cabeceras en el archivo
@@ -1275,6 +1276,10 @@ async def _ejecutar_operacion(lote_id: str, operacion, **opciones) -> dict:
 
 
 async def confirmar(lote_id: str, **opciones) -> dict:
+    # La opción heredada de crear perfiles debe exigir el mismo permiso que
+    # la confirmación de responsables del Excel, antes de reservar el lote.
+    if opciones.get("crear_usuarios_faltantes") and not tiene_permiso(opciones.get("usuario") or {}, "usuarios.editar"):
+        raise Prohibido("No tienes permiso para crear perfiles de usuarios desde el inventario.")
     return await _ejecutar_operacion(lote_id, _confirmar_lote, **opciones)
 
 

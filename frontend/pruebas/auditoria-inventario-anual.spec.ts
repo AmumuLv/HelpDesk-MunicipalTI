@@ -2,14 +2,41 @@ import { expect, test, type Page } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import { sinDesbordamiento } from './utilidades'
 
-// Ejecutar solo contra una instalación de pruebas aislada.
+// Estos años y este archivo pertenecen exclusivamente a los escenarios de abajo.
+// Cada ejecución elimina sus versiones antes y después: una revisión anterior
+// del mismo CSV no debe cambiar cuál versión compara el siguiente ensayo.
+const ANIOS_FICTICIOS = new Set([2040, 2041, 2042, 2043, 2044, 2045, 2046])
+const sesiones = new WeakMap<Page, Record<string, string>>()
+test.describe.configure({ mode: 'serial' })
+
+async function limpiarVersionesFicticias(page: Page, headers: Record<string, string>) {
+  expect(process.env.PRUEBA_API_URL).toBe('http://127.0.0.1:18100')
+  const respuesta = await page.request.get('/api/campanas/versiones/historico', { headers })
+  expect(respuesta.ok()).toBe(true)
+  const historial: { items: { id: string; anio: number; fuente?: string; archivo_nombre?: string }[] } = await respuesta.json()
+  for (const version of historial.items) {
+    if (!ANIOS_FICTICIOS.has(version.anio) || version.fuente !== 'archivo_anual' || version.archivo_nombre !== 'revision.csv') continue
+    const borrado = await page.request.delete(`/api/campanas/versiones/${version.id}`, { headers })
+    expect(borrado.ok(), await borrado.text()).toBe(true)
+  }
+}
+
 test.beforeEach(async ({ page }) => {
+  expect(process.env.PRUEBA_API_URL).toBe('http://127.0.0.1:18100')
   const respuesta = await page.request.post('/api/auth/login', { data: { correo: 'admin@demo.local', password: 'Demo12345' } })
   expect(respuesta.status()).toBe(200)
   const sesion = await respuesta.json()
+  const headers = { Authorization: `Bearer ${sesion.access_token}`, 'X-CSRF-Token': sesion.csrf_token }
+  sesiones.set(page, headers)
+  await limpiarVersionesFicticias(page, headers)
   await page.addInitScript(token => sessionStorage.setItem('ma.acceso', token), sesion.access_token)
   await page.goto('/panel/inventario-anual', { waitUntil: 'domcontentloaded' })
   await expect(page.getByRole('heading', { name: 'Inventario anual', exact: true })).toBeVisible()
+})
+
+test.afterEach(async ({ page }) => {
+  const headers = sesiones.get(page)
+  if (headers) await limpiarVersionesFicticias(page, headers)
 })
 
 const encabezado = 'AREA;Tipo de equipo;Dispositivo;Código patrimonial;Marca;Nombre Equipo;Estado;Responsable\n'

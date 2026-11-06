@@ -113,12 +113,18 @@ try {
         Write-Host 'Base y adjuntos restaurados. Inicia sesion de nuevo.'
     }
 } finally {
-    dockerOk exec $mongoId rm -f $archivoMongo
-    if ($pausados.Count) { dc start @pausados }
-    # Solo se elimina el directorio temporal absoluto creado por este script.
-    $temporalResuelto = [IO.Path]::GetFullPath($carpetaTemporal)
-    $raizTemporal = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\') + '\'
-    if ($temporalResuelto.StartsWith($raizTemporal, [StringComparison]::OrdinalIgnoreCase) -and (Split-Path $temporalResuelto -Leaf) -like 'helpdesk-*') {
-        Remove-Item -LiteralPath $temporalResuelto -Recurse -Force
+    try {
+        dockerOk exec $mongoId rm -f $archivoMongo
+    } finally {
+        try {
+            if ($pausados.Count) { dc start @pausados }
+        } finally {
+            # Solo se elimina el directorio temporal absoluto creado por este script.
+            $temporalResuelto = [IO.Path]::GetFullPath($carpetaTemporal)
+            $raizTemporal = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\') + '\'
+            if ($temporalResuelto.StartsWith($raizTemporal, [StringComparison]::OrdinalIgnoreCase) -and (Split-Path $temporalResuelto -Leaf) -like 'helpdesk-*') {
+                Remove-Item -LiteralPath $temporalResuelto -Recurse -Force
+            }
+        }
     }
 }

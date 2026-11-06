@@ -1,6 +1,12 @@
 """Contexto funcional revisado: no lee archivos privados ni vuelca el repositorio."""
 import re
 
+ALCANCE_DIRECTORIO = (
+    'El directorio consultable por el chatbot solo incluye cuentas activas. '
+    'Un resultado vacío no demuestra que una persona no exista ni que se haya borrado su historial. '
+    'Para revisar bajas usa Usuarios > Estado: Desactivados, Archivados o Todos, según tus permisos.'
+)
+
 AMBITO = """
 Ámbito exclusivo: esta web de Mesa de Ayuda TI y su funcionamiento, soporte técnico,
 Municipalidad Provincial de Casma, información del Perú y gestión municipal peruana
@@ -49,6 +55,9 @@ no suman 100%. No aplica se excluye del denominador correspondiente. No confunda
 porcentaje de equipos sin un campo con porcentaje global de casillas pendientes.
 Inventario anual usa campañas, revisión física, versiones y comparaciones.
 Importación Excel valida antes de confirmar y permite revisar advertencias.
+Crear perfiles desde el Excel requiere además el permiso para gestionar usuarios.
+No se asignan equipos nuevos a cuentas desactivadas o archivadas. Se conservan sus
+vínculos históricos; TI puede liberar o reasignar esos equipos a una persona activa.
 """),
     (r'usuario|oficina|zona|perfil|cuenta|permiso|técnico|tecnico|ausencia|horario', """
 Usuarios administra datos institucionales, asignaciones y permisos según rol.
@@ -59,6 +68,32 @@ no cambia de cuenta y muestra nombre, cargo, oficina y especialidades disponible
 El portal del trabajador simplifica el reporte propio, por compañero o por oficina;
 TI completa el diagnóstico y la vinculación exacta, sin exigir lenguaje técnico al usuario.
 """),
+    (r'administrador|principal|superadmin|jerarqu|\broles?\b|permiso|cuenta|usuari|técnico|tecnico|desactiv|reactiv', """
+Jerarquía de cuentas: en una instalación nueva, la primera cuenta es el administrador
+principal, con rol administrador y un indicador protegido. Solo el principal puede
+crear o ascender administradores. Nadie puede desactivarlo ni degradarlo; solo su
+titular modifica sus propios datos, foto y contraseña. No existe un botón para
+transferir esa protección. El rol administrador por sí solo no identifica al titular:
+no inventes quién es el principal si los datos recibidos no muestran ese indicador.
+Los demás administradores conservan la gestión operativa y de cuentas secundarias,
+incluidos técnicos y otros administradores secundarios, sin intervenir al principal.
+Los permisos adicionales no cambian el rol: un técnico con usuarios.editar solo
+gestiona cuentas de usuarios, nunca otros técnicos ni administradores, sus contraseñas
+o sus permisos. Conserva su perfil y cambio personal de contraseña. Un usuario o
+técnico no puede cambiar su propia oficina; la ubicación requiere gestión autorizada.
+Las cuentas se crean desde Usuarios; registrar un ticket no crea cuentas por detrás.
+"""),
+    (r'archivad|desactiv|reactiv|\bbaja\b|reemplaz|relevo|cuenta|usuari|trabajador|empleado', """
+Baja de personal: crear una cuenta distinta para el reemplazo; no renombrar la cuenta
+anterior para entregársela. Desactivar revoca las sesiones y conserva la identidad,
+los tickets y las referencias de equipos. Tras 30 días completos de baja, el worker
+archiva la cuenta al revisarla al arrancar o cada hora; no la elimina ni transfiere
+automáticamente sus equipos. Para bajas antiguas sin fecha, el plazo empieza cuando
+el worker registra la baja por primera vez. La cuenta principal queda excluida.
+Usuarios > Estado permite elegir Activos, Desactivados, Archivados o Todos. Reactivar
+requiere permiso para gestionar esa cuenta, limpia las fechas de baja y archivo y
+exige iniciar sesión de nuevo. El historial anterior se conserva.
+""" + ALCANCE_DIRECTORIO),
     (r'anal|gráfic|grafic|predic|reporte|export|estad|ia|inteligencia|conocimiento|guía|guia', """
 Análisis IA usa datos reales, filtros y periodos; las predicciones requieren muestra
 suficiente. Consultas de datos proporciona resultados estructurados. El chatbot

@@ -160,6 +160,9 @@ class UsuarioActualizar(Base):
 
 
 class UsuarioResumen(Base):
+    archivado: bool = False
+    desactivado_en: datetime | None = None
+    archivado_en: datetime | None = None
     administrador_principal: bool = False
     id: Id
     nombre: str

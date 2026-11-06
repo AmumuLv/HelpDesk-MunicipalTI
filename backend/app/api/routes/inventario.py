@@ -255,7 +255,7 @@ async def responsable_activo(activo_id: str, datos: CambioResponsable, sesion: D
 
 @router.post("/activos/cambio-masivo")
 async def cambio_masivo(datos: CambioMasivo, sesion: DependeUsuarioCsrf, _: DependeMasivo):
-    return await inventario_service.cambio_masivo(datos.model_dump(), usuario=sesion.como_dict())
+    return await inventario_service.cambio_masivo(datos.model_dump(exclude_unset=True), usuario=sesion.como_dict())
 
 
 @router.get("/activos/{activo_id}/componentes")

@@ -1,47 +1,63 @@
-"""Diagnostico puntual de endpoints (uso interno durante el desarrollo)."""
+"""Diagnóstico de solo lectura: API, MongoDB y Redis, sin cuentas de prueba.
+
+Ejecutar dentro de la API con ``python -m app.scripts.diagnostico``. La ruta
+health comprueba ambas dependencias. No inicia sesión, modifica preferencias ni
+crea exportaciones. No imprime el cuerpo recibido ni la configuración.
+"""
 
 from __future__ import annotations
 
+import argparse
 import asyncio
-import json
+import os
 
 import httpx
 
-BASE = "http://localhost:8000/api"
-PASSWORD = "PruebaHumo123"
+
+async def comprobar(
+    url: str | None = None,
+    *,
+    transporte: httpx.AsyncBaseTransport | None = None,
+) -> int:
+    prefijo = os.environ.get("API_PREFIX", "/api").rstrip("/")
+    destino = url or f"http://localhost:8000{prefijo}/health"
+    try:
+        async with httpx.AsyncClient(timeout=30, transport=transporte, trust_env=False) as cliente:
+            respuesta = await cliente.get(destino)
+    except httpx.HTTPError:
+        print("FALLA: no se pudo conectar con la API. Comprueba que esté iniciada.")
+        return 1
+
+    if respuesta.status_code != 200:
+        print(f"FALLA: la API respondió HTTP {respuesta.status_code}.")
+        return 1
+    try:
+        salud = respuesta.json()
+    except ValueError:
+        print("FALLA: la API no devolvió un diagnóstico válido.")
+        return 1
+    if not isinstance(salud, dict):
+        print("FALLA: la API no devolvió un diagnóstico válido.")
+        return 1
+
+    print("OK: la API responde.")
+    mongo_ok = salud.get("mongo") is True
+    redis_ok = salud.get("redis") is True
+    print("OK: MongoDB responde." if mongo_ok else "FALLA: MongoDB no confirmó disponibilidad.")
+    print("OK: Redis responde." if redis_ok else "FALLA: Redis no confirmó disponibilidad.")
+    if salud.get("estado") != "ok" or not mongo_ok or not redis_ok:
+        print("Diagnóstico incompleto: revisa los servicios con docker compose ps.")
+        return 1
+    print("Diagnóstico correcto. Comprueba también el acceso web y tus archivos desde el navegador.")
+    return 0
 
 
-async def main() -> None:
-    async with httpx.AsyncClient(base_url=BASE, timeout=60) as cliente:
-        inicio = await cliente.post("/auth/login", json={"correo": "humo@admin.local", "password": PASSWORD})
-        if inicio.status_code != 200:
-            print("login:", inicio.status_code, inicio.text[:200])
-            return
-        sesion = inicio.json()
-        cab = {"Authorization": f"Bearer {sesion['access_token']}", "X-CSRF-Token": sesion["csrf_token"]}
-        for ruta in [
-            "/analitica/resumen",
-            "/exportaciones",
-            "/campanas",
-            "/kb/articulos",
-            "/calidad-inventario",
-            "/equipo-ti/panel",
-            "/ia/asistente/preguntas",
-            "/auditoria",
-            "/configuracion",
-        ]:
-            r = await cliente.get(ruta, headers=cab)
-            print(f"GET {ruta:35} -> {r.status_code} {r.text[:150]}")
-
-        pref = await cliente.post("/auth/preferencia-ia", json={"recomendaciones_ia": False}, headers=cab)
-        print("POST /auth/preferencia-ia ->", pref.status_code, json.dumps(pref.json(), ensure_ascii=False)[:300])
-
-        exp = await cliente.post("/exportaciones", json={"tipo": "tickets", "formato": "pdf", "filtros": {}}, headers=cab)
-        print("POST /exportaciones ->", exp.status_code, exp.text[:200])
-        if exp.status_code == 200:
-            url = exp.json()["descarga_url"]
-            desc = await cliente.get(url, headers=cab)
-            print("GET", url, "->", desc.status_code, desc.content[:20])
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--url", help="URL del endpoint health; por defecto, la API local del contenedor.")
+    args = parser.parse_args()
+    return asyncio.run(comprobar(args.url))
 
 
-asyncio.run(main())
+if __name__ == "__main__":
+    raise SystemExit(main())

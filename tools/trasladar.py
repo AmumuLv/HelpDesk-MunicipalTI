@@ -48,9 +48,9 @@ def identificadores():
 def sin_escrituras():
     activos = ejecutar('ps', '--status', 'running', '--services', salida=True).splitlines()
     pausar = [s for s in ('api', 'worker') if s in activos]
-    if pausar:
-        ejecutar('stop', *pausar)
     try:
+        if pausar:
+            ejecutar('stop', *pausar)
         yield
     finally:
         if pausar:

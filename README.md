@@ -1,6 +1,6 @@
 # HelpDesk-MunicipalTI
 
-**¿Vas a otra PC?** Sigue la [lista de instalación en Windows](docs/NUEVA_PC.md).
+**¿Vas a otra PC?** Sigue la [guía sencilla en 6 pasos para Windows](docs/NUEVA_PC.md), también si descargaste el programa como ZIP.
 
 **Instalar, actualizar o trasladar a otro equipo:** consulta la [guía de instalación y traslado](docs/INSTALAR_Y_TRASLADAR.md).
 

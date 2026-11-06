@@ -51,21 +51,6 @@ import { useSesion } from '../../estado/useSesion'
 import { Ubicacion } from '../../componentes/dominio/Ubicacion'
 import type { MiPerfil, UsuarioResumen } from '../../api/tipos'
 
-/**
- * Si mostrar las cuentas desactivadas está marcado.
- *
- * Se guarda porque es una decisión de quien mira. Antes solo vivía mientras la
- * pantalla estuviera abierta, igual que en Zonas y oficinas.
- */
-const CLAVE_PREFERENCIA = 'usuarios.ver-desactivados'
-const mostrarDesactivadosGuardado = (() => {
-  try {
-    return window.localStorage.getItem(CLAVE_PREFERENCIA) !== 'false'
-  } catch {
-    return true
-  }
-})()
-
 export function Usuarios() {
   const sesion = useSesion()
   const avisos = useAvisos()
@@ -80,7 +65,7 @@ export function Usuarios() {
   const [zonaId, setZonaId] = useState('')
   const [oficinaId, setOficinaId] = useState('')
   const [pagina, setPagina] = useState(1)
-  const [verInactivas, setVerInactivas] = useState(mostrarDesactivadosGuardado)
+  const [estadoCuenta, setEstadoCuenta] = useState<NonNullable<FiltrosUsuarios["estado"]>>("activos")
   const [creando, setCreando] = useState(Boolean(parametros.get('crear')))
   const [seleccionado, setSeleccionado] = useState<string | null>(null)
   const [mostrarPassword, setMostrarPassword] = useState(false)
@@ -112,22 +97,12 @@ export function Usuarios() {
     document.title = 'Usuarios · Mesa de Ayuda TI'
   }, [])
 
-  /** Cada cambio se guarda en el momento. */
-  const cambiarVisibilidadInactivas = (valor: boolean) => {
-    setVerInactivas(valor)
-    try {
-      window.localStorage.setItem(CLAVE_PREFERENCIA, valor ? 'true' : 'false')
-    } catch {
-      // Si no se puede guardar, el cambio se aplica igual en esta sesión.
-    }
-  }
-
   const filtros: FiltrosUsuarios = {
     ...(texto.trim() ? { texto: texto.trim() } : {}),
     ...(rol ? { rol } : {}),
     ...(zonaId ? { zona_id: zonaId } : {}),
     ...(oficinaId ? { oficina_id: oficinaId } : {}),
-    solo_activos: !verInactivas,
+    estado: estadoCuenta,
     pagina,
     por_pagina: 25,
   }
@@ -213,7 +188,7 @@ export function Usuarios() {
       accessorKey: 'activo',
       header: 'Estado',
       meta: { celdaLibre: true, ancho: '16%' },
-      cell: ({ row }) => <EtiquetaEstadoActivo activo={row.original.activo} />,
+      cell: ({ row }) => row.original.archivado ? <span className="text-sm text-muted-foreground">Archivado</span> : <EtiquetaEstadoActivo activo={row.original.activo} />,
     },
   ]
 
@@ -272,7 +247,7 @@ export function Usuarios() {
   }
 
   const cambiarActivo = async () => {
-    if (!cambiandoActivo) return
+    if (!cambiandoActivo || guardando) return
     setGuardando(true)
     try {
       if (cambiandoActivo.activar) {
@@ -300,12 +275,13 @@ export function Usuarios() {
   }
 
   /* Hay filtros puesta: se puede volver atrás con un clic. */
-  const hayFiltros = Boolean(texto.trim() || rol || zonaId || oficinaId)
+  const hayFiltros = Boolean(texto.trim() || rol || zonaId || oficinaId || estadoCuenta !== 'activos')
   const quitarFiltros = () => {
     setTexto('')
     setRol('')
     setZonaId('')
     setOficinaId('')
+    setEstadoCuenta('activos')
     setPagina(1)
   }
 
@@ -328,14 +304,15 @@ export function Usuarios() {
       />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <label className="flex items-center gap-2 text-sm text-muted-foreground">
-          <input
-            type="checkbox"
-            checked={verInactivas}
-            onChange={(evento) => cambiarVisibilidadInactivas(evento.target.checked)}
-          />
-          Mostrar cuentas desactivadas
-        </label>
+        <Select etiqueta="Estado de las cuentas" value={estadoCuenta} onChange={(evento) => {
+          setEstadoCuenta(evento.target.value as NonNullable<FiltrosUsuarios['estado']>)
+          setPagina(1)
+        }} opciones={[
+          { valor: 'activos', etiqueta: 'Activos' },
+          { valor: 'desactivados', etiqueta: 'Desactivados' },
+          { valor: 'archivados', etiqueta: 'Archivados' },
+          { valor: 'todos', etiqueta: 'Todos' },
+        ]} />
         <span className="text-sm text-muted-foreground">
           {numero(usuarios.data?.total ?? 0)} {usuarios.data?.total === 1 ? 'cuenta' : 'cuentas'}
         </span>
@@ -410,7 +387,7 @@ export function Usuarios() {
           titulo={
             combinacionImposible
               ? 'Esa combinación de zona y oficina no tiene cuentas'
-              : texto.trim() || rol || zonaId || oficinaId
+              : hayFiltros
                 ? 'No hay personas con estos filtros'
                 : 'Todavía no hay ninguna cuenta'
           }
@@ -455,7 +432,7 @@ export function Usuarios() {
                   {usuario.administrador_principal ? 'Administrador principal' : etiquetaRol(usuario.rol)} · {usuario.oficina_nombre ?? 'Sin oficina'}
                 </p>
                 <div className="mt-2 flex items-center gap-1.5">
-                  <EtiquetaEstadoActivo activo={usuario.activo} />
+                  {usuario.archivado ? <span>Archivado</span> : <EtiquetaEstadoActivo activo={usuario.activo} />}
                   <span className="text-2xs text-muted-foreground">
                     Ayuda IA: {usuario.recomendaciones_ia ? 'activada' : 'desactivada'}
                   </span>
@@ -507,7 +484,9 @@ export function Usuarios() {
                 aria-label="Acciones de la cuenta"
                 className="flex flex-col gap-3 rounded-[var(--radius-panel)] border border-border bg-surface-2/70 p-3"
               >
-                <p className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Cuenta</p>
+                <p className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">{detalle.data.archivado ? 'Cuenta archivada' : 'Cuenta'}</p>
+                {detalle.data.desactivado_en ? <p className="text-sm text-muted-foreground">Baja: {new Date(detalle.data.desactivado_en).toLocaleDateString('es-PE')}</p> : null}
+                {detalle.data.archivado_en ? <p className="text-sm text-muted-foreground">Archivo: {new Date(detalle.data.archivado_en).toLocaleDateString('es-PE')}</p> : null}
                 <ControlFoto
                   usuarioId={detalle.data.id}
                   nombre={detalle.data.nombre}
@@ -544,7 +523,7 @@ export function Usuarios() {
 
       <ConfirmDialog
         abierto={Boolean(cambiandoActivo)}
-        alCerrar={() => setCambiandoActivo(null)}
+        alCerrar={() => { if (!guardando) setCambiandoActivo(null) }}
         alConfirmar={() => void cambiarActivo()}
         titulo={cambiandoActivo?.activar ? 'Reactivar cuenta' : 'Desactivar cuenta'}
         mensaje={

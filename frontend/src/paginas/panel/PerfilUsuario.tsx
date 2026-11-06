@@ -77,6 +77,7 @@ function ContenidoPerfilUsuario({ id }: { id?: string }) {
   const [rolNuevo, setRolNuevo] = useState('usuario')
   const [ayudaIa, setAyudaIa] = useState(true)
   const [paginaEquipos, setPaginaEquipos] = useState(1)
+  const puedeEditarUbicacion = sesion.esAdmin || id !== sesion.usuario?.id && sesion.puede('usuarios.editar')
   const zonas = useZonas()
   const oficinas = useOficinas(zonaId ? { zona_id: zonaId } : {})
 
@@ -104,7 +105,7 @@ function ContenidoPerfilUsuario({ id }: { id?: string }) {
 
   const guardar = async (evento: React.FormEvent) => {
     evento.preventDefault()
-    if (!id || !sesion.puede('usuarios.editar') || nombre.trim().length < 3 || guardando) return
+    if (!id || !perfil.data || !puedeEditarCuenta(sesion, perfil.data) || nombre.trim().length < 3 || guardando) return
     setGuardando(true)
     setErrores({})
     setErrorGeneral(null)
@@ -115,8 +116,7 @@ function ContenidoPerfilUsuario({ id }: { id?: string }) {
         cargo: cargo.trim() || null,
         telefono: telefono.trim() || null,
         anexo: anexo.trim() || null,
-        zona_id: zonaId || null,
-        oficina_id: oficinaId || null,
+        ...(puedeEditarUbicacion ? { zona_id: zonaId || null, oficina_id: oficinaId || null } : {}),
         recomendaciones_ia: ayudaIa,
         ...(sesion.esAdmin && id !== sesion.usuario?.id ? { rol: rolNuevo } : {}),
       })
@@ -214,7 +214,7 @@ function ContenidoPerfilUsuario({ id }: { id?: string }) {
           { etiqueta: 'Equipos a cargo', valor: equipos.length },
           { etiqueta: 'Tickets creados', valor: datos.tickets_creados ?? 0 },
           { etiqueta: datos.rol === 'usuario' ? 'Tickets abiertos' : 'Asignados abiertos', valor: datos.rol === 'usuario' ? datos.tickets_activos ?? 0 : datos.carga_actual ?? 0 },
-          { etiqueta: 'Cuenta', valor: datos.activo ? 'Activa' : 'Inactiva' },
+          { etiqueta: 'Cuenta', valor: datos.archivado ? 'Archivada' : datos.activo ? 'Activa' : 'Desactivada' },
         ]}
       />
 
@@ -231,7 +231,7 @@ function ContenidoPerfilUsuario({ id }: { id?: string }) {
           <p className="flex min-w-0 items-center gap-2 break-all text-sm"><Mail size={16} className="shrink-0 text-muted-foreground" aria-hidden="true" />{datos.email ?? 'Sin correo registrado'}</p>
           <div className="flex items-center gap-2">
             <InsigniaRol rol={datos.rol} principal={datos.administrador_principal} />
-            <EtiquetaEstadoActivo activo={datos.activo} />
+            <EtiquetaEstadoActivo activo={datos.activo} archivado={datos.archivado} cuenta />
           </div>
         </div>
         <dl className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -241,6 +241,8 @@ function ContenidoPerfilUsuario({ id }: { id?: string }) {
           <Dato etiqueta="Teléfono" valor={datos.telefono ?? 'No indicado'} />
           <Dato etiqueta="Anexo" valor={datos.anexo ?? 'No indicado'} />
           <Dato etiqueta="Creación de la cuenta" valor={fechaHora(datos.creado_en)} />
+          {datos.desactivado_en ? <Dato etiqueta="Fecha de baja" valor={fechaHora(datos.desactivado_en)} /> : null}
+          {datos.archivado_en ? <Dato etiqueta="Fecha de archivo" valor={fechaHora(datos.archivado_en)} /> : null}
           <Dato etiqueta="Último acceso" valor={datos.ultimo_acceso ? fechaHora(datos.ultimo_acceso) : 'Nunca'} />
           <Dato etiqueta="Ayuda IA" valor={datos.recomendaciones_ia ? 'Activada' : 'Desactivada'} />
         </dl>
@@ -316,7 +318,7 @@ function ContenidoPerfilUsuario({ id }: { id?: string }) {
             opciones={[{ valor: 'si', etiqueta: 'Activada' }, { valor: 'no', etiqueta: 'Desactivada' }]}
             onChange={(evento) => setAyudaIa(evento.target.value === 'si')} />
           <Select
-            disabled={guardando}
+            disabled={guardando || !puedeEditarUbicacion}
             etiqueta="Zona"
             placeholder="Sin zona"
             value={zonaId}
@@ -324,7 +326,7 @@ function ContenidoPerfilUsuario({ id }: { id?: string }) {
             opciones={(zonas.data?.items ?? []).map((zona) => ({ valor: zona.id, etiqueta: zona.nombre }))}
           />
           <Select
-            disabled={guardando}
+            disabled={guardando || !puedeEditarUbicacion}
             etiqueta="Oficina"
             placeholder="Sin oficina"
             value={oficinaId}
@@ -353,7 +355,7 @@ function ContenidoPerfilUsuario({ id }: { id?: string }) {
             </Panel> : null}
             {puedeCambiarEstadoCuenta(sesion, datos) ? (
               <Panel titulo="Estado de la cuenta">
-                <EstadoCuentaUsuario key={datos.id} usuarioId={datos.id} nombre={datos.nombre} activo={datos.activo} propia={datos.id === sesion.usuario?.id} />
+                <EstadoCuentaUsuario key={datos.id} usuarioId={datos.id} nombre={datos.nombre} activo={datos.activo} archivado={datos.archivado} propia={datos.id === sesion.usuario?.id} />
               </Panel>
             ) : null}
           </ContenidoTab>
