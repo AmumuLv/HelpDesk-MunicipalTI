@@ -130,6 +130,7 @@ export type TicketDetalle = Respuestas.RespuestaTicketsPorticket_id & {
 
 export type SugerenciasTicket = Respuestas.RespuestaTicketsPorticket_idIa & {
   decisiones?: Record<string, DecisionIA | undefined>
+  tecnico_sugerido_aplicable?: boolean
 }
 export type SugerenciaReporte = Respuestas.RespuestaIaSugerenciasReporte
 export type FiltrosSugerenciaReporte = Respuestas.ConsultaIaSugerenciasReporte

@@ -24,12 +24,12 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Iniciar la instalación ficticia del navegador
         run: docker compose -f compose.pruebas.yml --profile navegador up -d --wait --wait-timeout 120 api
-      - name: Flujos combinados de los cuatro perfiles
+      - name: Flujos combinados, aplicación de IA y relevo desde Excel
         working-directory: frontend
         env:
           PRUEBA_API_URL: http://127.0.0.1:18100
           PRUEBA_NAVEGADORES: chromium
-        run: npx playwright test pruebas/flujos-combinados-roles.spec.ts --reporter=list
+        run: npx playwright test pruebas/flujos-combinados-roles.spec.ts pruebas/ia-aplicar-sugerencia.spec.ts pruebas/importacion-relevo.spec.ts --reporter=list
       - name: Diagnóstico de servicios si falla la suite
         if: failure()
         run: |
@@ -67,4 +67,5 @@ jobs:
           python-version: '3.12'
       - run: python tools/revisar_publicacion.py
       - run: python tools/verificar_rutas.py
+      - run: python tools/verificar_manuales.py
       - run: python -m unittest discover -s tools -p 'test_*.py'

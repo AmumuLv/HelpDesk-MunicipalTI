@@ -1,7 +1,7 @@
 """Asistente de importacion de inventario desde Excel/CSV (hoja = zona).
 
 Flujo: subir -> detectar -> mapear columnas -> previsualizar con reglas visibles
--> confirmar (transaccion por lote) -> deshacer mientras no se modifique lo importado.
+-> confirmar las filas válidas -> deshacer los lotes que solo crearon equipos.
 
 Principios: los campos vacios NUNCA son error de importacion (se importan como
 "Pendiente"); los textos tipo "-" o "NO TIENE" se proponen como "No aplica"; la
@@ -164,6 +164,25 @@ async def listar_responsables_excel() -> list[dict[str, Any]]:
     ]
 
 
+async def _sincronizar_responsables_conjuntos(conjunto_ids, *, usuario: dict[str, Any]) -> None:
+    """Una PC completa sigue al mismo responsable de sus componentes activos."""
+    db = get_db()
+    for conjunto_id in set(conjunto_ids):
+        componentes = await db["activos"].find(
+            {"conjunto_id": conjunto_id, "activo": {"$ne": False}}, {"responsable_id": 1}
+        ).to_list(None)
+        responsables = {componente.get("responsable_id") for componente in componentes}
+        if len(responsables) != 1:
+            continue
+        responsable_id = next(iter(responsables))
+        conjunto = await db["conjuntos"].find_one({"_id": conjunto_id})
+        if conjunto and conjunto.get("responsable_id") != responsable_id:
+            await inventario_service.cambiar_responsable(
+                "conjunto", conjunto_id, responsable_id, usuario=usuario,
+                motivo="Responsable común de los componentes confirmado desde el Excel",
+            )
+
+
 async def confirmar_responsables_excel(
     selecciones: list[dict[str, str]], *, usuario: dict[str, Any]
 ) -> dict[str, Any]:
@@ -198,6 +217,7 @@ async def confirmar_responsables_excel(
     # personas, pero no cuáles ni en qué zona, y en la pantalla final no quedaba
     # rastro. Con la lista, lo hecho se puede revisar y corregir.
     detalle: list[dict[str, Any]] = []
+    conjuntos_actualizados: set[ObjectId] = set()
     for clave_grupo, grupo in por_clave.items():
         responsable_id = elegidas[clave_grupo]
         if responsable_id is None:
@@ -224,7 +244,7 @@ async def confirmar_responsables_excel(
             accion = "vinculado"
         equipos_del_grupo = 0
         for activo_id in grupo["_activos"]:
-            activo = await db["activos"].find_one({"_id": activo_id}, {"responsable_nombre": 1})
+            activo = await db["activos"].find_one({"_id": activo_id}, {"responsable_nombre": 1, "conjunto_id": 1})
             if activo is None:
                 continue
             await db["activos"].update_one(
@@ -239,6 +259,8 @@ async def confirmar_responsables_excel(
             )
             vinculados += 1
             equipos_del_grupo += 1
+            if activo.get("conjunto_id"):
+                conjuntos_actualizados.add(activo["conjunto_id"])
         detalle.append(
             {
                 "clave": clave_grupo,
@@ -260,6 +282,7 @@ async def confirmar_responsables_excel(
                 ),
             }
         )
+    await _sincronizar_responsables_conjuntos(conjuntos_actualizados, usuario=usuario)
     detalle.sort(key=lambda fila: (clave(fila["oficina_nombre"] or ""), clave(fila["nombre_excel"])))
     return {"personas_creadas": creados, "equipos_vinculados": vinculados, "detalle": detalle}
 
@@ -543,7 +566,8 @@ async def _preparar_filas(
         "'Tipo de equipo' se rellena hacia abajo dentro de la misma oficina.",
         "Los sinonimos de dispositivo se corrigen con el diccionario editable (por ejemplo MAUSE -> Mouse).",
         "Los textos '-', 'N/A', 'S/N', 'NO TIENE' y 'SIN CODIGO' equivalen a 'No aplica'.",
-        "Un equipo sin codigo patrimonial se identifica por oficina + conjunto + dispositivo.",
+        "Se reconoce primero el patrimonio o la MAC; la ubicación solo se usa si identifica un único equipo.",
+        "Los equipos indistinguibles se dejan para revisión: no se emparejan por el orden de las filas.",
         "Las celdas vacias se importan como 'Pendiente': nunca son un error.",
         "Si no hay responsable, el equipo queda como uso comun de la oficina.",
     ]
@@ -663,6 +687,7 @@ async def _preparar_filas(
                 "modelo": _sin_dato(valor("modelo")) or None,
                 "tamano_pantalla": _sin_dato(valor("tamano_pantalla")) or None,
                 "nombre_equipo": _sin_dato(valor("nombre_equipo")) or None,
+                "nombre_equipo_original": _sin_dato(valor("nombre_equipo")) or None,
                 "procesador": _sin_dato(valor("procesador")) or None,
                 "memoria_ram": _sin_dato(valor("memoria_ram")) or None,
                 "almacenamiento": _sin_dato(valor("almacenamiento")) or None,
@@ -681,25 +706,6 @@ async def _preparar_filas(
                 "observaciones": "; ".join(observaciones) or None,
             }
 
-            # Duplicados de codigo dentro del mismo archivo
-            if codigo:
-                previas = [f for f in filas if f["codigo_patrimonial"] == codigo]
-                if previas:
-                    fila["advertencias"].append(
-                        f"Codigo patrimonial repetido en las filas {', '.join(str(p['numero']) for p in previas)} y {numero}."
-                    )
-                    fila["observaciones"] = "; ".join(filter(None, [fila["observaciones"], f"Codigo patrimonial original duplicado: {codigo}"]))
-                    fila["codigo_patrimonial"] = None
-                else:
-                    existente = await db["activos"].find_one(
-                        {"codigo_patrimonial": codigo}, {"oficina_nombre": 1, "nombre_equipo": 1, "tipo": 1}
-                    )
-                    if existente:
-                        fila["accion"] = "actualizar"
-                        fila["existente_id"] = str(existente["_id"])
-                        fila["advertencias"].append(
-                            f"El codigo ya existe ({existente.get('oficina_nombre')}): se actualizara."
-                        )
             filas.append(fila)
 
     # Un grupo con un solo dispositivo se importa como equipo individual
@@ -738,7 +744,7 @@ async def _preparar_filas(
         fila["oficina_id"] = str(oficina["_id"])
 
         candidatos = await db["usuarios"].find(
-            {"oficina_id": oficina["_id"], "activo": True}, {"nombre": 1}
+            {"oficina_id": oficina["_id"], "activo": True, "archivado": {"$ne": True}}, {"nombre": 1}
         ).to_list(None)
         if not candidatos:
             fila["responsable_id"] = None
@@ -809,6 +815,82 @@ def _resolver_tipo(dispositivo: str, sinonimos: dict[str, str], tipos_conocidos:
     return normalizar_texto(dispositivo)
 
 
+async def _identificar_equipo(fila: dict[str, Any], repetidas: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """Resuelve patrimonio sin usar al trabajador ni el orden del archivo."""
+    db = get_db()
+    codigo, mac = fila.get("codigo_patrimonial"), fila.get("direccion_mac")
+    por_codigo = await db.activos.find({"codigo_patrimonial": codigo}).limit(3).to_list(None) if codigo else []
+    por_mac = await db.activos.find({"direccion_mac": mac}).limit(3).to_list(None) if mac else []
+    existente = None
+    if len(por_codigo) > 1:
+        if len(por_mac) == 1 and por_mac[0]["_id"] in {c["_id"] for c in por_codigo}:
+            existente = por_mac[0]
+        else:
+            fila["errores"].append("El patrimonio coincide con varios equipos. Corrige la identificación o añade su MAC única.")
+            return None
+    elif por_codigo:
+        existente = por_codigo[0]
+    if len(por_mac) > 1:
+        fila["errores"].append("La MAC coincide con varios equipos. Revisa la identificación.")
+        return None
+    if por_mac:
+        candidato = por_mac[0]
+        if (existente and candidato["_id"] != existente["_id"]) or (
+            codigo and candidato.get("codigo_patrimonial") not in (None, "", codigo)
+        ):
+            fila["errores"].append("El patrimonio y la MAC identifican equipos diferentes. Revisa la fila.")
+            return None
+        existente = candidato
+    if existente:
+        fila["identificado_por"] = "Código patrimonial" if codigo and por_codigo else "Dirección MAC"
+        return existente
+
+    # Un nombre explícito o la etiqueta del dispositivo individual distingue
+    # equipos iguales. Para componentes de PC se usa el conjunto y el tipo.
+    nombre = fila.get("nombre_equipo_original") or (fila.get("nombre_equipo") if not fila["es_conjunto"] else None)
+    nombre_unico = bool(nombre) and sum(
+        clave(f.get("nombre_equipo_original") or (f.get("nombre_equipo") if not f["es_conjunto"] else "") or "") == clave(nombre)
+        for f in repetidas
+    ) == 1
+    if not codigo and not mac and len(repetidas) > 1 and not nombre_unico:
+        fila["errores"].append("Hay varios dispositivos iguales sin identificación. Usa nombres únicos, patrimonio o MAC.")
+        return None
+    if nombre_unico:
+        fila["clave_natural_preview"] = f"{fila['clave_natural_preview'].rsplit('#', 1)[0]}|nombre|{clave(nombre)}"
+
+    oficina = await db.oficinas.find_one({
+        "zona_id": ObjectId(fila["zona_id"]), "nombre_normalizado": clave(fila["oficina_nombre"]),
+    })
+    if not oficina:
+        return None
+    candidatos = await db.activos.find({
+        "oficina_id": oficina["_id"],
+        "$or": [{"tipo_normalizado": clave(fila["tipo"])}, {"tipo": fila["tipo"]}],
+    }).to_list(None)
+    grupo = clave(fila.get("conjunto_nombre") or "") if fila["es_conjunto"] else ""
+    candidatos = [c for c in candidatos if clave(c.get("conjunto_nombre") or "") == grupo]
+    # Un identificador nuevo no sustituye al patrimonio distinto de otro equipo.
+    candidatos = [c for c in candidatos if
+        (not codigo or not c.get("codigo_patrimonial") or c["codigo_patrimonial"] == codigo) and
+        (not mac or not c.get("direccion_mac") or c["direccion_mac"] == mac)]
+    por_nombre = [c for c in candidatos if nombre and clave(c.get("nombre_equipo") or "") == clave(nombre)]
+    if nombre_unico and len(por_nombre) == 1:
+        fila["identificado_por"] = "Nombre del equipo y ubicación"
+        return por_nombre[0]
+    if len(por_nombre) > 1 or len(candidatos) > 1:
+        fila["errores"].append("La fila coincide con varios equipos existentes. Añade patrimonio o MAC para distinguirlos.")
+        return None
+    if candidatos and nombre and candidatos[0].get("nombre_equipo") and not por_nombre:
+        fila["errores"].append("El nombre no coincide con el equipo existente. Confirma su identidad en la ficha antes de importar.")
+        return None
+    if candidatos and (len(repetidas) == 1 or nombre_unico and por_nombre):
+        fila["identificado_por"] = "Ubicación y dispositivo únicos"
+        return candidatos[0]
+    if candidatos and not codigo and not mac:
+        fila["errores"].append("No se puede distinguir el equipo existente. Revisa su nombre o identificación.")
+    return None
+
+
 async def previsualizar(
     lote_id: str, *, filas_excluidas: list[int] | None = None, no_aplicar_confirmado: list[str] | None = None, usuario: dict[str, Any]
 ) -> dict[str, Any]:
@@ -819,9 +901,17 @@ async def previsualizar(
     db = get_db()
     confirmado = set(no_aplicar_confirmado or [])
 
-    # Clave natural estable: se calcula SIEMPRE sobre el orden del archivo,
-    # tambien para las filas que se van a actualizar, para que reimportar el
-    # mismo Excel empareje los mismos equipos y no duplique nada.
+    # El responsable no identifica el patrimonio. Dos filas sin identificador
+    # tampoco se distinguen solamente por su posición al ordenar otro Excel.
+    grupos: dict[str, list[dict[str, Any]]] = {}
+    for fila in filas:
+        if fila["excluida"]:
+            continue
+        base = f"{fila['zona_nombre']}|{fila['oficina_nombre']}|{fila['conjunto_nombre'] or '-'}|{clave(fila['tipo'])}"
+        grupos.setdefault(base, []).append(fila)
+
+    # El ordinal se conserva como clave inicial de una fila nueva. Nunca se
+    # utiliza por sí solo para elegir un equipo entre varios existentes.
     contadores: dict[str, int] = {}
     for fila in filas:
         fila["valida"] = not fila["errores"] and not fila["excluida"]
@@ -835,18 +925,32 @@ async def previsualizar(
         if fila["errores"]:
             fila["accion"] = "omitir"
             continue
-        existente_natural = await db["activos"].find_one({"clave_natural": fila["clave_natural_preview"]}, {"_id": 1})
-        if existente_natural:
+        codigo = fila.get("codigo_patrimonial")
+        existente = await _identificar_equipo(fila, grupos[base])
+        if existente:
             fila["accion"] = "actualizar"
-            fila["existente_id"] = str(existente_natural["_id"])
+            fila["existente_id"] = str(existente["_id"])
+            fila["clave_natural_preview"] = existente["clave_natural"]
+            fila["responsable_anterior"] = existente.get("responsable_nombre")
+            fila["cambia_responsable"] = clave_oscura(existente.get("responsable_nombre") or "") != clave_oscura(fila.get("responsable_nombre") or "")
+            if not codigo and existente.get("codigo_patrimonial") and clave(fila.get("propiedad") or "") != "PERSONAL":
+                fila["codigo_patrimonial"] = existente["codigo_patrimonial"]
+                fila["advertencias"].append("Se conserva el patrimonio existente que no está escrito en el archivo.")
+            if not fila.get("direccion_mac") and existente.get("direccion_mac"):
+                fila["direccion_mac"] = existente["direccion_mac"]
+                fila["advertencias"].append("Se conserva la MAC existente que no está escrita en el archivo.")
+        else:
+            fila.pop("existente_id", None)
+            fila["accion"] = "crear"
+            if codigo:
+                fila["clave_natural_preview"] = f"patrimonio|{codigo}"
+            elif fila.get("direccion_mac"):
+                fila["clave_natural_preview"] = f"mac|{fila['direccion_mac']}"
         if fila["accion"] != "actualizar":
             if not fila["codigo_patrimonial"]:
                 fila["advertencias"].append(
-                    "El equipo no tiene código patrimonial: se identificará por oficina + conjunto + dispositivo."
+                    "Sin patrimonio: se usará su MAC o una coincidencia única de ubicación, dispositivo y nombre."
                 )
-        if fila["es_conjunto"] and not fila["codigo_patrimonial"]:
-            # El conjunto se crea por nombre; sus componentes comparten clave
-            pass
         campos_estado = {}
         for campo in CAMPOS_BASE:
             if campo in confirmado and campo in fila["campos_no_aplica_sugeridos"]:
@@ -861,6 +965,24 @@ async def previsualizar(
             campos_estado['codigo_patrimonial'] = CAMPO_NO_APLICA
         fila["campos_estado"] = campos_estado
         fila["valida"] = not fila["errores"]
+
+    # Una misma identidad no se puede sobrescribir con dos filas del lote.
+    codigos: dict[str, list[dict[str, Any]]] = {}
+    for fila in filas:
+        if fila.get("codigo_patrimonial") and not fila["excluida"]:
+            codigos.setdefault(fila["codigo_patrimonial"], []).append(fila)
+    for repetidas in codigos.values():
+        if len(repetidas) > 1:
+            for fila in repetidas:
+                fila["errores"].append("El código patrimonial está repetido en el archivo. Revisa esas filas antes de importarlas.")
+    destinos: dict[str, list[dict[str, Any]]] = {}
+    for fila in filas:
+        if fila.get("existente_id") and not fila["excluida"]:
+            destinos.setdefault(fila["existente_id"], []).append(fila)
+    for repetidas in destinos.values():
+        if len(repetidas) > 1:
+            for fila in repetidas:
+                fila["errores"].append("Dos filas identifican el mismo equipo existente. Conserva solo una.")
 
     # No permitir asignar una IP o MAC a dos dispositivos distintos.
     redes: dict[tuple[str, str], list[dict]] = {}
@@ -934,7 +1056,7 @@ async def _confirmar_lote(
     crear_usuarios_faltantes: bool = False,
     usuario: dict[str, Any],
 ) -> dict[str, Any]:
-    """8. Confirmar e importar en una transaccion por lote."""
+    """8. Importar las filas válidas; los errores individuales se muestran al terminar."""
     db = get_db()
     documento = await obtener_lote(lote_id)
     if documento.get("estado") == "confirmado":
@@ -958,6 +1080,7 @@ async def _confirmar_lote(
     oficinas_nuevas: list[str] = []
     cache_conjuntos: dict[str, ObjectId] = {}
     cache_oficinas: dict[str, ObjectId] = {}
+    cache_responsables: dict[tuple[ObjectId, str], ObjectId] = {}
 
     try:
         async with db.client.start_session() as sesion:  # type: ignore[attr-defined]
@@ -970,6 +1093,7 @@ async def _confirmar_lote(
                             usuario=usuario,
                             cache_conjuntos=cache_conjuntos,
                             cache_oficinas=cache_oficinas,
+                            cache_responsables=cache_responsables,
                             crear_usuarios=crear_usuarios_faltantes,
                             contadores={"conjuntos_creados": 0, "usuarios_creados": 0, "zonas": zonas_nuevas, "oficinas": oficinas_nuevas},
                         )
@@ -987,6 +1111,7 @@ async def _confirmar_lote(
     except Exception as exc:
         raise Validacion(f"No se pudo confirmar la importacion: {exc}") from exc
 
+    await _sincronizar_responsables_conjuntos(cache_conjuntos.values(), usuario=usuario)
     for fila in filas:
         if fila["accion"] == "omitir" or fila["excluida"]:
             omitidos.append(str(fila["numero"]))
@@ -1060,9 +1185,25 @@ async def _importar_fila(
     usuario: dict[str, Any],
     cache_conjuntos: dict[str, ObjectId],
     cache_oficinas: dict[str, ObjectId],
+    cache_responsables: dict[tuple[ObjectId, str], ObjectId],
     crear_usuarios: bool,
     contadores: dict[str, Any],
 ) -> dict[str, Any]:
+    # No crear perfiles si el destino cambió después de la previsualización.
+    clave_natural = fila["clave_natural_preview"]
+    activo_existente = None
+    if fila.get("existente_id"):
+        activo_existente = await db["activos"].find_one({"_id": ObjectId(fila["existente_id"])})
+        if activo_existente is None:
+            raise Validacion("El equipo cambió después de la vista previa. Vuelve a revisar la importación.")
+        clave_natural = activo_existente["clave_natural"]
+    else:
+        identidades = [{"clave_natural": clave_natural}]
+        for campo in ("codigo_patrimonial", "direccion_mac"):
+            if fila.get(campo):
+                identidades.append({campo: fila[campo]})
+        if await db["activos"].find_one({"$or": identidades}, {"_id": 1}):
+            raise Conflicto("El inventario cambió después de la vista previa. Vuelve a revisar la importación.")
     zona_id = ObjectId(fila["zona_id"])
     clave_oficina = f"{fila['zona_id']}|{clave(fila['oficina_nombre'])}"
     if clave_oficina not in cache_oficinas:
@@ -1108,19 +1249,27 @@ async def _importar_fila(
                 contadores["conjuntos_creados"] += 1
         conjunto_id = cache_conjuntos[clave_conjunto]
 
+    usuarios_creados = 0
     responsable_id = ObjectId(fila["responsable_id"]) if fila.get("responsable_id") else None
     if not responsable_id and crear_usuarios and fila.get("responsable_nombre") and fila["responsable_estado"] == "no_encontrado":
-        nuevo = await usuario_service.crear(
-            {
-                "nombre": fila["responsable_nombre"],
-                "oficina_id": oficina_id,
-                "zona_id": zona_id,
-                "rol": "usuario",
-            },
-            usuario=usuario,
-        )
-        responsable_id = nuevo["_id"]
-        contadores["usuarios_creados"] += 1
+        clave_persona = (oficina_id, clave_oscura(fila["responsable_nombre"]))
+        if clave_persona not in cache_responsables:
+            candidatos = await db["usuarios"].find(
+                {"oficina_id": oficina_id, "activo": True, "archivado": {"$ne": True}}, {"nombre": 1}
+            ).to_list(None)
+            exactos = [c for c in candidatos if clave_oscura(c.get("nombre") or "") == clave_persona[1]]
+            if len(exactos) > 1:
+                raise Validacion("Hay varias personas con el mismo nombre. Vincula el responsable manualmente.")
+            if exactos:
+                cache_responsables[clave_persona] = exactos[0]["_id"]
+            else:
+                nuevo = await usuario_service.crear(
+                    {"nombre": fila["responsable_nombre"], "oficina_id": oficina_id,
+                     "zona_id": zona_id, "rol": "usuario"}, usuario=usuario,
+                )
+                cache_responsables[clave_persona] = nuevo["_id"]
+                usuarios_creados = 1
+        responsable_id = cache_responsables[clave_persona]
         fila["responsable_estado"] = "creado"
 
     campos = {campo: fila.get(campo) for campo in CAMPOS_BASE}
@@ -1136,25 +1285,14 @@ async def _importar_fila(
         if fila["campos_estado"].get(campo) == CAMPO_NO_APLICA
     }
 
-    # Idempotencia: primero la clave natural estable y despues el codigo patrimonial
-    clave_natural = fila.get("clave_natural_preview") or inventario_service.construir_clave_natural(
-        oficina_id, fila.get("conjunto_nombre"), fila["tipo"], int(fila.get("ordinal_grupo") or 1)
-    )
-    existente = await db["activos"].find_one({"clave_natural": clave_natural}, {"_id": 1})
-    if existente is None and fila.get("codigo_patrimonial"):
-        existente = await db["activos"].find_one(
-            {"codigo_patrimonial": fila["codigo_patrimonial"]}, {"_id": 1}
-        )
-    if fila.get("existente_id"):
-        existente = {"_id": ObjectId(fila["existente_id"])}
-    if existente is not None:
+    if activo_existente is not None:
         await inventario_service.actualizar_activo(
-            existente["_id"],
+            activo_existente["_id"],
             {**campos, "oficina_id": oficina_id, "conjunto_id": conjunto_id, "responsable_id": responsable_id},
             usuario=usuario,
         )
         await db["activos"].update_one(
-            {"_id": existente["_id"]},
+            {"_id": activo_existente["_id"]},
             {"$set": {
                 "clave_natural": clave_natural,
                 "importacion_lote": fila.get("lote_id"),
@@ -1163,7 +1301,8 @@ async def _importar_fila(
                 "responsable_vinculado": bool(responsable_id),
             }},
         )
-        return {"accion": "actualizar", "id": str(existente["_id"])}
+        return {"accion": "actualizar", "id": str(activo_existente["_id"]),
+                "conjuntos_creados": contadores["conjuntos_creados"], "usuarios_creados": usuarios_creados}
 
     documento = await inventario_service.crear_activo(
         {
@@ -1191,8 +1330,8 @@ async def _importar_fila(
     return {
         "accion": "crear",
         "id": str(documento["_id"]),
-        "conjuntos_creados": 0,
-        "usuarios_creados": 0,
+        "conjuntos_creados": contadores["conjuntos_creados"],
+        "usuarios_creados": usuarios_creados,
     }
 
 

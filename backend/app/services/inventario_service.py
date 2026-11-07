@@ -457,7 +457,9 @@ async def crear_activo(
     doc['faltantes_count'] = (await calcular_completitud(doc))['faltantes']
     resultado = await db["activos"].insert_one(doc)
     doc["_id"] = resultado.inserted_id
-    if responsable_id and not conjunto:
+    # Cada componente conserva su propia procedencia aunque también pertenezca
+    # a una PC. El historial del conjunto no sustituye al del equipo físico.
+    if responsable_id:
         await _registrar_historial_responsable(
             "activo", doc["_id"], responsable_id, responsable_nombre, None, "Asignacion inicial", usuario
         )

@@ -17,7 +17,8 @@ from bson import ObjectId
 
 from app.core.audit import registrar
 from app.core.db import get_db
-from app.core.ids import a_id, clave as clave_texto
+from app.core.errors import NoEncontrado, Prohibido, Validacion
+from app.core.ids import id_requerido, clave as clave_texto
 from app.core.time import utcnow
 from app.domain.constants import (
     PRIORIDAD_ALTA,
@@ -26,6 +27,7 @@ from app.domain.constants import (
     PRIORIDAD_MEDIA,
     URGENCIA_A_PRIORIDAD,
 )
+from app.domain.permissions import tiene_permiso
 from app.services import config_service, ia_provider, kb_service
 
 # Los cuatro valores de prioridad que el resto del sistema reconoce. Sirve para
@@ -209,7 +211,7 @@ async def sugerir_clasificacion(ticket: dict[str, Any], usuario: dict[str, Any])
 async def sugerencias_ticket(ticket_id: ObjectId, *, usuario: dict[str, Any]) -> dict[str, Any]:
     """Bloque IA del detalle. Si el usuario las desactivo, no se devuelve nada."""
     db = get_db()
-    ticket = await db["tickets"].find_one({"_id": ticket_id})
+    ticket = await db["tickets"].find_one({"_id": ticket_id, "eliminado": {"$ne": True}})
     if ticket is None:
         return {"disponible": False, "motivo_no_disponible": "Ticket no encontrado.", "activa": False}
     if not await config_service.recomendaciones_globales():
@@ -260,6 +262,14 @@ async def sugerencias_ticket(ticket_id: ObjectId, *, usuario: dict[str, Any]) ->
     # Lo que ya se decidió sobre cada punto. Sin esto la interfaz recalculaba la
     # sugerencia y volvía a ofrecerla después de aplicarla o de descartarla.
     decisiones = (ticket.get("ia_sugerencia") or {}).get("decisiones") or {}
+    destino = sugerida.get("tecnico_id")
+    actual = ticket.get("tecnico_id")
+    reasignar = tiene_permiso(usuario, "tickets.reasignar")
+    asignacion_aplicable = bool(
+        destino
+        and (destino in (usuario.get("_id"), actual) or reasignar)
+        and (usuario.get("rol") != "tecnico" or not actual or actual == usuario.get("_id") or reasignar)
+    )
     return {
         "disponible": True,
         "decisiones": decisiones,
@@ -275,6 +285,7 @@ async def sugerencias_ticket(ticket_id: ObjectId, *, usuario: dict[str, Any]) ->
         "respuesta_sugerida": _limitar_explicacion(respuesta_sugerida),
         "tecnico_sugerido_id": sugerida.get("tecnico_id"),
         "tecnico_sugerido_nombre": sugerida.get("tecnico_nombre"),
+        "tecnico_sugerido_aplicable": asignacion_aplicable,
         "explicacion_asignacion": _limitar_explicacion(sugerida.get("explicacion")),
         "activa": True,
         "llm_disponible": bool(resumen or respuesta_sugerida),
@@ -430,10 +441,16 @@ async def aplicar_sugerencia(
     `valor` y el servicio leía `categoria` y `prioridad`, que llegaban vacías, así
     que «Aplicar» contestaba con éxito sin cambiar nada del ticket.
     """
+    from app.services import ticket_service
+
+    if usuario.get("rol") not in {"tecnico", "administrador"}:
+        raise Prohibido("Las recomendaciones del ticket las gestiona el equipo TI.")
+    if clave and clave not in {"categoria", "prioridad", "tecnico_sugerido_id"}:
+        raise Validacion("La recomendación seleccionada no se puede aplicar.")
     db = get_db()
-    ticket = await db["tickets"].find_one({"_id": ticket_id})
+    ticket = await db["tickets"].find_one({"_id": ticket_id, "eliminado": {"$ne": True}})
     if ticket is None:
-        return {"ok": False}
+        raise NoEncontrado("Ticket no encontrado.")
 
     # La clave dice QUÉ se decide; el valor dice CON QUÉ se queda.
     valor = valor or None
@@ -444,7 +461,10 @@ async def aplicar_sugerencia(
         elif clave == "prioridad":
             prioridad = valor
         elif clave == "tecnico_sugerido_id":
-            tecnico_id = a_id(valor)
+            if accion == "aplicar":
+                tecnico_id = id_requerido(valor, "técnico")
+                if categoria or prioridad:
+                    raise Validacion("Aplica la asignación por separado de la categoría o prioridad.")
 
     # Una prioridad escrita a mano que no exista no se aplica: se ignora en lugar
     # de guardar un valor que el resto del sistema no reconoce.
@@ -461,22 +481,30 @@ async def aplicar_sugerencia(
 
     cambios: dict[str, Any] = {}
     if accion == "aplicar":
-        if categoria and categoria != anterior["categoria"]:
-            cambios["categoria"] = categoria
-            from app.services.vinculo_ticket_service import resolver
-            cambios.update(await resolver(ticket, {'categoria': categoria}, usuario))
-        if prioridad and prioridad != anterior["prioridad"]:
-            from app.services import sla_service
-
-            cambios["prioridad"] = prioridad
-            cambios.update(await sla_service.recalcular_prioridad(ticket, prioridad))
         if clave == "tecnico_sugerido_id" and tecnico_id:
-            nombre = await _nombre_tecnico(db, tecnico_id)
-            if nombre:
-                cambios["tecnico_id"] = tecnico_id
-                cambios["tecnico_nombre"] = nombre
-                if ticket.get("estado") == "nuevo":
-                    cambios["estado"] = "en_progreso"
+            resultado = await ticket_service.asignar(
+                ticket_id, {"tecnico_id": tecnico_id}, usuario=usuario
+            )
+            if resultado.get("requiere_confirmacion"):
+                raise Validacion(
+                    "El técnico está fuera de horario o ausente. Confirma la asignación en «Asignar a».",
+                    detalles=resultado.get("advertencia"),
+                )
+        else:
+            edicion = {}
+            if categoria and categoria != anterior["categoria"]:
+                edicion["categoria"] = categoria
+            if prioridad and prioridad != anterior["prioridad"]:
+                edicion["prioridad"] = prioridad
+            if edicion:
+                await ticket_service.actualizar(
+                    ticket_id, {**edicion, "version_esperada": ticket.get("actualizado_en")}, usuario=usuario
+                )
+        actualizado = await db["tickets"].find_one({"_id": ticket_id})
+        cambios = {
+            campo: dato for campo, dato in actualizado.items()
+            if campo != "ia_sugerencia" and dato != ticket.get(campo)
+        }
 
     # Se guarda por clave y no un único estado del ticket: la interfaz puede
     # aplicar la categoría y descartar la prioridad, y cada una necesita saber
@@ -491,12 +519,13 @@ async def aplicar_sugerencia(
     if clave:
         actualizacion[f"ia_sugerencia.decisiones.{clave}"] = {
             "accion": accion,
-            "elegido": valor,
+            "elegido": cambios.get("tecnico_nombre", valor) if clave == "tecnico_sugerido_id" else valor,
             "anterior": _anterior_de(clave, anterior),
             "por": usuario.get("nombre"),
             "en": utcnow(),
         }
-    actualizacion.update(cambios)
+    # La operación normal ya aplicó el cambio, sus permisos, avisos y auditoría.
+    # Aquí se registra solo la decisión, sin sobrescribir una edición concurrente.
     await db["tickets"].update_one({"_id": ticket_id}, {"$set": actualizacion})
 
     await _registrar_aprendizaje(

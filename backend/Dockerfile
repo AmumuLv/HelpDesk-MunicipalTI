@@ -1,5 +1,7 @@
 # Native security backports. Keep the distribution ABI and all Debian patches.
-FROM python:3.12-slim-trixie AS native-security
+# pyexpat below is rebuilt for this exact CPython version. Update them together.
+ARG PYTHON_IMAGE=python:3.12.16-slim-trixie@sha256:4840d514c583a4d3d8cad3940e68dee6f0f6f3635c12fcd0a3d74c21a5b93a54
+FROM ${PYTHON_IMAGE} AS native-security
 RUN printf 'deb-src http://deb.debian.org/debian trixie main\n' > /etc/apt/sources.list.d/helpdesk-source.list \
     && apt-get update && apt-get install -y --no-install-recommends \
         build-essential curl ca-certificates patch dpkg-dev pkg-config file automake autoconf libtool \
@@ -7,13 +9,13 @@ RUN printf 'deb-src http://deb.debian.org/debian trixie main\n' > /etc/apt/sourc
 WORKDIR /build
 ENV CFLAGS="-O2 -fstack-protector-strong -D_FORTIFY_SOURCE=3" \
     LDFLAGS="-Wl,-z,relro,-z,now"
+COPY security/patches/libxml2-bounds.patch /build/xml.patch
 RUN apt-get source libxml2 \
     && curl -fsSL https://download.gnome.org/sources/libxml2/2.9/libxml2-2.9.14.tar.xz -o xml-tests.tar.xz \
     && echo '60d74a257d1ccec0475e749cba2f21559e48139efba6ff28224357c7c798dfee  xml-tests.tar.xz' | sha256sum -c - \
     && mkdir /xml-tests && tar xf xml-tests.tar.xz -C /xml-tests \
-    && curl -fsSL https://github.com/GNOME/libxml2/commit/d1686f91dbda141a752200419d35639fd6b38340.patch -o xml.patch \
     && echo '5e51f8dcadfe3294a15d9e8644d61e8d92bd5b9e72c10cf13ef010eccfbfa4df  xml.patch' | sha256sum -c - \
-    && cd libxml2-*/ && patch -p1 < ../xml.patch && autoreconf -fi \
+    && cd libxml2-*/ && patch --batch --forward --fuzz=0 -p1 < ../xml.patch && autoreconf -fi \
     && cp -rn /xml-tests/libxml2-2.9.14/test /xml-tests/libxml2-2.9.14/result . \
     && ./configure --prefix=/usr --libdir=/usr/lib --without-python --with-icu \
     && make -j2 && make check \
@@ -28,9 +30,12 @@ RUN mkdir /artifacts && cp -L /patched/usr/lib/libxml2.so.2 /artifacts/libxml2.s
 
 # Only ffprobe is used by the API. A local-file build avoids RIST/cJSON and
 # unrelated network, display and device libraries. Development keeps ffmpeg.
-RUN curl -fsSL https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz -o ffmpeg.tar.xz \
-    && echo '8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e  ffmpeg.tar.xz' | sha256sum -c - \
-    && tar xf ffmpeg.tar.xz && cd ffmpeg-9.0.2 \
+# Use the official upstream tag archive: ffmpeg.org was unreachable from CI.
+# This is a different archive from the release .tar.xz and has its own checksum.
+RUN curl -4 -fsSL --retry 2 --retry-all-errors --connect-timeout 20 --max-time 180 \
+        https://codeload.github.com/FFmpeg/FFmpeg/tar.gz/refs/tags/n9.0.2 -o ffmpeg.tar.gz \
+    && echo '6e374ed621e48faa40639307dff48ba6fe574a509977956d2cce9669b7cc27e9  ffmpeg.tar.gz' | sha256sum -c - \
+    && tar xzf ffmpeg.tar.gz && cd FFmpeg-n9.0.2 \
     && ./configure --prefix=/probe --disable-everything --disable-autodetect --disable-network \
         --disable-doc --disable-debug --disable-x86asm --disable-ffmpeg \
         --disable-ffplay --disable-avdevice \
@@ -41,22 +46,23 @@ RUN curl -fsSL https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz -o ffmpeg.tar.xz 
         --enable-decoder=aac,flac,mp3,opus,vorbis,pcm_s16le,pcm_s24le,pcm_s32le,pcm_u8 \
     && make -j2 && make install
 RUN mkdir /licenses \
-    && cp /build/ffmpeg-9.0.2/COPYING.LGPLv2.1 /licenses/ffmpeg-LGPL-2.1.txt \
+    && cp /build/FFmpeg-n9.0.2/COPYING.LGPLv2.1 /licenses/ffmpeg-LGPL-2.1.txt \
     && cp /build/libxml2-*/Copyright /licenses/libxml2-Copyright.txt \
     && cp /build/zlib-*/README /licenses/zlib-README.txt
 
 # Keep Debian's Expat ABI and patches, then apply the upstream security commits.
+# The vendored files retain the previously verified SHA-256 values; GitHub's
+# dynamic .patch rendering changed only its abbreviated blob IDs (9 to 10).
+COPY security/patches/expat-empty.patch security/patches/expat-prefix.patch \
+    security/patches/expat-attributes.patch /build/
 RUN printf 'deb-src http://deb.debian.org/debian-security trixie-security main\n' > /etc/apt/sources.list.d/expat-security.list \
     && apt-get update && apt-get install -y --no-install-recommends cmake \
     && apt-get source expat=2.9.0-1~deb13u1 \
-    && curl -fsSL https://github.com/libexpat/libexpat/commit/bfc28346fa3efeb8ca56c17437d24a7344e5feab.patch -o expat-empty.patch \
     && echo '96ea42cc30d4fd99ea62a7fd84d339bef7dc01135f5774b094a09274a0a54f49  expat-empty.patch' | sha256sum -c - \
-    && curl -fsSL https://github.com/libexpat/libexpat/commit/621cb2c78b253ee023a86bc91d6ddb048481c04c.patch -o expat-prefix.patch \
     && echo '3b78184a2176ce725d21b233912033fa333466f4a5a2a17a10128002826f99fb  expat-prefix.patch' | sha256sum -c - \
-    && curl -fsSL https://github.com/libexpat/libexpat/commit/1bac53c4fc460a03cd9860f39501c7979f6750ae.patch -o expat-attributes.patch \
     && echo '28ebac139e59e1909e50eecfd834fc4baf9dcf7dc627b4e3a81af872fd818f15  expat-attributes.patch' | sha256sum -c -
-RUN cd expat-*/expat && patch --batch --fuzz=0 -p2 < ../../expat-empty.patch \
-    && patch --batch --fuzz=0 -p2 < ../../expat-prefix.patch && patch --batch --fuzz=0 -p2 < ../../expat-attributes.patch \
+RUN cd expat-*/expat && patch --batch --forward --fuzz=0 -p2 < ../../expat-empty.patch \
+    && patch --batch --forward --fuzz=0 -p2 < ../../expat-prefix.patch && patch --batch --forward --fuzz=0 -p2 < ../../expat-attributes.patch \
     && cmake -S . -B build -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_INSTALL_LIBDIR=lib \
          -DEXPAT_BUILD_DOCS=OFF -DEXPAT_BUILD_EXAMPLES=OFF -DEXPAT_BUILD_TOOLS=OFF \
          -DEXPAT_BUILD_TESTS=ON -DEXPAT_SHARED_LIBS=ON \
@@ -81,7 +87,7 @@ RUN test "$(python -c 'import platform; print(platform.python_version())')" = 3.
     && echo '3b2f81fe21d181c499c59a256c8e1968455d6689d269aa85373bfb6af41da3bf  /licenses/CPython-LICENSE' | sha256sum -c -
 
 # development / test / production share the same image; only the CMD changes.
-FROM python:3.12-slim-trixie AS base
+FROM ${PYTHON_IMAGE} AS base
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

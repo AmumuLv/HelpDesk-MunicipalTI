@@ -2,6 +2,8 @@
 
 **¿Vas a otra PC?** Sigue la [guía sencilla en 6 pasos para Windows](docs/NUEVA_PC.md), también si descargaste el programa como ZIP.
 
+**Manuales y preparación de la entrega:** consulta el [expediente de puesta en marcha](docs/ENTREGA_Y_PUESTA_EN_MARCHA.md), con guías por rol, relevo de trabajadores desde Excel, IA, arquitectura, base de datos y control de cambios.
+
 **Instalar, actualizar o trasladar a otro equipo:** consulta la [guía de instalación y traslado](docs/INSTALAR_Y_TRASLADAR.md).
 
 Archivos y espacio utilizado: [guía de almacenamiento](docs/ALMACENAMIENTO.md).
@@ -84,14 +86,10 @@ docker compose up -d clamav  # incluido en el arranque normal
 
 ### Desarrollo
 
-```bash
-# Backend con recarga automática
-docker compose build api && docker compose up -d --force-recreate api
-docker compose exec api uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-
-# Interfaz con recarga automática (proxy a la API del host)
-cd frontend && npm install && npm run dev   # http://localhost:5173
-```
+Prepara una instalación ficticia separada y apunta el frontend a ella. Las
+instrucciones de entorno, reinicio, dependencias y pruebas están en el
+[manual del desarrollador](docs/manuales/DESARROLLADOR.md). No ejecutes una segunda
+API en el mismo puerto ni uses registros municipales para desarrollar.
 
 ---
 

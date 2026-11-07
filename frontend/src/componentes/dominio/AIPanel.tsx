@@ -27,6 +27,8 @@ type Sugerencia = {
   clave: string
   etiqueta: string
   valor: string
+  valorAplicar?: string
+  editable?: boolean
   confianza?: number
   explicacion?: string
   /** `false` cuando no hay nada que decidir (el riesgo de SLA es un dato). */
@@ -181,12 +183,12 @@ export function AIPanel({
                         icono={<Check size={14} aria-hidden="true" />}
                         // El valor viaja siempre: sin él el backend no sabe qué
                         // aplicar y «Aplicar» solo registraba la decisión.
-                        onClick={() => void decidir(sugerencia.clave, 'aplicar', sugerencia.valor)}
+                        onClick={() => void decidir(sugerencia.clave, 'aplicar', sugerencia.valorAplicar ?? sugerencia.valor)}
                         cargando={ocupado === sugerencia.clave}
                       >
                         Aplicar
                       </Boton>
-                      <Boton
+                      {sugerencia.editable === false ? null : <Boton
                         icono={<Pencil size={14} aria-hidden="true" />}
                         onClick={() => {
                           setEditando(sugerencia.clave)
@@ -194,7 +196,7 @@ export function AIPanel({
                         }}
                       >
                         Editar
-                      </Boton>
+                      </Boton>}
                       <Boton
                         icono={<ThumbsDown size={14} aria-hidden="true" />}
                         onClick={() => void decidir(sugerencia.clave, 'descartar')}
@@ -345,6 +347,9 @@ function aSugerencias(datos: SugerenciasTicket): Sugerencia[] {
       clave: 'tecnico_sugerido_id',
       etiqueta: 'Técnico sugerido',
       valor: datos.tecnico_sugerido_nombre,
+      valorAplicar: datos.tecnico_sugerido_id ?? undefined,
+      editable: false,
+      accionable: Boolean(datos.tecnico_sugerido_id) && datos.tecnico_sugerido_aplicable !== false,
       confianza: datos.confianza,
       explicacion: datos.explicacion_asignacion ?? 'Según carga actual y especialidad.',
     })

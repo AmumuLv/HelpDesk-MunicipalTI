@@ -29,8 +29,13 @@ oficina. Sin responsable, el equipo es compartido de la oficina. Zonas y oficina
 muestra personas, equipos e historial. Base de conocimiento contiene guias publicas
 y procedimientos Solo equipo TI. Configuracion administra SLA y horarios, roles
 y parametros. Analisis muestra estadisticas, proyecciones y datos insuficientes
-cuando no alcanza la muestra. Los permisos pueden ocultar funciones. Solo el
-administrador restablece contrasenas. Este chat no modifica nada ni ejecuta comandos.
+cuando no alcanza la muestra. Los permisos pueden ocultar funciones. Un tecnico
+autorizado puede restablecer contrasenas de usuarios; los administradores gestionan
+las cuentas permitidas por la jerarquia. Solo el principal crea administradores y
+los demas no intervienen su cuenta. Este chat no modifica registros operativos ni ejecuta comandos.
+Un relevo de trabajador crea otra identidad y reasigna los mismos equipos; no se
+renombra la cuenta anterior ni se transfieren sus tickets. La importacion reconoce
+equipos por identificadores y exige revisar coincidencias ambiguas antes de aplicar.
 No existe aun un registro de visitas a sala de servidores."""
 
 GUIA += """

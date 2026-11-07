@@ -6,6 +6,8 @@
 Dockerfile text eol=lf
 # Unified patch context includes leading spaces before source tabs and blank lines.
 deploy/security/*.patch text eol=lf whitespace=-blank-at-eol,-space-before-tab
+backend/security/patches/*.patch text eol=lf whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab
+backend/security/patches/*.txt text eol=lf
 *.png binary
 *.jpg binary
 *.jpeg binary

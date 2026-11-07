@@ -45,31 +45,21 @@ Los informes descargados al navegador también ocupan espacio en la carpeta
 Descargas del equipo del usuario. Esa copia está fuera del almacenamiento del
 servidor y no se elimina al borrar un registro en la web.
 
-## Estado tras la limpieza solicitada
+## Instalación nueva y conservación de datos
 
-La instalación local se vació conservando las cuatro cuentas de administrador
-y sus contraseñas. Se retiraron sus fotos, ubicación y sesiones anteriores.
-Se restablecieron los catálogos y la configuración inicial necesarios para
-funcionar, junto con los perfiles TI básicos de esas cuentas.
+Una instalación con volúmenes vacíos no contiene las cuentas ni los registros de
+otra PC. El primer arranque permite crear el administrador principal y conserva
+los catálogos necesarios. Los datos ficticios de las pruebas no se cargan por
+iniciar la instalación operativa.
 
-Se eliminaron los demás usuarios, oficinas, zonas, equipos, tickets, artículos,
-conversaciones, notificaciones, importaciones, historial y archivos cargados en
-el almacenamiento del servidor, incluidos sus respaldos. No se generó un
-respaldo de los datos eliminados.
+Actualizar el código o recrear un contenedor conserva sus volúmenes. No indica
+cuántas cuentas existen ni demuestra que la base esté vacía. Esta guía describe
+rutas y funcionamiento; no es una fotografía del contenido actual del servidor.
 
-Se retiraron también los respaldos locales, las muestras originales, las capturas,
-los resultados de prueba, el clon temporal de validación y la documentación
-histórica de la versión actual del proyecto. La plantilla de inventario se
-genera vacía desde la web; no queda una copia de muestra en `docs/`.
-
-Se conserva el código de pruebas automáticas con sus entradas ficticias; no
-precarga datos en la instalación operativa. También se conservan el escudo, la
-imagen de acceso, las fuentes y los iconos que forman parte de la aplicación.
-
-La limpieza no elimina archivos de Descargas u otras carpetas ajenas al proyecto,
-ni documentos almacenados en equipos externos. Git conserva versiones anteriores
-de los archivos de código y documentación que estuvieron registrados; eliminar
-un documento de la versión actual no reescribe el historial del repositorio.
+Una limpieza de producción necesita alcance explícito y autorización. No borres
+volúmenes para resolver una incidencia de la interfaz. Los archivos descargados
+en otras computadoras y el historial de Git son independientes del almacenamiento
+operativo: borrar un documento de la versión actual no reescribe ese historial.
 
 
 ## Revision de archivos al subirlos

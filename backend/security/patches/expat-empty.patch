@@ -1,0 +1,26 @@
+From bfc28346fa3efeb8ca56c17437d24a7344e5feab Mon Sep 17 00:00:00 2001
+From: Sebastian Pipping <sebastian@pipping.org>
+Date: Mon, 26 Oct 2026 17:39:32 +0100
+Subject: [PATCH] lib: Fix initial non-final empty subparser call with a
+ handler
+
+---
+ expat/lib/xmlparse.c | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/expat/lib/xmlparse.c b/expat/lib/xmlparse.c
+index a370c7d7d..5a8da9c3b 100644
+--- a/expat/lib/xmlparse.c
++++ b/expat/lib/xmlparse.c
+@@ -3537,6 +3537,11 @@ externalEntityInitProcessor2(XML_Parser parser, const char *start,
+     }
+     parser->m_eventPtr = start;
+     return XML_ERROR_PARTIAL_CHAR;
++  case XML_TOK_NONE:
++    if (! parser->m_parsingStatus.finalBuffer) {
++      *endPtr = start;
++    }
++    return XML_ERROR_NONE;
+   }
+   parser->m_processor = externalEntityInitProcessor3;
+   return externalEntityInitProcessor3(parser, start, end, endPtr);

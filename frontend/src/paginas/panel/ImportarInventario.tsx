@@ -64,6 +64,9 @@ type Fila = {
   advertencias: string[]
   errores: string[]
   accion: string
+  responsable_anterior?: string | null
+  responsable_nombre?: string | null
+  cambia_responsable?: boolean
   [campo: string]: unknown
 }
 type Previsualizacion = {
@@ -90,6 +93,7 @@ type Resultado = {
   zonas_creadas?: number
   oficinas_creadas?: number
   conjuntos_creados?: number
+  usuarios_creados?: number
 }
 type DetalleResponsable = {
   clave: string
@@ -150,6 +154,7 @@ export function ImportarInventario() {
   /* Qué regla global eligió la persona: ninguna, crear lo que falta, o no
      vincular a nadie. Las dos reglas son contradictorias, así que una sola. */
   const [decision, setDecision] = useState<'ninguno' | 'crear' | 'nadie'>('ninguno')
+  const [crearPerfiles, setCrearPerfiles] = useState(false)
 
   /*
     El titular y la frase del resultado, en palabras.
@@ -235,6 +240,7 @@ export function ImportarInventario() {
     if (zonasCreadas) partes.push(plural(zonasCreadas, 'zona nueva', 'zonas nuevas'))
     if (oficinasCreadas) partes.push(plural(oficinasCreadas, 'oficina nueva', 'oficinas nuevas'))
     if (conjuntosCreados) partes.push(plural(conjuntosCreados, 'conjunto nuevo', 'conjuntos nuevos'))
+    if (resultado?.usuarios_creados) partes.push(plural(resultado.usuarios_creados, 'perfil nuevo', 'perfiles nuevos'))
     if (!partes.length) return ''
     return partes.length === 1 ? partes[0] : `${partes.slice(0, -1).join(', ')} y ${partes[partes.length - 1]}`
   })()
@@ -366,6 +372,7 @@ export function ImportarInventario() {
     setResponsablesRevisados(false)
     setResponsablesOmitidos(false)
     setDecision('ninguno')
+    setCrearPerfiles(false)
     setPaginaPedida(1)
     setError(null)
   }
@@ -478,6 +485,7 @@ export function ImportarInventario() {
     setSubiendo(true)
     setError(null)
     setArchivo(archivoElegido)
+    setCrearPerfiles(false)
     setLote(null)
     setVista(null)
     setResultado(null)
@@ -515,7 +523,9 @@ export function ImportarInventario() {
     setAplicando(true)
     setError(null)
     try {
-      const respuesta = await api.crear<Resultado>(`/importacion/${lote.lote_id}/confirmar`, {})
+      const respuesta = await api.crear<Resultado>(`/importacion/${lote.lote_id}/confirmar`, {
+        crear_usuarios_faltantes: crearPerfiles,
+      })
       setResultado(respuesta)
       setPaso('confirmar')
       /*
@@ -769,6 +779,12 @@ export function ImportarInventario() {
             <Cifra etiqueta="Equipos a actualizar" valor={vista.actualizaria} />
             <Cifra etiqueta="Se omitirán" valor={vista.omitiria} />
           </div>
+          {sesion.puede('usuarios.editar') ? (
+            <label className="mt-4 flex cursor-pointer items-start gap-2 rounded-lg border border-border bg-muted p-3 text-sm">
+              <input type="checkbox" checked={crearPerfiles} disabled={ocupado} onChange={(evento) => setCrearPerfiles(evento.target.checked)} className="mt-0.5 h-4 w-4 accent-primary" />
+              <span><strong>Crear los perfiles que faltan y asignarles sus equipos</strong><span className="mt-0.5 block text-xs text-muted-foreground">Sin correo ni contraseña. Se conservan las cuentas anteriores y el historial.</span></span>
+            </label>
+          ) : null}
           {/*
             Avisar de que «actualizar» es **sobrescribir**.
 
@@ -893,6 +909,11 @@ export function ImportarInventario() {
                         <span className={cn('rounded px-1.5 py-0.5 text-2xs font-semibold', TONO_ACCION[fila.accion] ?? 'bg-muted text-muted-foreground')}>
                           {ACCION[fila.accion] ?? fila.accion}
                         </span>
+                        {fila.accion === 'actualizar' && fila.cambia_responsable ? (
+                          <span className="mt-1 block max-w-56 whitespace-normal text-xs text-muted-foreground">
+                            {fila.responsable_anterior || 'Uso común'} → {fila.responsable_nombre || 'Uso común'}
+                          </span>
+                        ) : null}
                       </td>
                       {[`${fila.hoja.trim()} · ${fila.numero}`, fila.oficina_nombre, fila.grupo_crudo, fila.tipo, fila.codigo_patrimonial,
                         ...['marca', 'modelo', 'tamano_pantalla', 'nombre_equipo', 'procesador', 'memoria_ram', 'almacenamiento', 'direccion_ip', 'direccion_mac', 'propiedad', 'estado', 'responsable_nombre'].map((campo) => fila[campo])].map((valor, indice) => (
