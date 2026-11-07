@@ -2,7 +2,7 @@
 from io import BytesIO
 from types import SimpleNamespace
 from unittest import IsolatedAsyncioTestCase
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from bson import ObjectId
 from openpyxl import Workbook
@@ -98,9 +98,16 @@ class ReglasPlantilla(IsolatedAsyncioTestCase):
                     'responsable_nombre': None, 'responsable_estado': 'sin_responsable', 'propiedad': 'MUNICIPALIDAD', 'direccion_ip': ip}
         for repetida in (False, True):
             filas = [fila(2, '192.168.0.5'), fila(3, '192.168.0.5' if repetida else '192.168.0.6')]
-            activos = AsyncMock()
-            activos.find_one.return_value = None
+            activos = MagicMock()
+            activos.find_one = AsyncMock(return_value=None)
+            cursor = MagicMock()
+            cursor.limit.return_value = cursor
+            cursor.to_list = AsyncMock(return_value=[])
+            activos.find.return_value = cursor
             cambios = AsyncMock()
-            with patch.object(import_service, 'obtener_lote', new=AsyncMock(return_value={})), patch.object(import_service, '_preparar_filas', new=AsyncMock(return_value={'filas': filas, 'reglas_aplicadas': []})), patch.object(import_service, 'get_db', return_value={'activos': activos, 'importaciones': cambios}):
+            db = MagicMock(activos=activos)
+            db.oficinas.find_one = AsyncMock(return_value=None)
+            db.__getitem__.side_effect = {'activos': activos, 'importaciones': cambios}.__getitem__
+            with patch.object(import_service, 'obtener_lote', new=AsyncMock(return_value={})), patch.object(import_service, '_preparar_filas', new=AsyncMock(return_value={'filas': filas, 'reglas_aplicadas': []})), patch.object(import_service, 'get_db', return_value=db):
                 previa = await import_service.previsualizar('lote', usuario={})
             self.assertEqual(previa['con_error'], 2 if repetida else 0)
