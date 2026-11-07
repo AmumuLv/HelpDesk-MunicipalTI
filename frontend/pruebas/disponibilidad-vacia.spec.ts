@@ -1,6 +1,12 @@
 import { expect, test } from '@playwright/test'
 import { entrar, vigilarConsola } from './utilidades'
 
+// La sincronización puede iniciar otra lectura justo al terminar la aserción.
+// Esperar sus interceptores antes de cerrar la página evita contaminar otro caso.
+test.afterEach(async ({ page }) => {
+  await page.unrouteAll({ behavior: 'wait' })
+})
+
 test('la disponibilidad vacía no rompe el resumen ni el equipo TI', async ({ page }) => {
   expect(process.env.PRUEBA_API_URL).toBe('http://127.0.0.1:18100')
   const errores = vigilarConsola(page)

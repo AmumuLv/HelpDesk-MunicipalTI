@@ -157,3 +157,7 @@ carga prolongada ni el servidor, dominio o HTTPS definitivos.
 Se mantienen los límites documentados de la importación parcial, de deshacer
 lotes que actualizan equipos existentes y de la trazabilidad heredada indicada
 como `DAT-002` en [Registro de cambios](REGISTRO_DE_CAMBIOS.md).
+
+Actualización posterior: `DAT-002` se corrigió y validó en CAM-2026-002.
+Esta ficha conserva la evidencia de la tanda anterior; los resultados vigentes
+están en [Revisión integral](REVISION_INTEGRAL_2026_11_07.md).

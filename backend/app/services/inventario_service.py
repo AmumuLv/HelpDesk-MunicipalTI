@@ -603,6 +603,13 @@ async def actualizar_activo(activo_id: ObjectId, datos: dict[str, Any], *, usuar
         await cambiar_responsable(
             "activo", activo_id, datos.get("responsable_id"), usuario=usuario, motivo=datos.get("motivo")
         )
+    elif "responsable_id" in cambios and cambios["responsable_id"] != antes.get("responsable_id"):
+        # Vincular a una PC también puede cambiar el dueño, aunque el formulario
+        # no envíe responsable_id. No dejar abierto el tramo del dueño anterior.
+        await _registrar_historial_responsable(
+            "activo", activo_id, cambios["responsable_id"], cambios.get("responsable_nombre"),
+            None, datos.get("motivo") or "Responsable heredado del conjunto", usuario,
+        )
     despues = await db["activos"].find_one({"_id": activo_id})
     await registrar(
         "activo.editar",
@@ -1389,11 +1396,23 @@ async def cambiar_responsable(
         },
     )
     if tipo == "conjunto" and responsable_id:
-        # Los activos sin responsable propio siguen al conjunto
-        await db["activos"].update_many(
-            {"conjunto_id": entidad_id, "responsable_id": None},
-            {"$set": {"responsable_id": responsable_id, "responsable_nombre": nombre}},
-        )
+        # Los activos sin responsable propio siguen al conjunto. Registrar cada
+        # asignación y no pisar al que haya sido asignado mientras se leía la PC.
+        componentes = await db["activos"].find(
+            {"conjunto_id": entidad_id, "responsable_id": None}, {"_id": 1},
+        ).to_list(None)
+        for componente in componentes:
+            resultado = await db["activos"].update_one(
+                {"_id": componente["_id"], "conjunto_id": entidad_id, "responsable_id": None},
+                {"$set": {"responsable_id": responsable_id, "responsable_nombre": nombre,
+                          "uso_comun": False, "actualizado_en": utcnow(),
+                          "actualizado_por": usuario.get("nombre", "")}},
+            )
+            if resultado.matched_count:
+                await _registrar_historial_responsable(
+                    "activo", componente["_id"], responsable_id, nombre, None,
+                    motivo or "Responsable heredado del conjunto", usuario,
+                )
     await _registrar_historial_responsable(tipo, entidad_id, responsable_id, nombre, None, motivo, usuario)
     await registrar(
         "activo.responsable",
@@ -1582,7 +1601,10 @@ async def buscar_duplicados(
 
 async def cambio_masivo(datos: dict[str, Any], *, usuario: dict[str, Any]) -> dict[str, Any]:
     db = get_db()
-    ids = datos.get("activo_ids") or []
+    ids = list(dict.fromkeys(datos.get("activo_ids") or []))
+    existentes = await db["activos"].find({"_id": {"$in": ids}}, {"_id": 1}).to_list(None)
+    if len(existentes) != len(ids):
+        raise NoEncontrado("Uno o más equipos ya no existen. Actualiza la lista antes de guardar.")
     cambios: dict[str, Any] = {}
     if datos.get("estado"):
         cambios["estado"] = normalizar_texto(datos["estado"])
@@ -1609,8 +1631,8 @@ async def cambio_masivo(datos: dict[str, Any], *, usuario: dict[str, Any]) -> di
     if cambios:
         cambios["actualizado_en"] = utcnow()
         cambios["actualizado_por"] = usuario.get("nombre", "")
-        resultado = await db["activos"].update_many({"_id": {"$in": ids}}, {"$set": cambios})
-        actualizados += resultado.modified_count
+        await db["activos"].update_many({"_id": {"$in": ids}}, {"$set": cambios})
+        actualizados = len(ids)
     if oficina is not None:
         await db["activos"].update_many(
             {"_id": {"$in": ids}},
@@ -1624,7 +1646,7 @@ async def cambio_masivo(datos: dict[str, Any], *, usuario: dict[str, Any]) -> di
                 }
             },
         )
-        actualizados += len(ids)
+        actualizados = len(ids)
     if "responsable_id" in datos:
         await db["activos"].update_many(
             {"_id": {"$in": ids}},
@@ -1634,7 +1656,7 @@ async def cambio_masivo(datos: dict[str, Any], *, usuario: dict[str, Any]) -> di
             await _registrar_historial_responsable(
                 "activo", activo_id, nuevo_responsable, nombre, None, datos.get("motivo"), usuario
             )
-        actualizados += len(ids)
+        actualizados = len(ids)
     await recalcular_faltantes({'_id': {'$in': ids}})
     await registrar(
         "activo.masivo",

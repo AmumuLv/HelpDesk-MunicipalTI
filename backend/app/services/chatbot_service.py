@@ -86,6 +86,14 @@ def texto_presentable(texto):
     return '```'.join(bloques)
 
 
+def _error_herramienta_groq(respuesta):
+    try:
+        error = respuesta.json().get('error')
+        return isinstance(error, dict) and error.get('code') == 'tool_use_failed'
+    except (ValueError, TypeError, AttributeError):
+        return False
+
+
 async def responder_groq(instruccion, pregunta, historial, fuentes, *, usuario=None, filtros_pagina=None):
     from app.services import consultas_chatbot
     modelo = settings.groq_model
@@ -159,6 +167,8 @@ async def responder_groq(instruccion, pregunta, historial, fuentes, *, usuario=N
                 texto = 'Se alcanzó un límite de solicitudes o tokens de Groq. Espera a que se renueve la cuota y revisa los límites en Groq Console.'
             elif codigo == 402:
                 texto = 'Groq rechazó la consulta por el estado de la cuenta. Revisa el plan gratuito en Groq Console; el sistema no activa pagos ni cambia de proveedor automáticamente.'
+            elif codigo == 400 and _error_herramienta_groq(respuesta):
+                texto = 'No se pudo preparar la consulta de datos. Reformula la pregunta para volver a intentarlo.'
             elif codigo in (400, 401, 403, 404, 413):
                 texto = f'Groq rechazó la consulta ({codigo}). Revisa la clave, el modelo y el tamaño de la conversación en la configuración del servidor.'
             else:

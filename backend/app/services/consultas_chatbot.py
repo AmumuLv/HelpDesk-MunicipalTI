@@ -15,6 +15,8 @@ from app.domain.permissions import tiene_permiso
 from app.services import analitica_service, ticket_service
 from app.services.conocimiento_proyecto import ALCANCE_DIRECTORIO
 
+ESTADOS_TICKET = {'nuevo', 'en_progreso', 'en_espera', 'cerrado', 'resuelto'}
+
 
 def ajustar_intencion(argumentos, pregunta):
     """No aceptar un ranking deducido de una página de tickets ni un estado inventado."""
@@ -116,7 +118,7 @@ ESQUEMA = {
             'usar_filtros_pagina': {'type': 'boolean', 'description': 'False para una consulta general, de otra sección o si piden ignorar los filtros actuales. True para consultar el contexto visible.'},
             'desde': {'type': 'string', 'description': 'Fecha inicial ISO AAAA-MM-DD. Interpreta fechas en español; hoy usa la fecha local del contexto.'},
             'hasta': {'type': 'string', 'description': 'Fecha final ISO AAAA-MM-DD inclusiva. No inviertas día y mes.'},
-            'estado': {'type': 'string', 'enum': ['nuevo', 'en_progreso', 'en_espera', 'cerrado', 'resuelto']},
+            'estado': {'type': 'string', 'maxLength': 30, 'description': 'Solo tickets: nuevo, en_progreso, en_espera, cerrado o resuelto. Para equipos, estado de funcionamiento (por ejemplo Operativo, Inoperativo o En reparación); activo indica la vigencia que ya se consulta por defecto. Omitir para otros recursos. No confundir vigencia del equipo con estado de ticket.'},
             **{campo: {'type': 'string', 'description': 'Identificador real obtenido de la ruta de pantalla o de otra consulta; nunca inventarlo. registro_id busca el registro exacto.'} for campo in ('oficina_id', 'zona_id', 'equipo_id', 'conjunto_id', 'tecnico_id', 'registro_id')},
         }, 'required': ['recurso'], 'additionalProperties': False},
     },
@@ -175,6 +177,12 @@ async def consultar(argumentos, usuario, filtros_pagina=None):
         if not tiene_permiso(usuario, permiso):
             raise Prohibido('Tu cuenta no puede consultar este recurso.')
         consulta = {'activo': {'$ne': False}}
+        if datos.estado:
+            if datos.recurso != 'equipos':
+                raise Validacion('Este recurso no admite el filtro de estado solicitado.')
+            estado_equipo = datos.estado.strip()
+            if estado_equipo.casefold() not in {'activo', 'activos'}:
+                consulta['estado'] = {'$regex': '^' + re.escape(estado_equipo) + '$', '$options': 'i'}
         if datos.recurso == 'reportes' and usuario.get('rol') != 'administrador':
             consulta['usuario_id'] = usuario['_id']
         if datos.recurso == 'ausencias':
@@ -197,6 +205,8 @@ async def consultar(argumentos, usuario, filtros_pagina=None):
         raise Validacion('Consulta no disponible.')
     if not tiene_permiso(usuario, 'tickets.ver_propios'):
         raise Prohibido('Tu cuenta no puede consultar tickets.')
+    if datos.estado and datos.estado not in ESTADOS_TICKET:
+        raise Validacion('El estado solicitado no es un estado de tickets válido.')
     # El modelo interpreta la fecha pedida; si no pide otra, hereda el periodo visible.
     pagina = filtros_pagina or {}
     periodo = {'periodo': pagina.get('periodo', '30d')}
@@ -212,7 +222,7 @@ async def consultar(argumentos, usuario, filtros_pagina=None):
         filtros['estado'] = [datos.estado]
     elif pagina.get('estado'):
         estados = pagina['estado'].split(',')
-        if any(e not in {'nuevo', 'en_progreso', 'en_espera', 'cerrado', 'resuelto'} for e in estados):
+        if any(e not in ESTADOS_TICKET for e in estados):
             raise Validacion('El filtro visible de estados no es válido.')
         filtros['estado'] = estados
     if datos.consulta:

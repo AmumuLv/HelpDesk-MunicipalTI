@@ -4,6 +4,7 @@ import json
 import re
 import sys
 import time
+import httpx
 
 from app.core.config import settings
 from app.core.db import get_db, close_connections
@@ -14,6 +15,22 @@ from app.services import chatbot_service, consultas_chatbot
 async def main():
     assert settings.app_env == 'test' and settings.mongo_db == 'helpdesk_test_navegador'
     acceso = json.load(sys.stdin)
+    if acceso.get('diagnostico'):
+        post_original = httpx.AsyncClient.post
+
+        async def post_diagnostico(cliente, *args, **kwargs):
+            respuesta = await post_original(cliente, *args, **kwargs)
+            if respuesta.status_code >= 400 and respuesta.request.url.host == 'api.groq.com':
+                try:
+                    error = respuesta.json().get('error') or {}
+                    seguro = {campo: str(error[campo]).replace(acceso['clave'], '[redactada]')[:2000]
+                              for campo in ('code', 'type', 'message', 'failed_generation') if campo in error}
+                    print(json.dumps({'diagnostico_proveedor': seguro}, ensure_ascii=False), flush=True)
+                except (ValueError, TypeError, AttributeError):
+                    print(json.dumps({'diagnostico_proveedor': {'estado': respuesta.status_code}}), flush=True)
+            return respuesta
+
+        httpx.AsyncClient.post = post_diagnostico
     settings.chatbot_provider = acceso['proveedor']
     if acceso['proveedor'] == 'groq':
         settings.groq_api_key = acceso['clave']

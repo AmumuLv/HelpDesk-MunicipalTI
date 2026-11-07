@@ -281,6 +281,7 @@ class ActivoActualizar(Base):
     propiedad: str | None = None
     estado: str | None = None
     observaciones: str | None = None
+    motivo: str | None = Field(default=None, max_length=500)
     opciones_avanzadas: bool | None = None
     detalle_avanzado: DetalleAvanzado | None = None
 

@@ -72,6 +72,21 @@ fecha anterior no equivale a un análisis nuevo.
 
 ## Evidencia de esta entrega
 
+La ronda posterior se documenta en la
+[revisión integral del 07/11](REVISION_INTEGRAL_2026_11_07.md). Sustituye las
+cifras anteriores de validación: 456 casos distintos del backend consolidados,
+159 casos de navegador más tres de instalación inicial, 21 pruebas de
+herramientas y cuatro consultas satisfactorias al proveedor real sobre una
+base ficticia. La prueba de carga y restauración también concluyó; sus tiempos
+y límites están en ese informe. La auditoría completa y de producción de npm
+quedó en cero avisos tras corregir la dependencia afectada.
+
+Scout actualizado ya produjo un análisis verificable de API con ocho avisos
+altos y ningún crítico en el filtro aplicado. La revisión de las otras imágenes
+y la evaluación de los parches siguen abiertas; no se declara la entrega libre
+de vulnerabilidades. Los párrafos siguientes conservan el alcance histórico
+de la primera ronda, no el estado final de la revisión ampliada.
+
 Entre el 06 y el 07/11/2026 se verificaron **120 casos distintos del servidor**,
 consolidados entre tandas, y **cinco recorridos de Chromium**. Las repeticiones
 no se suman como casos nuevos. Se utilizaron bases, cuentas y equipos ficticios

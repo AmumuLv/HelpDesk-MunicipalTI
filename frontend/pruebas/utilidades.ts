@@ -112,7 +112,10 @@ export function vigilarConsola(pagina: Page): string[] {
 export async function entrar(pagina: Page, rol: ClaveRol): Promise<void> {
   const { correo, password } = ROLES[rol]
   pagina.setDefaultNavigationTimeout(60_000)
-  await pagina.goto('/acceder', { waitUntil: 'domcontentloaded' })
+  // Vite puede seguir compilando el árbol inicial aunque ya responda HTTP 200.
+  // Dar el mismo margen de preparación de 180 s solo a este primer acceso;
+  // las navegaciones siguientes conservan 60 s y los controles sus aserciones.
+  await pagina.goto('/acceder', { waitUntil: 'domcontentloaded', timeout: 180_000 })
   await pagina.getByLabel('Correo institucional').fill(correo)
   await pagina.getByLabel('Contraseña', { exact: true }).fill(password)
   await pagina.getByRole('button', { name: 'Entrar' }).click()

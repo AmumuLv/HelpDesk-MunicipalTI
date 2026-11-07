@@ -13,6 +13,50 @@ from app.services import chatbot_service as chat
 
 
 class ConsultasChatbotTest(unittest.IsolatedAsyncioTestCase):
+    async def test_fallo_de_filtro_no_pide_cambiar_clave_ni_muestra_detalles_privados(self):
+        cliente = MagicMock()
+        cliente.post = AsyncMock(return_value=httpx.Response(400, json={'error': {
+            'code': 'tool_use_failed', 'message': 'detalle privado', 'failed_generation': 'contenido privado',
+        }}))
+        contexto = MagicMock()
+        contexto.__aenter__ = AsyncMock(return_value=cliente)
+        contexto.__aexit__ = AsyncMock(return_value=False)
+        with patch.object(chat.httpx, 'AsyncClient', return_value=contexto):
+            respuesta = await chat.responder_groq('Solo lectura', 'Cuántos equipos hay', [], [], usuario={'rol': 'administrador'})
+        self.assertFalse(respuesta['disponible'])
+        self.assertIn('consulta de datos', respuesta['texto'])
+        for texto in ('clave', 'detalle privado', 'contenido privado'):
+            self.assertNotIn(texto, respuesta['texto'])
+
+    def test_esquema_admite_vigencia_de_equipos_sin_confundirla_con_tickets(self):
+        estado = consultas.ESQUEMA['function']['parameters']['properties']['estado']
+        self.assertEqual(estado['type'], 'string')
+        self.assertIn('activo', estado.get('enum', ['activo']))
+
+    async def test_estado_operativo_filtra_equipos_y_activo_usa_la_vigencia(self):
+        db, coleccion = self.base()
+        with patch.object(consultas, 'get_db', return_value=db):
+            await consultas.consultar({'recurso': 'equipos', 'estado': 'Operativo'}, {'rol': 'administrador'})
+            self.assertEqual(coleccion.find.call_args.args[0]['estado'], {'$regex': '^Operativo$', '$options': 'i'})
+            await consultas.consultar({'recurso': 'equipos', 'estado': 'activo'}, {'rol': 'administrador'})
+            filtro = coleccion.find.call_args.args[0]
+            self.assertEqual(filtro['activo'], {'$ne': False})
+            self.assertNotIn('estado', filtro)
+
+    async def test_ticket_rechaza_estado_de_vigencia_y_no_lee_datos(self):
+        db, coleccion = self.base()
+        with patch.object(consultas, 'get_db', return_value=db):
+            respuesta = await consultas.ejecutar_seguro({'recurso': 'tickets', 'estado': 'activo'}, {'rol': 'administrador'})
+        self.assertIn('error', respuesta)
+        coleccion.find.assert_not_called()
+
+    async def test_recurso_sin_estado_no_ignora_un_filtro_solicitado(self):
+        db, coleccion = self.base()
+        with patch.object(consultas, 'get_db', return_value=db):
+            respuesta = await consultas.ejecutar_seguro({'recurso': 'usuarios', 'estado': 'cerrado'}, {'rol': 'administrador'})
+        self.assertIn('error', respuesta)
+        coleccion.find.assert_not_called()
+
     def test_total_equipos_usa_el_total_no_la_muestra_y_admite_cero(self):
         for total in (0, 1, 280):
             with self.subTest(total=total):
