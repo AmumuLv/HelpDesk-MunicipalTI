@@ -19,7 +19,8 @@ RUN apk add --no-cache build-base curl patch xz zlib-dev xz-dev \
 
 FROM clamav/clamav:1.4
 # Aplica actualizaciones del sistema y retira el cliente HTTP no utilizado.
-RUN apk upgrade --no-cache && apk add --no-cache xz-libs && apk del curl \
+# No admitir de nuevo la versión señalada por CVE-2026-4738.
+RUN apk upgrade --no-cache && apk add --no-cache xz-libs 'zlib>=1.4-r0' && apk del curl \
     && apk info -v | grep -qx 'libxml2-2.13.9-r2'
 COPY --from=xml-security /patched/usr/lib/libxml2.so* /usr/lib/
 RUN mkdir -p /usr/local/share/helpdesk \

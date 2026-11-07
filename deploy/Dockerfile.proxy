@@ -16,14 +16,15 @@ WORKDIR /src
 RUN go mod download github.com/caddyserver/caddy/v2@v2.11.7 \
     && cp -a /go/pkg/mod/github.com/caddyserver/caddy/v2@v2.11.7/. /src/ \
     && chmod -R u+w /src \
-    && go mod edit -require=golang.org/x/net@v0.60.0 \
+    && go mod edit -require=golang.org/x/net@v0.62.0 \
+    && go mod edit -require=github.com/klauspost/compress@v1.20.2 \
     && go mod edit -require=github.com/go-jose/go-jose/v4@v4.1.6 \
     && go mod edit -replace=github.com/go-jose/go-jose/v3=/patched-jose-v3 \
     && go build -mod=mod -p=2 -trimpath -ldflags="-s -w" -o /out/caddy ./cmd/caddy
 
 FROM alpine:3.24
 RUN apk upgrade --no-cache \
-    && apk add --no-cache ca-certificates tzdata \
+    && apk add --no-cache ca-certificates tzdata 'zlib>=1.4-r0' \
     && mkdir -p /etc/caddy /config/caddy /data/caddy /srv
 ENV XDG_CONFIG_HOME=/config XDG_DATA_HOME=/data
 COPY --from=compilacion /out/caddy /usr/bin/caddy

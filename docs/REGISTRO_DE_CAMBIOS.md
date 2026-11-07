@@ -13,9 +13,15 @@ como casos nuevos.
 
 ## Seguimiento técnico e institucional
 
+`CAM-2026-003` (07/11/2026): actualización de seguridad de las cuatro imágenes
+indicadas en SEG-001, validada con reconstrucción, análisis y comprobaciones de
+servicio. Aplicada localmente; el despliegue público y la aceptación institucional
+siguen pendientes. La CI de las correcciones funcionales `a00459a` aprobó en
+[GitHub Actions](https://github.com/AmumuLv/HelpDesk-MunicipalTI/actions/runs/42397004250).
+
 | Referencia | Qué revisar | Situación |
 | --- | --- | --- |
-| `SEG-001` | Imágenes actuales, incluidos paquetes nativos y mitigaciones compiladas | Scout 1.29.0 verificó ocho avisos altos en API y los mismos ocho en worker, sin críticos en el filtro aplicado. Son avisos repetidos entre imágenes, no dieciséis CVE distintos. Otras imágenes y evaluación completa de mitigaciones pendientes; ver revisión integral. |
+| `SEG-001` | Imágenes actuales, incluidos paquetes nativos y mitigaciones compiladas | Actualizadas y aplicadas web, ClamAV, MongoDB y proxy. Consolidado posterior de siete imágenes: 20 avisos altos por imagen, nueve CVE distintos y cero críticos, incluyendo backports y discrepancias de rama. MongoDB: cero altos/críticos. GCC conserva seguimiento y comprobaciones específicas; no se declara ausencia de vulnerabilidades. Ver revisión integral. |
 | `OPE-001` | Servidor, dominio, TLS, exposición y recuperación | Requiere el entorno definitivo y la aceptación de TI. |
 | `DAT-001` | Retención de auditoría y chats, tratamiento por proveedores externos | Definición institucional pendiente; los plazos actuales no se presentan como aprobación legal. |
 | `DAT-002` | Herencia general de responsable desde una PC a componentes que no tenían dueño | Corregida y validada en CAM-2026-002: se registra cada componente heredado y el cambio implícito al vincular otra PC. Se respetan responsables particulares y no se reconstruyen periodos antiguos sin evidencia. |

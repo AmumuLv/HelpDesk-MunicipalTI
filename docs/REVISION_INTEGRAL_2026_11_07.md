@@ -8,8 +8,12 @@ Validación funcional local completada. Las correcciones se aplicaron a los
 contenedores locales de API y worker; la interfaz compiló con las dependencias
 corregidas. La revisión no acredita el servidor definitivo ni la ausencia de
 cualquier vulnerabilidad o fallo futuro. Scout 1.29.0 ya analizó la API:
-ocho avisos altos y ningún crítico dentro del filtro aplicado. Las demás
-imágenes siguen en revisión; no se presenta una cifra global cerrada.
+ocho avisos altos y ningún crítico dentro del filtro aplicado. El primer barrido
+de siete imágenes detectó también avisos críticos de zlib en otros servicios.
+Tras actualizar y volver a analizar, el consolidado vigente queda en **20 avisos
+altos por imagen, nueve CVE distintos y cero críticos**, incluyendo backports y
+discrepancias documentadas. Esto no declara el sistema libre de vulnerabilidades
+ni acredita su despliegue público.
 
 ## Correcciones preparadas y reproducidas con pruebas
 
@@ -120,7 +124,7 @@ Docker Scout 1.29.0 analizó la imagen de API
 `sha256:fe7642e612e6f8e9f17c1b2dda7cf8e38e87bada38958d913f24e7e8a3c3dc9c`:
 **ocho avisos altos y ningún crítico**, con filtro `critical,high`.
 La copia temporal oficial se verificó por SHA-256 antes de usarla, sin
-reemplazar el plugin de Docker Desktop. Las otras imágenes siguen en revisión.
+reemplazar el plugin de Docker Desktop. El barrido completo inicial figura abajo.
 Un timeout se registra como `sin_verificar`, nunca como cero vulnerabilidades.
 
 Avisos originales: CVE-2026-102010, CVE-2026-95619, CVE-2026-86140,
@@ -131,8 +135,9 @@ no equivalen automáticamente a ocho fallos explotables.
 El cambio oficial de zlib `df84af25dc1942490e1d1c899a07619152a46148`, ya
 incluido en la compilación nativa, cubre CVE-2026-76844 y CVE-2026-85091 según
 el [registro de Debian](https://security-tracker.debian.org/tracker/CVE-2026-76844).
-El aviso de asignación alineada de `libstdc++` sigue pendiente de mitigación
-confirmada; la ausencia del compilador no basta para descartarlo.
+El aviso de asignación alineada de `libstdc++` se contrastó después con el
+parche oficial y una comprobación del binario, descrita abajo; la ausencia del
+compilador por sí sola no basta para descartarlo.
 [Referencia oficial](https://security-tracker.debian.org/tracker/CVE-2026-95619).
 No se suprimen avisos para presentar un resultado artificialmente limpio.
 
@@ -145,6 +150,84 @@ presentó CVE-2026-86140 (alto, libxml2 con backport), CVE-2026-107891
 Se inició una reconstrucción sin caché para obtener las actualizaciones;
 no se considera corregido hasta verificar la nueva imagen. Por tanto, la
 ausencia de críticos en API no se extiende a toda la instalación.
+
+La comparación de musl requiere distinguir ramas: el
+[registro oficial de Alpine](https://security.alpinelinux.org/vuln/CVE-2026-107891)
+declara corregida `1.2.6-r3` en **3.24-main**, mientras que `1.2.6-r6`
+corresponde a **edge-main**. La imagen analizada declara Alpine 3.24 y
+musl 1.2.6-r3; ese aviso del analizador tiene una discrepancia de rama,
+documentada sin eliminarlo del resultado original ni instalar paquetes edge.
+
+### Barrido inicial completo, antes de actualizar las imágenes
+
+| Imagen | Altos | Críticos | Observación |
+| --- | ---: | ---: | --- |
+| API | 8 | 0 | Requiere contrastar backports y libstdc++. |
+| Worker | 8 | 0 | Mismos ocho CVE que API. |
+| ClamAV | 2 | 1 | libxml2 con backport, discrepancia musl y zlib actualizable. |
+| MongoDB | 3 | 0 | apt, x/net y klauspost/compress. |
+| Web | 1 | 1 | Discrepancia musl y zlib actualizable. |
+| Proxy | 3 | 1 | Discrepancia musl, x/net, compress y zlib. |
+| Redis | 0 | 0 | Sin avisos altos/críticos en este barrido. |
+
+Son 28 detecciones por imagen y **13 identificadores CVE distintos**,
+incluyendo repetidos entre servicios y avisos cubiertos o discrepantes. Es
+el resultado bruto inicial, no el recuento de fallos explotables ni el resultado
+posterior a las actualizaciones.
+
+MongoDB señaló CVE-2026-109518 (`apt` 2.8.3, corrección indicada
+2.8.4ubuntu0.1), CVE-2026-78661 (`x/net` 0.60.0, corrección 0.62.0)
+y CVE-2026-116591 (`klauspost/compress`, corrección 1.20.2). El proxy
+repite los dos avisos de Go. Se prepararon las versiones mínimas corregidas
+y se iniciaron reconstrucciones; este texto no las declara validadas todavía.
+
+### Resultado posterior a las actualizaciones
+
+Las cuatro reconstrucciones aprobaron. Se exigió zlib >= 1.4-r0 en web,
+ClamAV y proxy; se actualizaron `x/net` a 0.62.0 y `compress` a 1.20.2 en
+MongoDB y proxy, y apt a 2.8.4ubuntu0.1 en MongoDB. Se conservaron MongoDB
+8.0.34, sus volúmenes, los backports, comprobaciones de hashes y pruebas nativas.
+
+| Imagen final analizada | Altos | Críticos | Identificador SHA-256 |
+| --- | ---: | ---: | --- |
+| API, sin cambio de imagen | 8 | 0 | fe7642e612e6f8e9f17c1b2dda7cf8e38e87bada38958d913f24e7e8a3c3dc9c |
+| Worker, sin cambio de imagen | 8 | 0 | d9fb04b1c7f736a90714b9d2ada2f21f14bcd118650c9d0cfe387c38b357bf32 |
+| ClamAV | 2 | 0 | 3a247826f8bade7f263a9eb9147897e63712fdf8e62b1b6d99d9b79a0407668f |
+| MongoDB | 0 | 0 | 26badfde8d71bcaa718924c26935c1197f45883a200c96de489fecb7f0a167ea |
+| Web | 1 | 0 | 4c2e69ee745363698278627480305f4aad10ae12452ba6343b985fdad1fdc3ce |
+| Proxy | 1 | 0 | 7635611c4faa742b39178cbf092c0855af7ca532e5c4443e5890392e9105f288 |
+| Redis, sin cambio de imagen | 0 | 0 | 57e4255cc971b1c8d6f8a6ca283ac01bc3ecdd914273ef6bfaede87aaecd6541 |
+
+Los avisos restantes de web y proxy son la discrepancia de musl. ClamAV
+conserva esa discrepancia y el aviso de libxml2 con backport. API y worker
+conservan los avisos iniciales por versiones de paquetes de distribución;
+los binarios parcheados se validaron con sus hashes y pruebas de ejecución.
+No se alteraron metadatos de paquetes ni se ocultaron CVE al analizador.
+
+Para CVE-2026-95619, el [parche oficial de GCC](https://github.com/gcc-mirror/gcc/commit/200183d4ab5d57575f3dfebc6af3baf649910b9e)
+explica que la implementación basada en `posix_memalign` evita el redondeo
+afectado. `tools/verificar_libstdcxx.py` ejecutó los nueve pares tamaño/alineación
+del caso oficial mediante la variante `nothrow`, en contenedores nuevos sin red
+ni acceso a datos operativos: **9/9 en API y 9/9 en worker**, todos devolvieron
+puntero nulo. No equivale a probar todas las rutas C++ ni elimina el aviso bruto.
+El otro aviso de GCC, CVE-2026-102010, sigue sujeto a evaluación de aplicabilidad
+y seguimiento del paquete; no se presenta como corregido únicamente porque
+no estén instaladas las cabeceras C++.
+
+Validación de las imágenes nuevas: Nginx y Caddy aprobaron su configuración;
+MongoDB exportó y restauró un registro ficticio usando conexión zstd en un
+contenedor aislado identificado por su SHA; ClamAV aceptó un contenido limpio
+y detectó EICAR por streaming. La compilación XML aprobó sus pruebas nativas,
+incluidos 3.806 casos de regresión, 49 de recursión, 324.154 comprobaciones de
+API y 2.166 entradas de fuzz. La suite externa W3C no estaba incluida y ejecutó
+cero casos: no se suma a los aprobados.
+
+Las imágenes se aplicaron localmente. ClamAV excedió el primer límite de espera
+de dos minutos mientras cargaba las firmas; después quedó saludable y aprobó
+la prueba de detección. MongoDB quedó saludable, la API confirmó MongoDB y Redis
+disponibles y el proxy respondió HTTP 200 en salud e inicio. Se retiraron los
+contenedores y volúmenes del proyecto ficticio `helpdesk-verificacion`, sin
+retirar volúmenes de la instalación operativa.
 
 El servidor, dominio, HTTPS público, capacidad definitiva, política institucional
 de retención y aceptación de usuarios reales requieren el entorno y las

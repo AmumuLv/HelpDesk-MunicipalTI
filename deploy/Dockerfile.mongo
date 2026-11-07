@@ -7,7 +7,8 @@ ENV CGO_ENABLED=0 GOTOOLCHAIN=local GOMAXPROCS=2
 WORKDIR /src
 RUN git clone --depth 1 --branch 100.19.1 https://github.com/mongodb/mongo-tools.git tools
 WORKDIR /src/tools
-RUN go mod edit -require=golang.org/x/net@v0.60.0 \
+RUN go mod edit -require=golang.org/x/net@v0.62.0 \
+    && go mod edit -require=github.com/klauspost/compress@v1.20.2 \
     && for herramienta in bsondump mongodump mongoexport mongofiles mongoimport mongorestore mongostat mongotop; do \
          go build -mod=mod -p=2 -trimpath -ldflags="-s -w -X main.VersionStr=100.19.1 -X main.GitCommit=9348e032419d906e40966f477278cce647b9b1eb" \
            -o /out/$herramienta ./$herramienta/main; \
@@ -24,7 +25,8 @@ RUN mkdir -p /out/js-yaml && wget -q https://registry.npmjs.org/js-yaml/-/js-yam
 FROM ${MONGO_BASE_IMAGE} AS runtime
 # Actualiza el decodificador Brotli sin cambiar MongoDB ni sus datos.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends --only-upgrade libbrotli1 \
+    && apt-get install -y --no-install-recommends --only-upgrade libbrotli1 apt \
+    && dpkg --compare-versions "$(dpkg-query -W -f='${Version}' apt)" ge '2.8.4ubuntu0.1' \
     && dpkg --compare-versions "$(dpkg-query -W -f='${Version}' libbrotli1)" ge '1.1.0-2ubuntu0.1' \
     && rm -rf /var/lib/apt/lists/*
 # mongosh also embeds Node/Brotli; patching the OS library alone is insufficient.

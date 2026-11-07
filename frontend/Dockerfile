@@ -21,6 +21,7 @@ RUN npm run build
 # ── prod ─────────────────────────────────────────────────────
 FROM nginx:1.30.6-alpine AS prod
 RUN apk upgrade --no-cache \
+    && apk add --no-cache 'zlib>=1.4-r0' \
     && apk del curl nginx-module-xslt nginx-module-njs nginx-module-image-filter nginx-module-geoip nginx-module-acme
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf

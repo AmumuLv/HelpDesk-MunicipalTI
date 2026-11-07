@@ -81,10 +81,13 @@ base ficticia. La prueba de carga y restauración también concluyó; sus tiempo
 y límites están en ese informe. La auditoría completa y de producción de npm
 quedó en cero avisos tras corregir la dependencia afectada.
 
-Scout actualizado ya produjo un análisis verificable de API con ocho avisos
-altos y ningún crítico en el filtro aplicado. La revisión de las otras imágenes
-y la evaluación de los parches siguen abiertas; no se declara la entrega libre
-de vulnerabilidades. Los párrafos siguientes conservan el alcance histórico
+Scout actualizado completó el barrido inicial y la revisión posterior a las
+actualizaciones de web, ClamAV, MongoDB y proxy: **cero críticos y 20 avisos
+altos por imagen, nueve CVE distintos**, incluyendo repeticiones, backports y
+discrepancias documentadas. MongoDB quedó sin altos/críticos. GCC conserva
+seguimiento de aplicabilidad; no se declara la entrega libre de vulnerabilidades.
+Los identificadores de imágenes y pruebas están en la revisión integral.
+Los párrafos siguientes conservan el alcance histórico
 de la primera ronda, no el estado final de la revisión ampliada.
 
 Entre el 06 y el 07/11/2026 se verificaron **120 casos distintos del servidor**,
