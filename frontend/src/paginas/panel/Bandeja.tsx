@@ -199,10 +199,11 @@ const ETIQUETAS_FILTRO: [string, string][] = [
 function CeldaEquipo({
   ticket,
 }: {
-  ticket: { activo_nombre?: string | null; activo_tipo?: string | null; conjunto_nombre?: string | null }
+  ticket: { activo_id?: string | null; activo_nombre?: string | null; activo_tipo?: string | null; conjunto_id?: string | null; conjunto_nombre?: string | null }
 }) {
-  const nombre = (ticket.activo_nombre ?? '').trim()
-  const tipo = ticket.activo_tipo?.trim() || ''
+  const nombre = ticket.activo_nombre?.trim() || ticket.conjunto_nombre?.trim()
+    || (ticket.conjunto_id ? 'Computadora de escritorio' : ticket.activo_id ? 'Equipo vinculado' : '')
+  const tipo = ticket.activo_tipo?.trim() || (ticket.conjunto_id && !ticket.activo_id ? 'PC de escritorio' : '')
   const conjunto = ticket.conjunto_nombre?.trim() || ''
 
   // «Computadora N°01 - CPU» con tipo CPU pasa a «Computadora N°01». Solo se toca
@@ -231,7 +232,7 @@ function CeldaEquipo({
       <span className="block truncate">{limpio || nombre}</span>
       {detalle ? (
         <span className="block truncate text-2xs text-muted-foreground">
-          {tipo}
+          {detalle}
           {tipo && conjuntoAporta ? ` · ${conjunto}` : ''}
         </span>
       ) : null}
@@ -498,7 +499,8 @@ export function Bandeja({
         </span> : <span className="text-sm text-muted-foreground">—</span>,
       },
       {
-        accessorKey: 'activo_nombre',
+        id: 'activo_nombre',
+        accessorFn: ticket => ticket.activo_nombre || ticket.conjunto_nombre || '',
         header: 'Equipo',
         // `celdaLibre` porque aquí solo hay texto, y el envoltorio que recorta en
         // una línea impedía que la columna encogiera a su ancho declarado: el
@@ -512,7 +514,7 @@ export function Bandeja({
         // Sin esta columna el historial no decía qué equipo se reparó, que es
         // justo lo que se busca al revisar casos ya cerrados.
         cell: ({ row }) =>
-          row.original.activo_nombre ? (
+          row.original.activo_id || row.original.conjunto_id || row.original.activo_nombre || row.original.conjunto_nombre ? (
             <CeldaEquipo ticket={row.original} />
           ) : (
             <CeldaEquipoSinEquipo tipo={row.original.activo_tipo} />

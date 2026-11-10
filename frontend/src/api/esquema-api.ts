@@ -2619,6 +2619,41 @@ export interface paths {
         delete: operations["borrar_conversacion_api_ia_asistente_conversaciones__conversacion_id__delete"];
         options?: never;
         head?: never;
+        /** Renombrar Conversacion */
+        patch: operations["renombrar_conversacion_api_ia_asistente_conversaciones__conversacion_id__patch"];
+        trace?: never;
+    };
+    "/api/ia/asistente/conversaciones/{conversacion_id}/regenerar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Regenerar Respuesta */
+        post: operations["regenerar_respuesta_api_ia_asistente_conversaciones__conversacion_id__regenerar_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ia/asistente/conversaciones/{conversacion_id}/editar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Editar Pregunta */
+        post: operations["editar_pregunta_api_ia_asistente_conversaciones__conversacion_id__editar_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
         patch?: never;
         trace?: never;
     };
@@ -2750,6 +2785,8 @@ export interface components {
             estado?: string | null;
             /** Observaciones */
             observaciones?: string | null;
+            /** Motivo */
+            motivo?: string | null;
             /** Opciones Avanzadas */
             opciones_avanzadas?: boolean | null;
             detalle_avanzado?: components["schemas"]["DetalleAvanzado"] | null;
@@ -3355,6 +3392,11 @@ export interface components {
             creado_en?: string | null;
             /** Actualizado En */
             actualizado_en?: string | null;
+            /**
+             * Version
+             * @default 0
+             */
+            version: number;
         };
         /**
          * DetalleAvanzado
@@ -3437,6 +3479,20 @@ export interface components {
             } | null;
             /** Puertos */
             puertos?: string[] | null;
+        };
+        /** EditarPreguntaIA */
+        EditarPreguntaIA: {
+            /** Pregunta */
+            pregunta: string;
+            filtros?: components["schemas"]["FiltrosAnalitica"];
+            /** Conversacion Id */
+            conversacion_id?: string | null;
+            /** Version */
+            version?: number | null;
+            /** Solicitud Id */
+            solicitud_id?: string | null;
+            /** Indice */
+            indice: number;
         };
         /** EstadoCampo */
         EstadoCampo: {
@@ -3625,6 +3681,22 @@ export interface components {
             confianza?: number | null;
             /** Explicacion */
             explicacion?: string | null;
+            /** Analisis */
+            analisis?: {
+                [key: string]: string;
+            } | null;
+            /** Seguimientos */
+            seguimientos?: string[];
+            /** Contexto Consulta */
+            contexto_consulta?: {
+                [key: string]: unknown;
+            } | null;
+            /** Alcance Consulta */
+            alcance_consulta?: string | null;
+            /** Filtros Consulta */
+            filtros_consulta?: {
+                [key: string]: unknown;
+            } | null;
         };
         /** ModuloMemoria */
         ModuloMemoria: {
@@ -3726,6 +3798,16 @@ export interface components {
             filtros?: components["schemas"]["FiltrosAnalitica"];
             /** Conversacion Id */
             conversacion_id?: string | null;
+            /** Version */
+            version?: number | null;
+            /** Solicitud Id */
+            solicitud_id?: string | null;
+        };
+        /** RegenerarRespuestaIA */
+        RegenerarRespuestaIA: {
+            filtros?: components["schemas"]["FiltrosAnalitica"];
+            /** Version */
+            version?: number | null;
         };
         /** ReglaSLA */
         ReglaSLA: {
@@ -3735,6 +3817,13 @@ export interface components {
             horas_responder: number;
             /** Horas Resolver */
             horas_resolver: number;
+        };
+        /** RenombrarConversacionIA */
+        RenombrarConversacionIA: {
+            /** Titulo */
+            titulo: string;
+            /** Version */
+            version?: number | null;
         };
         /** RespuestaMensaje */
         RespuestaMensaje: {
@@ -4005,6 +4094,11 @@ export interface components {
         UsuarioSesion: {
             /** Id */
             id: string;
+            /**
+             * Administrador Principal
+             * @default false
+             */
+            administrador_principal: boolean;
             /** Nombre */
             nombre: string;
             /** Email */
@@ -5131,6 +5225,7 @@ export interface operations {
                 oficina_id?: string | null;
                 rol?: string | null;
                 solo_activos?: boolean;
+                estado?: ("activos" | "desactivados" | "archivados" | "todos") | null;
                 texto?: string | null;
                 pagina?: number;
                 por_pagina?: number;
@@ -10550,6 +10645,123 @@ export interface operations {
             };
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    renombrar_conversacion_api_ia_asistente_conversaciones__conversacion_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-CSRF-Token"?: string | null;
+            };
+            path: {
+                conversacion_id: string;
+            };
+            cookie?: {
+                ma_csrf?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenombrarConversacionIA"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    regenerar_respuesta_api_ia_asistente_conversaciones__conversacion_id__regenerar_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-CSRF-Token"?: string | null;
+            };
+            path: {
+                conversacion_id: string;
+            };
+            cookie?: {
+                ma_csrf?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegenerarRespuestaIA"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    editar_pregunta_api_ia_asistente_conversaciones__conversacion_id__editar_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-CSRF-Token"?: string | null;
+            };
+            path: {
+                conversacion_id: string;
+            };
+            cookie?: {
+                ma_csrf?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EditarPreguntaIA"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

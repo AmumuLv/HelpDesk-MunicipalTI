@@ -32,6 +32,9 @@ from app.schemas.admin import (
     CampanaCrear,
     ConfigRespuesta,
     ConversacionIA,
+    EditarPreguntaIA,
+    RenombrarConversacionIA,
+    RegenerarRespuestaIA,
     ExportarSolicitud,
     Feriado,
     HorarioSemanal,
@@ -645,7 +648,8 @@ async def refrescar_modelo(sesion: DependeUsuarioCsrf):
 # ══ Asistente conversacional ════════════════════════════════
 @ia_router.get("/ia/asistente/preguntas")
 async def preguntas_sugeridas(sesion: DependeUsuario, _: DependeAnalitica):
-    return PreguntasSugeridas(preguntas=analitica_chat.PREGUNTAS_SUGERIDAS)
+    sesion.exigir_tecnico()
+    return PreguntasSugeridas(**analitica_chat.preguntas_disponibles(sesion.usuario))
 
 
 @ia_router.post("/ia/asistente")
@@ -653,36 +657,20 @@ async def preguntar(datos: PreguntaIA, sesion: DependeUsuarioCsrf, _: DependeAna
     sesion.exigir_tecnico()
     filtros = datos.filtros.model_dump(exclude_none=True)
     analitica_service.resolver_periodo(filtros)
-    conversacion = await analitica_chat.guardar_conversacion(
-        sesion.usuario, titulo=datos.pregunta[:60], conversacion_id=datos.conversacion_id
-    )
-    historial = conversacion.get("mensajes") or []
-    filtros.setdefault("periodo", "30d")
-    respuesta = await analitica_chat.responder(
-        datos.pregunta,
-        usuario=sesion.usuario,
-        filtros=filtros,
-        conversacion_id=conversacion["_id"],
-        historial=historial,
-    )
-    await analitica_chat.agregar_mensaje(conversacion["_id"], "user", datos.pregunta, None, sesion.usuario)
-    await analitica_chat.agregar_mensaje(conversacion["_id"], "assistant", respuesta["texto"], respuesta, sesion.usuario)
-    return {
-        "conversacion_id": str(conversacion["_id"]),
-        **respuesta,
-        "lectura_solo": True,
-        "periodo": respuesta.get("periodo"),
-    }
+    return await analitica_chat.procesar_turno(datos.pregunta, usuario=sesion.usuario,
+        filtros=filtros, conversacion_id=datos.conversacion_id, version=datos.version, solicitud_id=datos.solicitud_id)
 
 
 @ia_router.get("/ia/asistente/conversaciones")
 async def conversaciones(sesion: DependeUsuario, _: DependeAnalitica):
     sesion.exigir_tecnico()
-    items = await analitica_chat.listar_conversaciones(sesion.usuario)
+    items = await analitica_chat.listar_conversaciones(sesion.usuario, limite=101)
+    hay_mas = len(items) > 100
+    items = items[:100]
     for item in items:
         item["id"] = str(item["id"])
         item["usuario_id"] = str(item["usuario_id"])
-    return {"items": items}
+    return {"items": items, 'hay_mas': hay_mas}
 
 
 @ia_router.get("/ia/asistente/conversaciones/{conversacion_id}")
@@ -692,6 +680,28 @@ async def conversacion(conversacion_id: str, sesion: DependeUsuario, _: DependeA
     datos["id"] = str(datos["id"])
     datos["usuario_id"] = str(datos["usuario_id"])
     return datos
+
+
+@ia_router.patch("/ia/asistente/conversaciones/{conversacion_id}")
+async def renombrar_conversacion(conversacion_id: str, datos: RenombrarConversacionIA, sesion: DependeUsuarioCsrf, _: DependeAnalitica):
+    sesion.exigir_tecnico()
+    return await analitica_chat.renombrar_conversacion(id_requerido(conversacion_id, 'conversacion'), sesion.usuario, datos.titulo, version=datos.version)
+
+
+@ia_router.post("/ia/asistente/conversaciones/{conversacion_id}/regenerar")
+async def regenerar_respuesta(conversacion_id: str, datos: RegenerarRespuestaIA, sesion: DependeUsuarioCsrf, _: DependeAnalitica):
+    sesion.exigir_tecnico()
+    return await analitica_chat.procesar_turno(None, usuario=sesion.usuario,
+        filtros=datos.filtros.model_dump(exclude_none=True), conversacion_id=id_requerido(conversacion_id, 'conversacion'),
+        version=datos.version, regenerar=True)
+
+
+@ia_router.post("/ia/asistente/conversaciones/{conversacion_id}/editar")
+async def editar_pregunta(conversacion_id: str, datos: EditarPreguntaIA, sesion: DependeUsuarioCsrf, _: DependeAnalitica):
+    sesion.exigir_tecnico()
+    return await analitica_chat.procesar_turno(datos.pregunta, usuario=sesion.usuario,
+        filtros=datos.filtros.model_dump(exclude_none=True), conversacion_id=id_requerido(conversacion_id, 'conversacion'),
+        version=datos.version, indice=datos.indice)
 
 
 @ia_router.delete("/ia/asistente/conversaciones/{conversacion_id}")

@@ -11,18 +11,23 @@ El chat del ticket (usuario <-> TI) es otro modulo: ver ticket_service.
 from __future__ import annotations
 
 import json
+import hashlib
 import re
 from datetime import date, timedelta
 from typing import Any
+from uuid import UUID
 
 from bson import ObjectId
+from pymongo.errors import DuplicateKeyError
 
 from app.core.db import agregar, get_db
-from app.core.errors import AppError, Prohibido, Validacion
+from app.core.errors import AppError, Conflicto, Prohibido, Validacion
 from app.core.ids import clave, clave_oscura, normalizar_texto
 from app.core.time import business_tz, local_date, utcnow
 from app.domain.permissions import tiene_permiso
 from app.services import analitica_service, horario_service, ia_provider, inventario_service
+from app.services import analisis_consultas
+from app.services import analisis_catalogo
 
 ROLES_CON_ACCESO = {"tecnico", "administrador"}
 
@@ -34,9 +39,17 @@ PREGUNTAS_SUGERIDAS = [
     "¿Qué familias de equipos tienen más fallas?",
     "¿Para qué sirve este asistente?",
     "¿Qué significa el porcentaje de datos faltantes?",
+    "¿Puedes darme un resumen del servicio?",
+    "¿Hay más tickets que en el periodo anterior?",
+    "¿Cuántos tickets están abiertos y cerrados?",
+    "¿Qué tickets tienen el plazo vencido?",
+    "¿Cómo evolucionan los tickets por día?",
+    "¿Cuántos equipos tenemos registrados?",
 ]
 
 REGLAS_PERMISOS: dict[str, str] = {
+    **{nombre: config['permiso'] for nombre, config in analisis_catalogo.CONSULTAS.items()},
+    **{nombre: 'equipos.ver' if nombre == 'resumen_inventario' else 'analitica.ver' for nombre in analisis_consultas.CONSULTAS},
     'ranking_conjuntos': 'analitica.ver',
     "ranking_oficinas": "analitica.ver",
     "ranking_zonas": "analitica.ver",
@@ -219,7 +232,7 @@ HERRAMIENTAS: dict[str, dict[str, Any]] = {
     },
     "equipos_con_fallas": {
         "funcion": herramienta_equipos_con_fallas,
-        "descripcion": "Familias de equipos con mayor tasa de falla y prediccion de probabilidad.",
+        "descripcion": "Historial observado de incidencias por tipo de equipo en los últimos doce meses; no predice fallas futuras.",
         "esquema": {"type": "object", "properties": {}},
     },
     "tickets_de_usuario": {
@@ -232,6 +245,12 @@ HERRAMIENTAS: dict[str, dict[str, Any]] = {
         },
     },
 }
+
+HERRAMIENTAS.update({nombre: {'funcion': funcion, 'descripcion': descripcion,
+                             'esquema': {'type': 'object', 'properties': {}}}
+                     for nombre, (funcion, descripcion) in analisis_consultas.CONSULTAS.items()})
+HERRAMIENTAS.update(analisis_catalogo.CONSULTAS)
+analisis_consultas.LECTURAS.update({nombre: config['lectura'] for nombre, config in analisis_catalogo.CONSULTAS.items()})
 
 
 def esquema_herramientas_openai() -> list[dict[str, Any]]:
@@ -254,9 +273,14 @@ async def ejecutar_herramienta(
     config = HERRAMIENTAS.get(nombre)
     if config is None:
         raise Validacion(f"Herramienta desconocida: {nombre}")
+    if config.get('solo_admin') and usuario.get('rol') != 'administrador':
+        raise Prohibido('Esta consulta está reservada al administrador.', codigo='sin_permiso_analitica')
     permiso = REGLAS_PERMISOS.get(nombre)
     if permiso and not tiene_permiso(usuario, permiso) and usuario.get("rol") != "administrador":
         raise Prohibido("Tu rol no tiene acceso a esa consulta.", codigo="sin_permiso_analitica")
+    if nombre in analisis_catalogo.CONSULTAS:
+        seguros = analisis_catalogo.argumentos_seguros(nombre, argumentos or {})
+        return await config['funcion'](filtros, seguros, usuario=usuario)
     return await config["funcion"](filtros, argumentos or {})
 
 
@@ -276,6 +300,17 @@ INTENCIONES: list[tuple[str, str]] = [
 
 
 def _detectar_intencion(pregunta: str) -> tuple[str | None, dict[str, Any]]:
+    nueva = analisis_catalogo.detectar(pregunta)
+    if nueva:
+        return nueva
+    ampliada = analisis_consultas.detectar(pregunta)
+    if ampliada:
+        if ampliada == 'metricas_generales':
+            texto = clave(pregunta).lower()
+            for patron, indicador in ((r'satisfaccion|valoracion|calificacion', 'satisfaccion'), (r'tiempo|demora|tarda', 'tiempo'), (r'sla|cumplimiento', 'sla')):
+                if re.search(patron, texto):
+                    return ampliada, {'indicador': indicador}
+        return ampliada, {}
     import unicodedata
     texto = ''.join(c for c in unicodedata.normalize('NFD', pregunta.lower()) if not unicodedata.combining(c))
     if re.search(r'conjunto|pc.*(incidencia|falla)|computadora.*(incidencia|falla)', texto):
@@ -307,13 +342,18 @@ def _detectar_intencion(pregunta: str) -> tuple[str | None, dict[str, Any]]:
 
 def _formatear(herramienta: str, datos: Any) -> tuple[str, list[dict[str, Any]], dict[str, Any] | None]:
     """Texto claro + tabla + enlaces, a partir de datos reales."""
+    if herramienta in analisis_catalogo.CONSULTAS:
+        return datos['texto'], [], {'tabla': datos.get('tabla'), 'enlaces': datos.get('enlaces') or []}
+    ampliada = analisis_consultas.formatear(herramienta, datos)
+    if ampliada:
+        return ampliada[0], [], {'tabla': ampliada[1]}
     if herramienta == 'ranking_conjuntos':
         filas = datos.get('items', [])[:10]
         if not filas:
             return 'No hay incidencias vinculadas a computadoras en este periodo.', [], None
         lineas = ['Computadoras con más incidencias (componentes y programas incluidos):']
         lineas.extend(f"- {f['nombre']} · {f['oficina']} · {f['responsable']}: {f['total']} tickets, {f['programas']} de programas." for f in filas)
-        return '\n'.join(lineas), [], None
+        return '\n'.join(lineas), [], {'tabla': analisis_consultas.tabla([('nombre', 'Computadora'), ('oficina', 'Oficina'), ('responsable', 'Responsable'), ('total', 'Tickets'), ('programas', 'Programas'), ('abiertos', 'Abiertos')], filas)}
     if herramienta == "ranking_oficinas" and datos.get("top"):
         primero = datos['top'][0]
         lideres = [i['oficina'] for i in datos['top'] if i['total'] == primero['total']]
@@ -448,9 +488,9 @@ def _formatear(herramienta: str, datos: Any) -> tuple[str, list[dict[str, Any]],
                 else:
                     tendencia = " (estable)"
             lineas.append(
-                f"- {item.get('categoria') or 'sin categoria'} / {item.get('equipo') or 'sin equipo'}: {item['total']} casos{tendencia}"
+                f"- {item.get('categoria') or 'Sin categoría'} / {item.get('problema') or 'Sin problema especificado'}: {item['total']} casos{tendencia}"
             )
-        return "\n".join(lineas), [], None
+        return "\n".join(lineas), [], {'tabla': analisis_consultas.tabla([('categoria', 'Categoría'), ('problema', 'Problema registrado'), ('total', 'Tickets'), ('tendencia', 'Variación (%)')], items)}
     if herramienta == "tickets_de_usuario":
         if not datos.get("encontrado"):
             return datos.get("mensaje", "No se encontro la persona."), [], None
@@ -488,20 +528,26 @@ def _periodo_pregunta(pregunta: str, filtros: dict[str, Any]) -> dict[str, Any]:
         except ValueError:
             raise Validacion("Las fechas de la pregunta no son válidas. Usa día/mes/año.")
         resultado.update(desde=dias[0], hasta=dias[-1])
-    elif re.search(r"\b(hoy|ayer)\b", texto):
+    elif re.search(r"\b(hoy|ayer)\b", texto) and not re.search(r'\b(?:esta semana|semana actual|semana pasada|semana anterior)\b', texto):
         if re.search(r"\bhoy\b", texto) and re.search(r"\bayer\b", texto):
             raise Validacion("Indica un rango de fechas para comparar hoy y ayer.")
         dia = local_date() - timedelta(days=1 if re.search(r"\bayer\b", texto) else 0)
         resultado.update(desde=dia, hasta=dia)
+    elif re.search(r'\b(?:esta semana|semana actual|semana pasada|semana anterior)\b', texto):
+        hoy = local_date()
+        lunes = hoy - timedelta(days=hoy.weekday())
+        pasada = bool(re.search(r'semana (?:pasada|anterior)', texto))
+        resultado.update(desde=lunes - timedelta(days=7) if pasada else lunes,
+                         hasta=lunes - timedelta(days=1) if pasada else hoy)
     else:
-        for expresion, periodo in (("este mes", "mes"), ("este ano", "anio"), ("ultimos 90", "90d"), ("ultimos 30", "30d"), ("ultimos 7", "7d")):
+        for expresion, periodo in (("mes pasado", "mes_anterior"), ("mes anterior", "mes_anterior"), ("este mes", "mes"), ("este ano", "anio"), ("ultimo ano", "365d"), ("ultimos 365", "365d"), ("ultimos 90", "90d"), ("ultimos 30", "30d"), ("ultimos 7", "7d")):
             if expresion in texto:
                 resultado.update(periodo=periodo)
                 resultado.pop("desde", None)
                 resultado.pop("hasta", None)
                 break
     analitica_service.resolver_periodo(resultado)
-    if fechas or re.search(r"\b(hoy|ayer)\b", texto):
+    if fechas or re.search(r"\b(hoy|ayer|esta semana|semana actual|semana pasada|semana anterior)\b", texto):
         resultado["periodo"] = f"{resultado['desde']:%d/%m/%Y} – {resultado['hasta']:%d/%m/%Y}"
     return resultado
 
@@ -517,18 +563,55 @@ async def responder(
     """Responde una pregunta de analitica usando datos reales del sistema."""
     if usuario.get("rol") not in ROLES_CON_ACCESO:
         raise Prohibido("El asistente de analisis es solo para personal autorizado.")
+    contexto_previo = analisis_consultas.contexto_completo(historial)
+    previa, argumentos_previos = analisis_consultas.contexto_anterior(historial)
+    if re.fullmatch(r'(?:explicame (?:eso|el resultado)|no entiendo|que significa eso)', clave(pregunta).lower()) and previa in analisis_consultas.LECTURAS:
+        lectura = analisis_consultas.lectura(previa, argumentos_previos)
+        return {'texto': f"{lectura['significado']}\n\n{lectura['limite']}\n\nPuedes revisar esto: {lectura['revision']}",
+                'fuentes': ['guia_analisis'], 'periodo': None, 'tabla': None,
+                'explicacion': 'Explicación de la consulta anterior; no es un nuevo recuento.',
+                'seguimientos': analisis_consultas.seguimientos(previa),
+                'contexto_consulta': contexto_previo,
+                'alcance_consulta': contexto_previo.get('alcance'),
+                'filtros_consulta': contexto_previo.get('filtros')}
     from app.services.ayuda_analisis import responder_ayuda
-    ayuda = responder_ayuda(pregunta)
+    nueva = analisis_catalogo.detectar(pregunta)
+    ayuda = None if nueva else responder_ayuda(pregunta)
     if ayuda:
         return {'texto': ayuda, 'tabla': None, 'enlaces': [], 'fuentes': ['guia_analisis'],
                 'explicacion': 'Orientación funcional del sistema, sin consultar un modelo externo. No representa un recuento de registros.',
                 'periodo': None, 'confianza': 1.0, 'suficiente_datos': True, 'herramientas': []}
-    filtros = _periodo_pregunta(pregunta, filtros or {})
+    filtros = dict(filtros or {})
+    selector = filtros.get('periodo', '30d')
+    continuacion = analisis_consultas.es_continuacion(pregunta)
+    if continuacion and contexto_previo.get('selector', selector) == selector:
+        anteriores = analisis_consultas.filtros_del_contexto(contexto_previo)
+        filtros = {**anteriores, **filtros}
+        if anteriores.get('periodo'):
+            filtros['periodo'] = anteriores['periodo']
+    conocida, argumentos_directos = _detectar_intencion(pregunta)
+    if conocida:
+        analisis_consultas.exigir_ubicacion_explicita(pregunta)
+    filtros = _periodo_pregunta(pregunta, filtros)
+    contexto_ubicacion = analisis_consultas.ubicacion_anterior(historial) if continuacion else None
+    # No se resuelven nombres cuando no se pidió filtro ni hay contexto: evita
+    # lecturas adicionales y conserva el camino de las consultas existentes.
+    if re.search(r'\b(?:en|para|de)\s+(?:la\s+)?(?:oficina|zona)\s+', pregunta, re.I) or contexto_ubicacion or filtros.get('oficina_id') or filtros.get('zona_id'):
+        filtros, ambito = await analisis_consultas.resolver_ubicacion(pregunta, filtros, contexto_ubicacion)
+    else:
+        ambito = 'Todas las oficinas'
     db = get_db()
     proveedor = ia_provider.obtener_proveedor()
     # Las preguntas reconocidas se resuelven directamente: no necesitan tokens
     # de un proveedor ni dependen de su disponibilidad para redactar cifras.
-    conocida, _ = _detectar_intencion(pregunta)
+    if not conocida and continuacion and previa in HERRAMIENTAS:
+        conocida, argumentos_directos = previa, argumentos_previos
+    if continuacion and previa == 'tickets_pendientes_detalle':
+        otra_lista = analisis_catalogo.detectar('Muéstrame los tickets ' + re.sub(r'^y\s+', '', clave(pregunta).lower()))
+        if otra_lista and otra_lista[0] == previa:
+            conocida, argumentos_directos = previa, {**argumentos_previos, **otra_lista[1]}
+    if conocida in {'equipos_con_fallas', 'disponibilidad_equipo', 'equipos_de_usuario', 'tickets_de_usuario'} and (filtros.get('oficina_id') or filtros.get('zona_id')):
+        raise Validacion('Esta consulta no admite filtros por ubicación. Consulta sin ese filtro o elige el resumen, los estados, las causas o los plazos de una oficina.')
     llm = False if conocida else await proveedor.disponible()
     mensajes_usados: list[str] = []
     explicacion = ""
@@ -604,12 +687,12 @@ async def responder(
             # se utiliza la consulta directa que corresponde a la pregunta.
 
     # ── Camino sin modelo: intencion + datos reales ──────────
-    herramienta, argumentos = _detectar_intencion(pregunta)
+    herramienta, argumentos = conocida, argumentos_directos
     if herramienta is None:
         texto = (
-            "Esta pregunta no coincide con una consulta de datos disponible. Puedo comparar tickets por zona u oficina, "
-            "revisar causas frecuentes, disponibilidad de TI e inventario por persona.\n\n"
-            "Elige una sugerencia para obtener un resultado verificable. Para orientación técnica o preguntas generales, usa el chatbot TI."
+            "Necesito una pregunta más concreta para consultar los registros. ¿Quieres revisar tickets, equipos o disponibilidad de TI?\n\n"
+            "Por ejemplo: «¿Qué oficina tiene más incidencias este mes?» o «¿Cuántos tickets están abiertos?». "
+            "Si buscas orientación técnica general, puedes usar el chatbot TI."
         )
         return {
             "texto": texto,
@@ -619,11 +702,13 @@ async def responder(
             "herramientas": [],
             "fuentes": [],
             "puede_responder": False,
-            "preguntas_sugeridas": PREGUNTAS_SUGERIDAS,
+            "preguntas_sugeridas": preguntas_disponibles(usuario)['preguntas'],
             "periodo": filtros.get("periodo", "30d"),
         }
     try:
         datos = await ejecutar_herramienta(herramienta, argumentos, filtros=filtros, usuario=usuario)
+    except Prohibido:
+        raise
     except Exception as exc:
         return {
             "texto": exc.mensaje if isinstance(exc, AppError) else 'No se pudo completar la lectura de datos. Revisa el periodo e inténtalo nuevamente.',
@@ -649,7 +734,24 @@ async def responder(
         "suficiente_datos": suficiente,
         "periodo": filtros.get("periodo", "30d"),
         "enlaces": (extras or {}).get("enlaces"),
+        "analisis": analisis_consultas.lectura(herramienta, argumentos),
+        "seguimientos": datos.get('seguimientos', analisis_consultas.seguimientos(herramienta)),
+        "contexto_consulta": {'herramienta': herramienta, 'argumentos': argumentos, 'selector': selector, 'alcance': ambito,
+            'filtros': {campo: valor.isoformat() if isinstance(valor, date) else str(valor) if isinstance(valor, ObjectId) else valor for campo, valor in filtros.items()}},
+        "alcance_consulta": ambito,
     }
+    respuesta['contexto_consulta']['ubicacion'] = {campo: str(filtros[campo]) for campo in ('oficina_id', 'zona_id') if filtros.get(campo)}
+    if herramienta in analisis_catalogo.CONSULTAS:
+        respuesta['periodo'] = datos.get('periodo_label') or respuesta['periodo']
+        if datos.get('alcance'):
+            respuesta['alcance_consulta'] = datos['alcance']
+            respuesta['contexto_consulta']['alcance'] = datos['alcance']
+        if 'seguimientos' not in datos:
+            respuesta['seguimientos'] = analisis_catalogo.CONSULTAS[herramienta].get('preguntas', [])[:3]
+        # Cada seguimiento vuelve a verificar permisos al consultar.
+        respuesta['seguimientos'] = [p for p in respuesta['seguimientos'] if not analisis_catalogo.detectar(p)
+            or _permitida(analisis_catalogo.detectar(p)[0], usuario)]
+    respuesta['filtros_consulta'] = respuesta['contexto_consulta']['filtros']
     if not suficiente and isinstance(datos, dict):
         # Honestidad: si no hay datos, dice cuantos necesita en vez de inventar
         respuesta["minimo_requerido"] = datos.get("minimo_requerido")
@@ -659,10 +761,27 @@ async def responder(
 
 
 def _permitida(herramienta: str, usuario: dict[str, Any]) -> bool:
+    if HERRAMIENTAS.get(herramienta, {}).get('solo_admin') and usuario.get('rol') != 'administrador':
+        return False
     permiso = REGLAS_PERMISOS.get(herramienta)
     if usuario.get("rol") == "administrador":
         return True
     return bool(permiso) and tiene_permiso(usuario, permiso)
+
+
+def preguntas_disponibles(usuario):
+    """Sugerencias autorizadas y su grupo, sin revelar opciones reservadas."""
+    preguntas, grupos = [], {}
+    for pregunta in PREGUNTAS_SUGERIDAS:
+        nombre, _ = _detectar_intencion(pregunta)
+        if nombre is None or _permitida(nombre, usuario):
+            preguntas.append(pregunta)
+    for pregunta, nombre, grupo in analisis_catalogo.preguntas():
+        if _permitida(nombre, usuario):
+            if pregunta not in preguntas:
+                preguntas.append(pregunta)
+            grupos[pregunta] = grupo
+    return {'preguntas': preguntas, 'grupos': grupos}
 
 
 async def ia_service_registrar(pregunta: str, respuesta: str, usuario: dict[str, Any], herramientas: list[str]) -> None:
@@ -689,6 +808,7 @@ async def guardar_conversacion(
         "usuario_nombre": usuario.get("nombre"),
         "rol": usuario.get("rol"),
         "mensajes": [],
+        "version": 0,
         "creado_en": utcnow(),
         "actualizado_en": utcnow(),
     }
@@ -697,11 +817,8 @@ async def guardar_conversacion(
     return documento
 
 
-async def agregar_mensaje(
-    conversacion_id: ObjectId, rol: str, texto: str, extras: dict[str, Any] | None, usuario: dict[str, Any]
-) -> None:
-    db = get_db()
-    mensaje = {
+def _mensaje(rol: str, texto: str, extras: dict[str, Any] | None = None) -> dict[str, Any]:
+    return {
         "rol": rol,
         "texto": texto,
         "created_at": utcnow().isoformat(),
@@ -711,17 +828,155 @@ async def agregar_mensaje(
         "explicacion": (extras or {}).get("explicacion"),
         "fuentes": (extras or {}).get("fuentes") or [],
         "periodo": (extras or {}).get("periodo"),
+        "analisis": (extras or {}).get("analisis"),
+        "seguimientos": (extras or {}).get("seguimientos") or [],
+        "contexto_consulta": (extras or {}).get("contexto_consulta"),
+        "alcance_consulta": (extras or {}).get("alcance_consulta"),
+        "filtros_consulta": (extras or {}).get("filtros_consulta"),
     }
+
+
+def _control_version(documento, version=None):
+    actual = documento.get('version', 0)
+    if version is not None and version != actual:
+        raise Conflicto('Esta conversación cambió en otra pestaña. Actualízala y vuelve a enviar tu pregunta.', codigo='conversacion_actualizada')
+    return actual
+
+
+def _filtro_version(documento, usuario):
+    consulta = {'_id': documento['_id'], 'usuario_id': usuario['_id']}
+    version = documento.get('version', 0)
+    if version == 0:
+        consulta['$or'] = [{'version': 0}, {'version': {'$exists': False}}]
+    else:
+        consulta['version'] = version
+    return consulta
+
+
+async def _conversacion_propia(conversacion_id, usuario):
+    documento = await get_db()['conversaciones_ia'].find_one({'_id': conversacion_id, 'usuario_id': usuario['_id']})
+    if documento is None:
+        raise Prohibido('No se encontró esa conversación.')
+    return documento
+
+
+def _identidad_solicitud(usuario, solicitud_id, pregunta, filtros):
+    try:
+        nonce = str(UUID(str(solicitud_id)))
+    except (ValueError, AttributeError, TypeError):
+        raise Validacion('El identificador de la solicitud no es válido.')
+    propietario = str(usuario['_id'])
+    identificador = ObjectId(hashlib.sha256(f'analisis-interno-v1:{propietario}:{nonce}'.encode()).digest()[:12])
+    contenido = json.dumps({'pregunta': pregunta, 'filtros': filtros}, sort_keys=True, ensure_ascii=False, default=str)
+    firma = hashlib.sha256(contenido.encode()).hexdigest()
+    return identificador, nonce, firma
+
+
+def _respuesta_repetida(documento, usuario, nonce, firma):
+    if documento.get('usuario_id') != usuario['_id'] or documento.get('solicitud_inicial') != nonce:
+        raise Conflicto('No se pudo recuperar esa solicitud. Inicia una consulta nueva.', codigo='solicitud_incompatible')
+    if documento.get('firma_inicial') != firma:
+        raise Conflicto('Este identificador ya se usó para otra pregunta. Inicia una consulta nueva.', codigo='solicitud_reutilizada')
+    return {**documento['respuesta_inicial'], 'conversacion_id': str(documento['_id']),
+        'mensajes': documento.get('mensajes') or [], 'version': documento.get('version', 0), 'lectura_solo': True}
+
+
+async def procesar_turno(pregunta: str | None, *, usuario, filtros=None, conversacion_id=None, version=None, regenerar=False, indice=None, solicitud_id=None):
+    """Publica un turno completo con una única escritura y control de concurrencia.
+
+    Una regeneración conserva la pregunta original; una edición descarta su rama
+    posterior solo cuando la nueva respuesta pudo obtenerse y guardarse.
+    """
+    if usuario.get('rol') not in ROLES_CON_ACCESO:
+        raise Prohibido('El asistente de análisis es solo para personal autorizado.')
+    if solicitud_id and (conversacion_id or regenerar or indice is not None):
+        raise Validacion('El identificador de solicitud solo corresponde a una conversación nueva.')
+    filtros = dict(filtros or {})
+    analitica_service.resolver_periodo(filtros)
+    documento = await _conversacion_propia(conversacion_id, usuario) if conversacion_id else None
+    if (regenerar or indice is not None) and documento is None:
+        raise Validacion('Selecciona una conversación para modificar su pregunta.')
+    if documento:
+        _control_version(documento, version)
+    historial = list((documento or {}).get('mensajes') or [])
+    if regenerar:
+        if len(historial) < 2 or historial[-1].get('rol') != 'assistant' or historial[-2].get('rol') != 'user':
+            raise Validacion('La conversación no tiene una respuesta completa para regenerar.')
+        indice = len(historial) - 2
+        pregunta = historial[indice]['texto']
+    if indice is not None:
+        if indice >= len(historial) or indice < 0 or historial[indice].get('rol') != 'user':
+            raise Validacion('Selecciona una pregunta válida de esta conversación.')
+        historial = historial[:indice]
+    if not isinstance(pregunta, str) or not 2 <= len(pregunta.strip()) <= 1000:
+        raise Validacion('Escribe una pregunta de entre 2 y 1000 caracteres.')
+    pregunta = pregunta.strip()
+    identidad = _identidad_solicitud(usuario, solicitud_id, pregunta, filtros) if solicitud_id else None
+    if identidad:
+        existente = await get_db()['conversaciones_ia'].find_one({'_id': identidad[0]})
+        if existente:
+            return _respuesta_repetida(existente, usuario, identidad[1], identidad[2])
+    respuesta = await responder(pregunta, usuario=usuario, filtros=filtros,
+        conversacion_id=conversacion_id, historial=historial)
+    if not respuesta.get('texto', '').strip():
+        raise Validacion('No se obtuvo una respuesta. Intenta nuevamente.')
+    mensajes = [*historial, _mensaje('user', pregunta), _mensaje('assistant', respuesta['texto'], respuesta)]
+    ahora = utcnow()
+    if documento:
+        siguiente = documento.get('version', 0) + 1
+        resultado = await get_db()['conversaciones_ia'].update_one(_filtro_version(documento, usuario),
+            {'$set': {'mensajes': mensajes, 'actualizado_en': ahora, 'version': siguiente}})
+        if resultado.matched_count != 1:
+            raise Conflicto('Esta conversación cambió en otra pestaña. Actualízala y vuelve a enviar tu pregunta.', codigo='conversacion_actualizada')
+    else:
+        siguiente = 1
+        documento = {'titulo': pregunta[:60], 'usuario_id': usuario['_id'], 'usuario_nombre': usuario.get('nombre'),
+            'rol': usuario.get('rol'), 'mensajes': mensajes, 'creado_en': ahora, 'actualizado_en': ahora, 'version': siguiente}
+        if identidad:
+            documento.update(_id=identidad[0], solicitud_inicial=identidad[1], firma_inicial=identidad[2], respuesta_inicial=respuesta)
+        try:
+            creado = await get_db()['conversaciones_ia'].insert_one(documento)
+        except DuplicateKeyError:
+            if not identidad:
+                raise
+            existente = await get_db()['conversaciones_ia'].find_one({'_id': identidad[0]})
+            if not existente:
+                raise Conflicto('La solicitud cambió durante el guardado. Vuelve a intentarlo.', codigo='solicitud_actualizada')
+            return _respuesta_repetida(existente, usuario, identidad[1], identidad[2])
+        conversacion_id = creado.inserted_id
+    return {**respuesta, 'conversacion_id': str(conversacion_id), 'mensajes': mensajes, 'version': siguiente, 'lectura_solo': True}
+
+
+async def renombrar_conversacion(conversacion_id, usuario, titulo, *, version=None):
+    titulo = titulo.strip()
+    if not 1 <= len(titulo) <= 100:
+        raise Validacion('El título debe tener entre 1 y 100 caracteres.')
+    documento = await _conversacion_propia(conversacion_id, usuario)
+    actual = _control_version(documento, version)
+    resultado = await get_db()['conversaciones_ia'].update_one(_filtro_version(documento, usuario),
+        {'$set': {'titulo': titulo, 'actualizado_en': utcnow(), 'version': actual + 1}})
+    if resultado.matched_count != 1:
+        raise Conflicto('La conversación cambió. Actualízala para renombrarla.', codigo='conversacion_actualizada')
+    return {'id': str(conversacion_id), 'titulo': titulo, 'version': actual + 1}
+
+
+async def agregar_mensaje(
+    conversacion_id: ObjectId, rol: str, texto: str, extras: dict[str, Any] | None, usuario: dict[str, Any]
+) -> None:
+    db = get_db()
     await db["conversaciones_ia"].update_one(
-        {"_id": conversacion_id},
-        {"$push": {"mensajes": mensaje}, "$set": {"actualizado_en": utcnow()}},
+        {"_id": conversacion_id, "usuario_id": usuario['_id']},
+        {"$push": {"mensajes": _mensaje(rol, texto, extras)}, "$set": {"actualizado_en": utcnow()}, '$inc': {'version': 1}},
     )
 
 
-async def listar_conversaciones(usuario: dict[str, Any], limite: int = 20) -> list[dict[str, Any]]:
+async def listar_conversaciones(usuario: dict[str, Any], limite: int = 100) -> list[dict[str, Any]]:
     documentos = await (
         get_db()["conversaciones_ia"]
-        .find({"usuario_id": usuario["_id"]}, {"mensajes": 0})
+        .find({"usuario_id": usuario["_id"]}, {
+            '_id': 1, 'titulo': 1, 'usuario_id': 1, 'usuario_nombre': 1, 'rol': 1,
+            'creado_en': 1, 'actualizado_en': 1, 'version': 1,
+        })
         .sort("actualizado_en", -1)
         .limit(limite)
         .to_list(None)

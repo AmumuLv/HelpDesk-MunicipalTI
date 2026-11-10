@@ -182,3 +182,29 @@ async def test_programas_automaticamente_pc_y_formateo_cpu_real(db, api):
     await db.activos.insert_one({'tipo': 'CPU', 'responsable_id': ObjectId(m['usuario_id']), 'oficina_id': ObjectId(m['oficina']['id']), 'conjunto_id': otra_pc, 'activo': True, 'campos_estado': {}})
     r = await api.post('/api/tickets/manual', headers=m['admin'], json={'persona': {'afectado_id': m['usuario_id']}, 'asunto': 'Office no abre', 'categoria': 'Sistema / Programa'})
     assert r.status_code == 422, r.text
+
+
+@pytest.mark.parametrize('categoria', ['Sistema / Programa', 'Hardware', 'Correo / Cuenta'])
+async def test_pc_completa_numero_dos_conserva_vinculo_en_detalle_bandeja_y_edicion(db, api, categoria):
+    m = await _mundo(api, 'pc-n2-' + categoria.replace(' / ', '-'))
+    pc, _ = await patrimonio(db, m)
+    await db.conjuntos.update_one({'_id': pc}, {'$set': {'nombre': 'Computadora N°2', 'numero': 2}})
+    creado = await api.post('/api/tickets/manual', headers=m['admin'], json={
+        'persona': {'afectado_id': m['usuario_id']}, 'asunto': 'Revisar la computadora completa',
+        'categoria': categoria, 'conjunto_id': str(pc),
+    })
+    assert creado.status_code == 201, creado.text
+    ticket_id = creado.json()['ticket']['id']
+    ruta = '/api/tickets/' + ticket_id
+    for paso in ('creado', 'editado'):
+        if paso == 'editado':
+            cambio = await api.patch(ruta, headers=m['admin'], json={'asunto': 'Computadora completa revisada'})
+            assert cambio.status_code == 200, cambio.text
+        detalle = (await api.get(ruta, headers=m['admin'])).json()
+        listado = await api.get('/api/tickets', headers=m['admin'], params={'conjunto_id': str(pc)})
+        assert listado.status_code == 200, listado.text
+        fila = next(item for item in listado.json()['items'] if item['id'] == ticket_id)
+        for salida in (detalle, fila):
+            assert salida['activo_id'] is None
+            assert salida['conjunto_id'] == str(pc)
+            assert salida['conjunto_nombre'] == 'Computadora N°2'

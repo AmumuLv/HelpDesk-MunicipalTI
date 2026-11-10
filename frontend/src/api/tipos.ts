@@ -263,12 +263,14 @@ export type MiHorarioPermiso = Respuestas.RespuestaEquipoTiMiHorarioPermiso
 
 export type ResumenAnalitica = Respuestas.RespuestaAnaliticaResumen
 export type FiltrosAnalitica = Respuestas.ConsultaAnaliticaPanel
-export type PanelAnalitica = Respuestas.RespuestaAnaliticaPanel & {
+export type PanelAnalitica = Omit<Respuestas.RespuestaAnaliticaPanel, 'riesgo_sla_oficina'> & {
+  kpis: Respuestas.RespuestaAnaliticaPanel['kpis'] & { muestras_tiempo?: number; muestras_satisfaccion?: number; cerrados_a_tiempo?: number; retroalimentaciones_clasificacion?: number }
+  riesgo_sla_oficina: Omit<Respuestas.RespuestaAnaliticaPanel['riesgo_sla_oficina'], 'items'> & { items: (Respuestas.RespuestaAnaliticaPanel['riesgo_sla_oficina']['items'][number] & { sin_plazo?: number })[] }
   ranking_conjuntos?: { items: { id: string; nombre: string; oficina: string; oficina_id: string | null; responsable: string; responsable_id: string | null; total: number; programas: number; abiertos: number }[] }
 }
 export type PrediccionEquipos = Respuestas.RespuestaAnaliticaEquiposPrediccion
-export type PreguntasAsistente = Respuestas.RespuestaIaAsistentePreguntas
-export type Conversaciones = { items: { id: string; titulo: string; actualizado_en?: string }[] }
+export type PreguntasAsistente = Respuestas.RespuestaIaAsistentePreguntas & { grupos?: Record<string, string> }
+export type Conversaciones = { items: { id: string; titulo: string; actualizado_en?: string; version?: number }[]; hay_mas?: boolean }
 export type Conversacion = NonNullable<Conversaciones['items']>[number]
 
 /* ══ Base de conocimiento ══════════════════════════════════ */

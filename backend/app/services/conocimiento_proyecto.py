@@ -1,11 +1,56 @@
 """Contexto funcional revisado: no lee archivos privados ni vuelca el repositorio."""
 import re
+import unicodedata
 
 ALCANCE_DIRECTORIO = (
     'El directorio consultable por el chatbot solo incluye cuentas activas. '
     'Un resultado vacío no demuestra que una persona no exista ni que se haya borrado su historial. '
     'Para revisar bajas usa Usuarios > Estado: Desactivados, Archivados o Todos, según tus permisos.'
 )
+
+GUIA_IMPORTACION_RELEVO = """
+Importación operativa y relevo de trabajador (flujo actual verificado):
+En Equipos > Importar, el Excel puede actualizar los mismos equipos y cambiar su
+responsable al trabajador nuevo. No es obligatorio mover cada equipo manualmente
+después de importar. Conserva el código patrimonial de cada componente físico o
+la MAC real cuando corresponda; si faltan ambos, solo se reconoce una coincidencia
+única por nombre estable, ubicación, conjunto y tipo. El número de serie no es
+un identificador mapeado por este importador. No inventes códigos ni MAC.
+En cada fila que cambia de persona, escribe al nuevo responsable. La vista previa
+debe mostrar «Se actualizará» y persona anterior → persona nueva. Revisa antes de
+confirmar: una identidad ambigua, duplicada o contradictoria se omite, no se elige
+el primer equipo posible. Solo cambian los equipos de las filas válidas aplicadas;
+los equipos ausentes del Excel o en filas omitidas no se transfieren por suposición.
+Si falta la persona, activa «Crear los perfiles que faltan y asignarles sus equipos»:
+está desactivado inicialmente y exige permiso de importación y usuarios.editar. Crea un único
+perfil de usuario por persona/oficina y vincula las filas correspondientes. No crea
+correo, contraseña ni privilegios administrativos: configura el acceso desde Usuarios.
+Sin esa opción, puede quedar el nombre pendiente de vincular; el bloque de personas
+del Excel permite elegir una cuenta existente o crear el perfil con autorización.
+El equipo conserva su identificador y registra su historial de responsables. Los
+tickets conservan al reportante y afectado originales; no se mezclan las identidades
+ni se renombran las cuentas para entregarlas a otro trabajador. Incluye todos los
+componentes si se entrega una PC completa; un relevo parcial no mueve los restantes.
+Crear una cuenta o desactivar/archivar la anterior, por sí solos, no reasigna equipos.
+Importar reescribe datos de las filas válidas y puede aplicar resultados parciales;
+un lote que actualiza equipos existentes no tiene Deshacer automático.
+Inventario anual conserva y compara instantáneas: cargar allí un archivo no ejecuta
+este relevo operativo ni transfiere los equipos al nuevo trabajador.
+"""
+
+
+def _texto_consulta(texto):
+    return ''.join(c for c in unicodedata.normalize('NFD', texto.lower()) if not unicodedata.combining(c))
+
+
+def trata_importacion_relevo(texto):
+    """Selecciona el flujo verificado también si se pregunta por una persona nueva."""
+    normal = _texto_consulta(texto)
+    return bool(re.search(
+        r'\bexcel\b|\bimport(?:a(?!nte)|[oe])|relevo|reemplaz|cambi\w* (?:(?:de|del|al|el|la) )?(?:responsable|trabajador|propietario)|'
+        r'(?:nuev[oa]|crear|creacion).{0,35}(?:usuario|trabajador|persona|perfil|cuenta)|'
+        r'(?:usuario|trabajador|persona|perfil|cuenta).{0,25}nuev[oa]|'
+        r'(?:transfer|traspas|reasign)\w*.{0,35}(?:equip|inventario|usuario)', normal))
 
 AMBITO = """
 Ámbito exclusivo: esta web de Mesa de Ayuda TI y su funcionamiento, soporte técnico,
@@ -98,6 +143,13 @@ exige iniciar sesión de nuevo. El historial anterior se conserva.
 Análisis IA usa datos reales, filtros y periodos; las predicciones requieren muestra
 suficiente. Consultas de datos proporciona resultados estructurados. El chatbot
 Groq interpreta y orienta; no entrena por conversar ni modifica modelos internos.
+Consultas de datos también lista tickets vencidos/sin asignar/sin equipo, analiza
+faltantes y responsables del inventario, PC de escritorio incompletas, años de
+inventario guardados y comparación entre dos años explícitos. Expone carga, muestras
+de tiempos/valoraciones y programación de mañana; horas programadas no son horas
+trabajadas. Consulta guías y sus valoraciones acumuladas sin sumar lecturas. Solo
+administradores consultan la auditoría conservada de 15 días; nunca valores privados.
+Cada lectura respeta permisos y filtros; no inventa estados antiguos ni datos ausentes.
 Base de conocimiento contiene guías públicas o internas según permisos, pasos y
 valoraciones. Reportes exporta Excel o PDF: tickets por periodo, inventario por zona,
 carga del equipo TI, resumen de atención y movimientos importantes según permisos.
@@ -119,4 +171,6 @@ def contexto_proyecto(pregunta, historial):
     # Las referencias recientes ayudan con preguntas como «¿y ese porcentaje?».
     consulta = pregunta + ' ' + ' '.join(m.texto for m in historial[-2:] if m.rol == 'user')
     secciones = [texto.strip() for patron, texto in MODULOS if re.search(patron, consulta, re.I)]
+    if trata_importacion_relevo(consulta):
+        secciones.insert(0, GUIA_IMPORTACION_RELEVO.strip())
     return AMBITO + '\nFuncionamiento verificado del proyecto:\n' + '\n'.join(secciones)

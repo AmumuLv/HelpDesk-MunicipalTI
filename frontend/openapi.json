@@ -1930,6 +1930,28 @@
             }
           },
           {
+            "name": "estado",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "activos",
+                    "desactivados",
+                    "archivados",
+                    "todos"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Estado"
+            }
+          },
+          {
             "name": "texto",
             "in": "query",
             "required": false,
@@ -14033,6 +14055,91 @@
           }
         }
       },
+      "patch": {
+        "tags": [
+          "ia"
+        ],
+        "summary": "Renombrar Conversacion",
+        "operationId": "renombrar_conversacion_api_ia_asistente_conversaciones__conversacion_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "conversacion_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Conversacion Id"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          },
+          {
+            "name": "ma_csrf",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ma Csrf"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenombrarConversacionIA"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
       "delete": {
         "tags": [
           "ia"
@@ -14087,6 +14194,180 @@
             }
           }
         ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ia/asistente/conversaciones/{conversacion_id}/regenerar": {
+      "post": {
+        "tags": [
+          "ia"
+        ],
+        "summary": "Regenerar Respuesta",
+        "operationId": "regenerar_respuesta_api_ia_asistente_conversaciones__conversacion_id__regenerar_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "conversacion_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Conversacion Id"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          },
+          {
+            "name": "ma_csrf",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ma Csrf"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegenerarRespuestaIA"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ia/asistente/conversaciones/{conversacion_id}/editar": {
+      "post": {
+        "tags": [
+          "ia"
+        ],
+        "summary": "Editar Pregunta",
+        "operationId": "editar_pregunta_api_ia_asistente_conversaciones__conversacion_id__editar_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "conversacion_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Conversacion Id"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          },
+          {
+            "name": "ma_csrf",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ma Csrf"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EditarPreguntaIA"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -14894,6 +15175,18 @@
               }
             ],
             "title": "Observaciones"
+          },
+          "motivo": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Motivo"
           },
           "opciones_avanzadas": {
             "anyOf": [
@@ -16759,6 +17052,11 @@
               }
             ],
             "title": "Actualizado En"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version",
+            "default": 0
           }
         },
         "type": "object",
@@ -17043,6 +17341,65 @@
         "type": "object",
         "title": "DetalleAvanzado",
         "description": "Secciones plegables, todas opcionales y solo si el interruptor esta activo."
+      },
+      "EditarPreguntaIA": {
+        "properties": {
+          "pregunta": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 2,
+            "title": "Pregunta"
+          },
+          "filtros": {
+            "$ref": "#/components/schemas/FiltrosAnalitica"
+          },
+          "conversacion_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversacion Id"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "solicitud_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Solicitud Id"
+          },
+          "indice": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Indice"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pregunta",
+          "indice"
+        ],
+        "title": "EditarPreguntaIA"
       },
       "EstadoCampo": {
         "properties": {
@@ -17583,6 +17940,62 @@
               }
             ],
             "title": "Explicacion"
+          },
+          "analisis": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analisis"
+          },
+          "seguimientos": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Seguimientos"
+          },
+          "contexto_consulta": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contexto Consulta"
+          },
+          "alcance_consulta": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alcance Consulta"
+          },
+          "filtros_consulta": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filtros Consulta"
           }
         },
         "type": "object",
@@ -17902,6 +18315,30 @@
               }
             ],
             "title": "Conversacion Id"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "solicitud_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Solicitud Id"
           }
         },
         "type": "object",
@@ -17909,6 +18346,27 @@
           "pregunta"
         ],
         "title": "PreguntaIA"
+      },
+      "RegenerarRespuestaIA": {
+        "properties": {
+          "filtros": {
+            "$ref": "#/components/schemas/FiltrosAnalitica"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "type": "object",
+        "title": "RegenerarRespuestaIA"
       },
       "ReglaSLA": {
         "properties": {
@@ -17936,6 +18394,33 @@
           "horas_resolver"
         ],
         "title": "ReglaSLA"
+      },
+      "RenombrarConversacionIA": {
+        "properties": {
+          "titulo": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Titulo"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "titulo"
+        ],
+        "title": "RenombrarConversacionIA"
       },
       "RespuestaMensaje": {
         "properties": {
@@ -18920,6 +19405,11 @@
           "id": {
             "type": "string",
             "title": "Id"
+          },
+          "administrador_principal": {
+            "type": "boolean",
+            "title": "Administrador Principal",
+            "default": false
           },
           "nombre": {
             "type": "string",

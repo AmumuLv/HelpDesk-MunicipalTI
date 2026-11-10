@@ -1,6 +1,6 @@
 # IA del sistema y chatbot TI
 
-Revisión del código: 06/11/2026. Esta guía describe las funciones implementadas;
+Revisión del código: 10/11/2026. Esta guía describe las funciones implementadas;
 no supone que existan claves de proveedores ni que una cuota gratuita esté disponible.
 
 ## Qué aporta cada uno
@@ -51,6 +51,16 @@ y tickets por persona o conjuntos. Los permisos se vuelven a comprobar y la
 respuesta incluye el periodo y sus fuentes. La ayuda sobre el propio módulo
 tampoco necesita un proveedor. Una pregunta no reconocida puede no tener respuesta
 en este módulo; para orientación abierta se usa el chatbot.
+
+El catálogo también incluye listados de tickets pendientes con enlaces, calidad
+de datos por equipo y oficina, responsables, componentes registrados de las PC,
+comparación de inventarios anuales, carga y horarios programados de TI y guías
+consultadas o valoradas. Los administradores pueden consultar la auditoría
+conservada. Las preguntas se buscan dentro de cuatro grupos; cada respuesta
+indica su fuente y alcance. Inventario actual, instantáneas anuales, lecturas
+acumuladas de guías y jornadas programadas son medidas diferentes; no se presentan
+como datos históricos o tiempo realmente trabajado. Los detalles y límites están
+en [Análisis IA](ANALISIS_IA.md).
 
 `ml_service.py` combina modelos estadísticos con reglas orientativas. La muestra
 mínima declarada es de 30 para entrenamiento y de 14 para pronósticos; además se

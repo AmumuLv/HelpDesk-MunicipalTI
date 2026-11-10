@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from typing import Any, Literal
+from uuid import UUID
 
 from pydantic import Field, field_validator, model_validator
 
@@ -498,11 +499,32 @@ class PreguntaIA(Base):
     pregunta: str = Field(min_length=2, max_length=1000)
     filtros: FiltrosAnalitica = Field(default_factory=FiltrosAnalitica)
     conversacion_id: Id | None = None
+    version: int | None = Field(default=None, ge=0)
+    solicitud_id: UUID | None = None
 
     @field_validator("pregunta", mode="before")
     @classmethod
     def _limpiar_pregunta(cls, valor: Any) -> Any:
         return valor.strip() if isinstance(valor, str) else valor
+
+
+class RenombrarConversacionIA(Base):
+    titulo: str = Field(min_length=1, max_length=100)
+    version: int | None = Field(default=None, ge=0)
+
+    @field_validator('titulo', mode='before')
+    @classmethod
+    def _limpiar_titulo(cls, valor: Any) -> Any:
+        return valor.strip() if isinstance(valor, str) else valor
+
+
+class RegenerarRespuestaIA(Base):
+    filtros: FiltrosAnalitica = Field(default_factory=FiltrosAnalitica)
+    version: int | None = Field(default=None, ge=0)
+
+
+class EditarPreguntaIA(PreguntaIA):
+    indice: int = Field(ge=0)
 
 
 class MensajeIA(Base):
@@ -516,6 +538,11 @@ class MensajeIA(Base):
     accion: dict[str, Any] | None = None
     confianza: float | None = None
     explicacion: str | None = None
+    analisis: dict[str, str] | None = None
+    seguimientos: list[str] = Field(default_factory=list)
+    contexto_consulta: dict[str, Any] | None = None
+    alcance_consulta: str | None = None
+    filtros_consulta: dict[str, Any] | None = None
 
 
 class ConversacionIA(Base):
@@ -526,10 +553,12 @@ class ConversacionIA(Base):
     mensajes: list[MensajeIA] = Field(default_factory=list)
     creado_en: datetime | None = None
     actualizado_en: datetime | None = None
+    version: int = 0
 
 
 class PreguntasSugeridas(Base):
     preguntas: list[str] = Field(default_factory=list)
+    grupos: dict[str, str] = Field(default_factory=dict)
 
 
 # ── Exportaciones ────────────────────────────────────────────

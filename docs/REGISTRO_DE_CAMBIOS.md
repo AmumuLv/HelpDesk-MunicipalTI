@@ -13,6 +13,44 @@ como casos nuevos.
 
 ## Seguimiento técnico e institucional
 
+`CAM-2026-005` (10/11/2026): corrección de la columna Equipo de tickets abiertos
+y cerrados. Una PC completa conserva `conjunto_id` y `conjunto_nombre`; la
+bandeja solo comprobaba `activo_nombre` y mostraba «Sin equipo». Ahora reconoce
+ambos vínculos, muestra la PC completa y mantiene el identificador de columna
+para conservar las preferencias. No requiere migrar ni reasignar tickets.
+
+Validación de entrega: **676 casos de backend y 44 subpruebas**, suite completa;
+**77 escenarios funcionales de Chromium** consolidados y **tres pantallas HTTPS**.
+Se comprobaron registro, cancelación, edición, recarga, asignación, cierre,
+reapertura, permisos entre cuentas, laptops independientes y ambas IA. Una
+prueba de navegación entre pestañas se sincronizó con su estado seleccionado
+y aprobó tres repeticiones; esas repeticiones no aumentan el total de escenarios.
+Datos exclusivamente ficticios. El contrato OpenAPI y sus tipos se actualizaron;
+160 llamadas del frontend coinciden con 153 rutas documentadas. ESLint,
+TypeScript, construcción de API/worker/web y controles nativos aprobados.
+
+La comprobación HTTPS local aprobó cookies Secure/HttpOnly, CSRF, CSP, rechazo
+de orígenes ajenos, archivos y documentación privados y revocación de sesión
+HTTP/WebSocket. Los archivos publicables y el contenido XML de los Word se
+revisaron sin encontrar credenciales del entorno. Se actualizan el manual y
+los recorridos de CI. Docker local está saludable y sirve la bandeja corregida.
+Entrega autorizada al repositorio privado; el commit y Actions acreditan el
+estado remoto. El dominio, HTTPS público, aceptación institucional y seguimiento
+de SEG-001 continúan pendientes; esta ronda no es un nuevo escaneo de CVE.
+
+`CAM-2026-004` (10/11/2026): ampliación de Consultas de datos con quince
+lecturas sobre pendientes de tickets, calidad y responsables del inventario,
+PC de escritorio, archivos anuales, equipo TI, guías y auditoría. Añade búsqueda
+en los cuatro grupos, enlaces seguros en conversación y Markdown y conocimiento
+actualizado del módulo. Conserva permisos de solo lectura; auditoría exclusiva
+de administradores. Validación local: 149 casos nuevos de backend y regresión
+de 130 casos/19 subpruebas; 61 escenarios de Chromium en la ejecución completa,
+ESLint, TypeScript y construcción de API, worker y web aprobados. Detalles y
+límites en [Análisis IA](ANALISIS_IA.md). Aplicado en Docker local: los tres
+servicios saludables y página, API y JavaScript actualizado con HTTP 200.
+Entorno aislado y volúmenes ficticios retirados al terminar. Esta entrada no
+acredita publicación de los cambios en GitHub ni despliegue público.
+
 `CAM-2026-003` (07/11/2026): actualización de seguridad de las cuatro imágenes
 indicadas en SEG-001, validada con reconstrucción, análisis y comprobaciones de
 servicio. Aplicada localmente; el despliegue público y la aceptación institucional

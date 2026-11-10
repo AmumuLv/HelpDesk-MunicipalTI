@@ -502,20 +502,39 @@ test('consultas internas muestran resultado, comparación y fuentes en ambos tem
   let solicitudes = 0
   const respuesta = { texto: 'Soporte TI registra 30 tickets, entre el 01/10/2026 y el 20/10/2026.\n\nEl volumen no mide por sí solo la gravedad.', fuentes: ['ranking_oficinas'], periodo: '30d', explicacion: 'Consulta directa de solo lectura.', tabla: { columnas: [{ clave: 'oficina', titulo: 'Oficina' }, { clave: 'total', titulo: 'Tickets' }], filas: [{ oficina: 'Soporte TI', total: 30 }, { oficina: 'Caja', total: 1 }] } }
   await page.route('**/api/analitica/equipos-prediccion', ruta => ruta.fulfill({ json: { familias: [] } }))
-  await page.route('**/api/ia/asistente/preguntas', ruta => ruta.fulfill({ json: { preguntas: [pregunta] } }))
+  await page.route('**/api/ia/asistente/preguntas', ruta => ruta.fulfill({ json: { preguntas: [pregunta, '¿Qué zona tiene más tickets?', '¿Qué técnico está disponible ahora?', '¿Cuáles son las causas más frecuentes?', '¿Qué familias de equipos tienen más fallas?'] } }))
   await page.route('**/api/ia/asistente/conversaciones', ruta => ruta.fulfill({ json: { items: mensajes.length ? [{ id: 'consulta', titulo: pregunta }] : [] } }))
   await page.route('**/api/ia/asistente/conversaciones/consulta', ruta => ruta.fulfill({ json: { id: 'consulta', titulo: pregunta, mensajes } }))
   await page.route('**/api/ia/asistente', ruta => {
     solicitudes++
+    expect(ruta.request().postDataJSON().pregunta).toBe(pregunta)
     expect(ruta.request().postDataJSON().filtros).toEqual({ periodo: '30d' })
     mensajes = [{ rol: 'user', texto: pregunta }, { rol: 'assistant', ...respuesta }]
     return ruta.fulfill({ json: { conversacion_id: 'consulta', ...respuesta } })
   })
   await page.goto('/panel/analisis?tab=asistente')
-  await expect(page.getByRole('heading', { name: 'Inteligencia operativa' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Tus datos, fáciles de entender' })).toBeVisible()
+  await expect(page.getByRole('button', { name: pregunta })).toContainText('Oficinas con más problemas')
+  await expect(page.locator('.datos-options button')).toHaveCount(5)
+  for (const ancho of [320, 1440]) {
+    await page.setViewportSize({ width: ancho, height: 1000 })
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+    const titulo = await page.getByRole('heading', { name: '¿Qué quieres saber?', exact: true }).boundingBox()
+    const nueva = await page.getByRole('button', { name: 'Nueva conversación', exact: true }).boundingBox()
+    expect(titulo && nueva && (titulo.y + titulo.height <= nueva.y || titulo.x + titulo.width <= nueva.x)).toBeTruthy()
+    expect(await page.locator('.datos-suggestion small').evaluateAll(elementos => elementos.every(e => e.scrollWidth <= e.clientWidth + 1))).toBe(true)
+    const bienvenida = await page.getByRole('heading', { name: 'Empieza con un clic' }).boundingBox()
+    const registro = await page.getByRole('log').boundingBox()
+    expect(bienvenida && registro && bienvenida.y >= registro.y).toBeTruthy()
+    await page.screenshot({ path: `../.codex-pdf-tools/asistente-interno-inicio-${ancho}.png`, fullPage: true })
+  }
+  expect((await new AxeBuilder({ page }).include('.datos-lab').analyze()).violations).toEqual([])
   await page.getByRole('button', { name: pregunta }).click()
   await expect(page.getByRole('log')).toContainText('Soporte TI registra 30 tickets')
   await expect(page.getByRole('figure', { name: 'Comparación de resultados' })).toBeVisible()
+  await expect(page.getByText('Tickets por oficina', { exact: true })).not.toBeVisible()
+  await page.getByText('De dónde sale esta respuesta', { exact: true }).click()
+  await expect(page.getByText('Tickets por oficina', { exact: true })).toBeVisible()
   await page.getByText('Ver datos de la respuesta', { exact: true }).click()
   await expect(page.getByRole('cell', { name: '30', exact: true })).toBeVisible()
   expect(solicitudes).toBe(1)
@@ -524,7 +543,7 @@ test('consultas internas muestran resultado, comparación y fuentes en ambos tem
     for (const ancho of [320, 1440]) {
       await page.setViewportSize({ width: ancho, height: 1000 })
       await expect(page.locator('.datos-lab')).toBeVisible()
-      expect(await page.locator('.datos-workspace').evaluate(elemento => elemento.getBoundingClientRect().height)).toBeLessThanOrEqual(760)
+      expect(await page.locator('.datos-workspace').evaluate(e => e.getBoundingClientRect().height)).toBeLessThanOrEqual(760)
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
       await page.screenshot({ path: `../.codex-pdf-tools/consultas-datos-${tema}-${ancho}.png`, fullPage: true })
     }
@@ -579,6 +598,72 @@ test('asistente interno explica su función con formato de chat y sin datos inve
   await expect(page.getByRole('log').getByText('Asistente interno', { exact: true })).toBeVisible()
   await expect(page.getByRole('log').getByText('Ayuda del sistema', { exact: true })).toBeVisible()
   await expect(page.getByRole('figure', { name: 'Comparación de resultados' })).toHaveCount(0)
+})
+
+test('centro de análisis explica cifras, conserva filtros y permite continuar una consulta', async ({ page }) => {
+  await portal(page, false, 'administrador')
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  const pregunta = '¿Hay más tickets que en el periodo anterior?'
+  let mensajes: Record<string, unknown>[] = []
+  const enviadas: string[] = []
+  const datos = {
+    kpis: { tickets_analizados: 30, tickets_periodo_anterior: 20, cerrados: 12, tiempo_medio_resolucion_min: null, cumplimiento_sla: 50, cerrados_a_tiempo: 6, satisfaccion_promedio: null, precision_clasificacion: null, muestras_satisfaccion: 0, muestras_tiempo: 0, suficiente_datos: true, periodo: { desde: '2026-10-01', hasta: '2026-10-30' } },
+    ranking_oficinas: { items: [{ id: 'oficina', oficina: 'Soporte TI', total: 30, criticas: 2 }] }, ranking_zonas: { items: [] }, ranking_conjuntos: { items: [] },
+    riesgo_sla_oficina: { items: [{ nombre: 'Soporte TI', vencidos: 2, sin_plazo: 1 }] }, causas: { items: [] },
+    tendencia: { serie: [{ fecha: '2026-10-01', valor: 10 }, { fecha: '2026-10-02', valor: 20 }] }, actualizado_en: '2026-10-30T17:00:00Z',
+  }
+  await page.route('**/api/analitica/panel?**', ruta => ruta.fulfill({ json: datos }))
+  await page.route('**/api/analitica/equipos-prediccion', ruta => ruta.fulfill({ json: { familias: [] } }))
+  await page.route('**/api/ia/asistente/preguntas', ruta => ruta.fulfill({ json: { preguntas: [pregunta, '¿Puedes darme un resumen del servicio?', '¿Cuántos equipos tenemos registrados?', '¿Qué técnico está disponible ahora?', '¿Para qué sirve este asistente?', '¿Qué tickets tienen el plazo vencido?', '¿Cuántos tickets están abiertos y cerrados?', '¿Cómo evolucionan los tickets por día?'] } }))
+  await page.route('**/api/ia/asistente/conversaciones', ruta => ruta.fulfill({ json: { items: mensajes.length ? [{ id: 'lectura', titulo: pregunta }] : [] } }))
+  await page.route('**/api/ia/asistente/conversaciones/lectura', ruta => ruta.fulfill({ json: { id: 'lectura', titulo: pregunta, mensajes } }))
+  await page.route('**/api/ia/asistente', ruta => {
+    const solicitud = ruta.request().postDataJSON()
+    expect(solicitud.filtros.periodo).toBe('30d')
+    if (enviadas.length) expect(solicitud.conversacion_id).toBe('lectura')
+    enviadas.push(solicitud.pregunta)
+    const respuesta = { texto: 'Hay 30 tickets frente a 20 del intervalo anterior.', fuentes: ['comparacion_periodos'], periodo: '30d', alcance_consulta: 'Todas las oficinas', analisis: { significado: 'Comparamos dos intervalos de igual duración.', revision: 'Revisa las oficinas con más reportes.', limite: 'Más tickets no demuestra peor atención.' }, seguimientos: ['¿Y ayer?'], tabla: { columnas: [{ clave: 'intervalo', titulo: 'Intervalo' }, { clave: 'total', titulo: 'Tickets' }], filas: [{ intervalo: 'Actual', total: 30 }, { intervalo: 'Anterior', total: 20 }] } }
+    mensajes = [...mensajes, { rol: 'user', texto: solicitud.pregunta }, { rol: 'assistant', ...respuesta }]
+    return ruta.fulfill({ json: { conversacion_id: 'lectura', ...respuesta } })
+  })
+  await page.goto('/panel/analisis')
+  await expect(page.getByRole('heading', { name: 'Primero entiende. Después decide.' })).toBeVisible()
+  await expect(page.locator('.analisis-indicator')).toHaveCount(6)
+  await expect(page.locator('.analisis-indicator').filter({ hasText: 'Satisfacción' })).toContainText('Sin datos')
+  await expect(page.locator('.analisis-indicator').filter({ hasText: 'Precisión de la clasificación' })).toContainText('Sin datos')
+  await expect(page.locator('.analisis-overview')).toContainText('2 tickets vencidos')
+  await page.locator('.analisis-indicator summary').first().click()
+  await expect(page.locator('.analisis-indicator').first()).toContainText('Cómo se obtiene')
+  await expect(page.getByTestId('mosaico-graficos').locator(':scope > div')).toHaveCount(7)
+  for (const tema of ['claro', 'oscuro']) {
+    await page.evaluate(t => document.documentElement.setAttribute('data-tema', t), tema)
+    for (const ancho of [320, 1440]) {
+      await page.setViewportSize({ width: ancho, height: 1000 })
+      await page.screenshot({ path: `../.codex-pdf-tools/centro-analisis-${tema}-${ancho}.png`, fullPage: true })
+      const desbordados = await page.locator('.analisis-centro *').evaluateAll(es => es.filter(e => e.getBoundingClientRect().right > innerWidth + 1).map(e => ({ tag: e.tagName, clase: e.className, ancho: e.getBoundingClientRect().width, texto: e.textContent?.slice(0, 60) })).slice(0, 12))
+      await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), { message: JSON.stringify(desbordados) }).toBe(true)
+    }
+    expect((await new AxeBuilder({ page }).include('.analisis-centro').analyze()).violations).toEqual([])
+  }
+  await page.getByRole('button', { name: 'Entender la comparación' }).click()
+  await expect(page.getByLabel('Tu pregunta', { exact: true })).toHaveValue(pregunta)
+  expect(enviadas).toEqual([])
+  await expect(page.getByRole('group', { name: 'Tipo de consulta' })).toBeVisible()
+  await expect(page.getByLabel('Periodo', { exact: true })).toHaveValue('30d')
+  await expect(page.getByLabel('Buscar conversaciones')).toBeVisible()
+  await page.getByRole('group', { name: 'Tipo de consulta' }).getByRole('button', { name: 'Equipos', exact: true }).click()
+  await expect(page.getByRole('button', { name: '¿Cuántos equipos tenemos registrados?' })).toBeVisible()
+  await page.getByRole('button', { name: 'Preguntar', exact: true }).click()
+  await expect(page.getByRole('log')).toContainText('Comparamos dos intervalos de igual duración.')
+  await expect(page.getByRole('log')).toContainText('Todas las oficinas')
+  await page.getByRole('group', { name: 'Seguir consultando' }).getByRole('button', { name: '¿Y ayer?' }).click()
+  expect(enviadas).toEqual([pregunta, '¿Y ayer?'])
+  await page.reload()
+  await expect(page.getByRole('log')).toContainText('Comparamos dos intervalos de igual duración.')
+  await page.getByRole('button', { name: 'Explícame este resultado' }).click()
+  expect(enviadas).toEqual([pregunta, '¿Y ayer?', 'Explícame eso'])
+  await page.getByRole('tab', { name: 'Paneles', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Análisis IA', exact: true })).toBeVisible()
 })
 
 test('chatbot guarda y recupera conversaciones tras recargar y permite eliminarlas', async ({ page }) => {

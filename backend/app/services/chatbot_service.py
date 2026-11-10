@@ -33,9 +33,14 @@ cuando no alcanza la muestra. Los permisos pueden ocultar funciones. Un tecnico
 autorizado puede restablecer contrasenas de usuarios; los administradores gestionan
 las cuentas permitidas por la jerarquia. Solo el principal crea administradores y
 los demas no intervienen su cuenta. Este chat no modifica registros operativos ni ejecuta comandos.
-Un relevo de trabajador crea otra identidad y reasigna los mismos equipos; no se
-renombra la cuenta anterior ni se transfieren sus tickets. La importacion reconoce
-equipos por identificadores y exige revisar coincidencias ambiguas antes de aplicar.
+Equipos > Importar puede cambiar el responsable de los mismos equipos reconocidos
+en el Excel, sin moverlos despues uno por uno. La vista previa muestra Se actualizará
+y persona anterior → persona nueva. Crear perfiles faltantes es opcional, requiere
+permiso de importacion y usuarios.editar; no crea correo ni contraseña. Revisa las filas validas y omitidas;
+no supongas que todos los equipos del trabajador anterior se entregaron al nuevo.
+La identidad del equipo y los tickets originales se conservan; no renombres la cuenta
+anterior para otro trabajador. Crear o desactivar una cuenta no reasigna por si solo.
+Una version de Inventario anual es una instantanea, no este relevo operativo.
 No existe aun un registro de visitas a sala de servidores."""
 
 GUIA += """

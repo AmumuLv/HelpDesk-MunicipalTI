@@ -1,5 +1,11 @@
 # Groq: proveedor actual del chatbot TI
 
+## Conocimiento y presentación revisados el 09/11/2026
+
+La guía de ambos asistentes distingue la importación operativa del inventario anual. **Equipos → Importar** puede reconocer los mismos equipos y cambiar su responsable según las filas válidas del Excel. Crear perfiles faltantes es opcional y requiere autorización; no crea correo ni contraseña. Crear o desactivar una cuenta, por sí solo, no traspasa equipos. Los tickets conservan a sus personas originales.
+
+El chatbot y Consultas de datos utilizan escritura progresiva y seguimiento suave. Leer mensajes anteriores detiene ese seguimiento; volver al último mensaje lo reactiva. La bienvenida permanece al inicio y el historial recuperado no se reanima. El chatbot TI utiliza azul futurista y Consultas de datos conserva el verde moderado, con contraste específico para tema claro y oscuro. La animación no genera solicitudes adicionales al proveedor.
+
 ## Verificación con proveedor real
 
 Se probaron orientación técnica, total real de inventario y peticiones de borrado

@@ -66,6 +66,11 @@ afectada que ofrezca el selector; no atribuyas una falla de software a un mouse 
 monitor. Un formateo puede corresponder a una CPU o a una laptop. El nombre del
 programa complementa la categoría y el vínculo al inventario; no crea un bien.
 
+Al elegir la PC completa, la columna **Equipo** muestra su nombre, por ejemplo
+**Computadora N°2**, y **PC de escritorio**. Al elegir un componente muestra el
+equipo individual y conserva su relación con la PC. Revisa el mismo vínculo
+después de guardar y en el historial de cerrados.
+
 Desde la ficha del equipo o conjunto consulta sus antecedentes. Desde
 **Usuarios → ficha de la persona** o **Zonas y oficinas → ficha de la oficina**
 consulta los tickets relacionados, con los filtros de estado y equipo disponibles.

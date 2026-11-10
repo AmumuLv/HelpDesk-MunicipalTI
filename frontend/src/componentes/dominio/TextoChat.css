@@ -1,0 +1,25 @@
+.texto-chat { min-width:0; overflow-wrap:anywhere; line-height:1.8; }
+.texto-chat>:first-child { margin-top:0; }
+.texto-chat>:last-child { margin-bottom:0; }
+.texto-chat p { white-space:pre-wrap; margin-block:0 1em; }
+.texto-chat h3,.texto-chat h4 { font-size:1.08em; line-height:1.5; font-weight:700; margin-block:1.3em .6em; }
+.texto-chat h4 { font-size:1em; }
+.texto-chat strong { font-weight:700; }
+.texto-chat a { color:var(--datos-cyan,currentColor); text-decoration:underline; text-underline-offset:3px; }
+.texto-chat a:focus-visible,.texto-chat button:focus-visible,.texto-chat-tabla:focus-visible { outline:2px solid currentColor; outline-offset:3px; }
+.texto-chat ul,.texto-chat ol { padding-left:1.5em; margin-block:.5em 1em; }
+.texto-chat ul { list-style:disc; }
+.texto-chat ol { list-style:decimal; }
+.texto-chat li { padding-left:.15em; margin-block:.35em; }
+.texto-chat blockquote { padding-left:1em; margin-block:1em; border-left:3px solid var(--datos-border,currentColor); color:var(--datos-muted,currentColor); white-space:pre-wrap; }
+.texto-chat hr { margin-block:1.3em; border:0; border-top:1px solid var(--datos-border,currentColor); }
+.texto-chat :not(pre)>code { padding:.12em .35em; border-radius:5px; background:var(--datos-tint,transparent); font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-size:.9em; }
+.texto-chat-codigo { margin-block:1em; min-width:0; border:1px solid var(--datos-border,currentColor); border-radius:10px; overflow:hidden; }
+.texto-chat-codigo-barra { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:8px 12px; background:var(--datos-tint,transparent); font-size:12px; }
+.texto-chat-codigo-barra button { display:inline-flex; align-items:center; gap:6px; padding:4px 6px; cursor:pointer; border-radius:5px; color:inherit; }
+.texto-chat pre { margin:0; padding:14px; max-width:100%; overflow:auto; background:var(--datos-card,transparent); white-space:pre; font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-size:13px; line-height:1.7; }
+.texto-chat-copia-error { display:block; padding:8px 12px; font-size:12px; }
+.texto-chat-tabla { max-width:100%; overflow:auto; margin-block:1em; }
+.texto-chat table { border-collapse:collapse; min-width:100%; font-size:.9em; }
+.texto-chat th,.texto-chat td { padding:9px 12px; border-bottom:1px solid var(--datos-border,currentColor); vertical-align:top; min-width:100px; }
+.texto-chat th { font-weight:700; }
