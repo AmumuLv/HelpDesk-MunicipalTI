@@ -157,4 +157,4 @@ USER root
 RUN python -m pip uninstall -y pip
 USER appuser
 ENV APP_ENV=production PYTHONPATH=/app
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*", "--ws-max-size", "8192", "--ws-max-queue", "8"]
+CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips \"${FORWARDED_ALLOW_IPS:-$(python -m app.scripts.redes_proxy)}\" --ws-max-size 8192 --ws-max-queue 8"]

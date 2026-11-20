@@ -548,6 +548,7 @@ async def calendario_equipo(desde: date, hasta: date) -> list[dict[str, Any]]:
             tramos = [] if libre or festivo or ausencia else config.get("tramos") or []
             filas.append({
                 "fecha": dia, "tecnico_id": tecnico["_id"], "tecnico_nombre": tecnico.get("nombre"),
+                "oficina_nombre": tecnico.get('oficina_nombre'),
                 "tramos": tramos, "libre": libre, "feriado": festivo,
                 "ausencia": ausencia["tipo"] if ausencia else None,
                 "horas_disponibles": minutos_tramos(tramos) / 60,

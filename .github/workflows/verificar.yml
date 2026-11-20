@@ -29,7 +29,7 @@ jobs:
         env:
           PRUEBA_API_URL: http://127.0.0.1:18100
           PRUEBA_NAVEGADORES: chromium
-        run: npx playwright test pruebas/flujos-combinados-roles.spec.ts pruebas/ia-aplicar-sugerencia.spec.ts pruebas/importacion-relevo.spec.ts pruebas/ticket-conjunto.spec.ts pruebas/ticket-laptop.spec.ts pruebas/analisis-ampliado-real.spec.ts --reporter=list
+        run: npx playwright test pruebas/flujos-combinados-roles.spec.ts pruebas/ia-aplicar-sugerencia.spec.ts pruebas/importacion-relevo.spec.ts pruebas/ticket-conjunto.spec.ts pruebas/ticket-laptop.spec.ts pruebas/analisis-ampliado-real.spec.ts pruebas/resultados-explorables-real.spec.ts --reporter=list
       - name: Diagnóstico de servicios si falla la suite
         if: failure()
         run: |
@@ -57,7 +57,7 @@ jobs:
       - run: npm run verify:clases
       - run: npm run build
       - run: npx playwright install --with-deps chromium
-      - run: npx playwright test pruebas/portal-sencillo.spec.ts pruebas/analisis-ampliado.spec.ts pruebas/consultas-chat.spec.ts pruebas/chats-casos-adicionales.spec.ts pruebas/chats-fluidez.spec.ts --reporter=list
+      - run: npx playwright test pruebas/portal-sencillo.spec.ts pruebas/analisis-ampliado.spec.ts pruebas/consultas-chat.spec.ts pruebas/chats-casos-adicionales.spec.ts pruebas/chats-fluidez.spec.ts pruebas/resultados-explorables.spec.ts --reporter=list
   publicacion:
     runs-on: ubuntu-latest
     steps:

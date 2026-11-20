@@ -9,7 +9,7 @@ from bson import ObjectId
 from app.core import ratelimit
 from app.core.audit import registrar
 from app.core.db import get_db
-from app.core.errors import NoAutorizado, Prohibido, Validacion
+from app.core.errors import Conflicto, NoAutorizado, Prohibido, Validacion
 from app.core.ids import normalizar_texto
 from app.core.security import (
     crear_access_token,
@@ -232,17 +232,26 @@ async def crear_admin_inicial(datos: dict[str, Any], *, ip: str | None = None) -
     ya_hay = await db["usuarios"].count_documents({"rol": "administrador"})
     if ya_hay:
         raise Prohibido("Ya existe un administrador. Ingresa con tu cuenta.")
-    admin = await usuario_service.crear(
-        {
-            "nombre": datos["nombre"],
-            "email": datos["email"],
-            "password": datos["password"],
-            "telefono": datos.get("telefono"),
-            "rol": "administrador",
-        },
-        usuario={"nombre": "Instalador", "rol": "sistema", "_id": None},
-        es_primer_admin=True,
-    )
+    try:
+        admin = await usuario_service.crear(
+            {
+                "nombre": datos["nombre"],
+                "email": datos["email"],
+                "password": datos["password"],
+                "telefono": datos.get("telefono"),
+                "rol": "administrador",
+            },
+            usuario={"nombre": "Instalador", "rol": "sistema", "_id": None},
+            es_primer_admin=True,
+        )
+    except Conflicto:
+        # Dos instalaciones a la vez: las dos pasan la comprobacion de arriba,
+        # pero el indice unico parcial `administrador_principal_unico` (migracion
+        # m027) solo deja insertar una. La segunda se rechaza aqui con el mismo
+        # mensaje que si el administrador ya existiera, en vez de un 500.
+        if await db["usuarios"].count_documents({"rol": "administrador"}):
+            raise Prohibido("Ya existe un administrador. Ingresa con tu cuenta.") from None
+        raise
     await db["usuarios"].update_one({"_id": admin["_id"]}, {"$set": {"debe_cambiar_password": False}})
     await registrar(
         "usuario.crear",

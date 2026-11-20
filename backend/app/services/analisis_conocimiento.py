@@ -6,19 +6,13 @@ no escribe registros y nunca devuelve el contenido privado de una auditoría.
 from __future__ import annotations
 
 import re
-from typing import Any
-
-from bson import ObjectId
-
-from app.core.audit import ACCIONES, accion_legible, consulta_movimientos
 from app.core.db import agregar, get_db
 from app.core.errors import Prohibido, Validacion
-from app.core.ids import a_id, clave
-from app.core.time import business_tz
+from app.core.ids import clave
 from app.domain.permissions import tiene_permiso
 from app.services import analitica_service, kb_service
 
-LIMITE = 10
+LIMITE = 20
 
 
 def _tabla(columnas, filas):
@@ -36,6 +30,8 @@ def _argumentos(argumentos, permitidos):
     if (argumentos is not None and not isinstance(argumentos, dict)) or set(argumentos or {}) - set(permitidos):
         raise Validacion('La consulta contiene argumentos no admitidos.')
     argumentos = argumentos or {}
+    if 'pagina' in argumentos and (type(argumentos['pagina']) is not int or not 1 <= argumentos['pagina'] <= 500):
+        raise Validacion('Selecciona una página entre 1 y 500.')
     for campo in ('periodo_explicito',):
         if campo in argumentos and not isinstance(argumentos[campo], bool):
             raise Validacion('El periodo indicado no es válido.')
@@ -72,11 +68,11 @@ def _unificar_guias(consulta):
 
 
 async def guias_consultadas(filtros, argumentos, *, usuario=None):
-    argumentos = _argumentos(argumentos, {'periodo_explicito'})
+    argumentos = _argumentos(argumentos, {'periodo_explicito', 'pagina'})
     consulta = _consulta_guias(filtros, usuario, argumentos)
     resultado = await agregar('articulos_kb', _unificar_guias(consulta) + [
         {'$facet': {'items': [
-            {'$sort': {'visualizaciones': -1, '_id': -1}}, {'$limit': LIMITE},
+            {'$sort': {'visualizaciones': -1, '_id': -1}}, {'$skip': (argumentos.get('pagina', 1) - 1) * 20}, {'$limit': LIMITE},
             {'$project': {'titulo': 1, 'categoria': 1, 'visualizaciones': {'$ifNull': ['$visualizaciones', 0]}}},
         ], 'conteo': [{'$count': 'total'}]}},
     ])
@@ -85,7 +81,7 @@ async def guias_consultadas(filtros, argumentos, *, usuario=None):
     total = (bloque.get('conteo') or [{}])[0].get('total', 0)
     filas = [{'guia': f.get('titulo') or 'Sin título', 'categoria': f.get('categoria') or 'Sin categoría',
               'lecturas': f.get('visualizaciones', 0)} for f in items]
-    return {'texto': f'Hay {total} guías activas y visibles. Muestro hasta {LIMITE}, ordenadas por sus lecturas acumuladas.'
+    return {'total': total, 'texto': f'Hay {total} guías activas y visibles. Mostrando {len(filas)} de {total}, ordenadas por sus lecturas acumuladas.'
                     '\n\nLas lecturas no equivalen a problemas resueltos ni al número de visitas repetidas de una persona.',
             'tabla': _tabla([('guia', 'Guía'), ('categoria', 'Categoría'), ('lecturas', 'Lecturas acumuladas')], filas),
             'enlaces': [{'texto': f.get('titulo') or 'Abrir guía', 'href': f"/panel/ayuda/{f['_id']}"} for f in items],
@@ -94,7 +90,7 @@ async def guias_consultadas(filtros, argumentos, *, usuario=None):
 
 
 async def guias_valoradas(filtros, argumentos, *, usuario=None):
-    argumentos = _argumentos(argumentos, {'periodo_explicito'})
+    argumentos = _argumentos(argumentos, {'periodo_explicito', 'pagina'})
     consulta = _consulta_guias(filtros, usuario, argumentos)
     resultado = await agregar('articulos_kb', _unificar_guias(consulta) + [
         {'$lookup': {'from': 'articulos_kb_valoraciones', 'let': {'articulo': '$_id'}, 'pipeline': [
@@ -106,7 +102,7 @@ async def guias_valoradas(filtros, argumentos, *, usuario=None):
         {'$unwind': '$estadistica'},
         {'$set': {'porcentaje': {'$round': [{'$multiply': [100, {'$divide': ['$estadistica.utiles', '$estadistica.votos']}]}, 1]}}},
         {'$facet': {'items': [
-            {'$sort': {'porcentaje': -1, 'estadistica.votos': -1, '_id': -1}}, {'$limit': LIMITE},
+            {'$sort': {'porcentaje': -1, 'estadistica.votos': -1, '_id': -1}}, {'$skip': (argumentos.get('pagina', 1) - 1) * 20}, {'$limit': LIMITE},
             {'$project': {'titulo': 1, 'porcentaje': 1, 'votos': '$estadistica.votos', 'utiles': '$estadistica.utiles'}},
         ], 'conteo': [{'$count': 'total'}]}},
     ])
@@ -115,7 +111,7 @@ async def guias_valoradas(filtros, argumentos, *, usuario=None):
     total = (bloque.get('conteo') or [{}])[0].get('total', 0)
     filas = [{'guia': f.get('titulo') or 'Sin título', 'porcentaje_util': f['porcentaje'], 'valoraciones': f['votos'],
               'utiles': f['utiles'], 'muestra': 'Pocas valoraciones' if f['votos'] < 5 else '5 o más valoraciones'} for f in items]
-    return {'texto': (f'{total} guías activas y visibles tienen valoraciones. Muestro hasta {LIMITE}, ordenadas por el porcentaje de votos útiles.' if total else
+    return {'total': total, 'texto': (f'{total} guías activas y visibles tienen valoraciones. Mostrando {len(filas)} de {total}, ordenadas por el porcentaje de votos útiles.' if total else
                      'No hay valoraciones registradas en las guías activas y visibles. Esto no equivale a una valoración de cero.')
                     + '\n\nUna valoración por persona y guía: se toma su decisión más reciente. Con pocas valoraciones el porcentaje puede ser poco representativo.',
             'tabla': _tabla([('guia', 'Guía'), ('porcentaje_util', 'Utilidad (%)'), ('valoraciones', 'Valoraciones'), ('utiles', 'Votos útiles'), ('muestra', 'Muestra')], filas),
@@ -127,7 +123,7 @@ async def guias_valoradas(filtros, argumentos, *, usuario=None):
 async def brechas_guias(filtros, argumentos, *, usuario=None):
     _autorizar(usuario, 'analitica.ver')
     _autorizar(usuario, 'kb.ver')
-    _argumentos(argumentos, set())
+    argumentos = _argumentos(argumentos, {'pagina'})
     desde, hasta, _, _ = analitica_service.resolver_periodo(filtros)
     categorias = await agregar('tickets', [
         {'$match': analitica_service._match(filtros, desde, hasta)},
@@ -143,38 +139,15 @@ async def brechas_guias(filtros, argumentos, *, usuario=None):
     cubiertas = {clave(f['_id']) for f in guias if f.get('_id')}
     pendientes = [f for f in categorias if not f.get('_id') or clave(f['_id']) not in cubiertas]
     filas = [{'categoria': f['_id'] or 'Sin clasificar', 'total': f['total'],
-              'revision': 'Falta clasificar los tickets' if not f.get('_id') else 'Sin guía activa visible en esta categoría'} for f in pendientes[:20]]
+              'revision': 'Falta clasificar los tickets' if not f.get('_id') else 'Sin guía activa visible en esta categoría'} for f in pendientes[(argumentos.get('pagina', 1) - 1) * 20:argumentos.get('pagina', 1) * 20]]
     total = sum(f['total'] for f in categorias)
-    return {'texto': f'Se revisaron {total} tickets creados en el periodo. Hay {len(pendientes)} categorías o grupos pendientes; muestro hasta 20.'
+    return {'total': len(pendientes), 'texto': f'Se revisaron {total} tickets creados en el periodo. Mostrando {len(filas)} de {len(pendientes)} categorías o grupos pendientes.'
                     '\n\nLa comparación usa la categoría registrada. Una guía de otra categoría podría cubrir el problema; esto no analiza su contenido ni confirma la causa de la incidencia.',
             'tabla': _tabla([('categoria', 'Categoría'), ('total', 'Tickets del periodo'), ('revision', 'Qué revisar')], filas),
             'enlaces': [{'texto': 'Revisar la base de conocimiento', 'href': '/panel/conocimiento'}],
             'seguimientos': ['¿Cuáles son las causas más frecuentes?', '¿Qué guías son las más consultadas?']}
 
 
-async def _equipo_auditoria(filtros, argumentos):
-    db = get_db()
-    identificador = filtros.get('equipo_id')
-    nombre = argumentos.get('equipo')
-    if identificador is not None:
-        identificador = a_id(identificador)
-        if not identificador:
-            raise Validacion('El identificador del equipo no es válido.')
-        consulta: dict[str, Any] = {'_id': identificador}
-    elif isinstance(nombre, str) and 2 <= len(nombre.strip()) <= 160:
-        patron = {'$regex': '^' + re.escape(nombre.strip()) + '$', '$options': 'i'}
-        consulta = {'$or': [{'nombre_equipo': patron}, {'nombre': patron}, {'codigo_patrimonial': patron}]}
-    else:
-        raise Validacion('Indica el nombre exacto o código patrimonial del equipo para revisar sus cambios de responsable.')
-    for campo in ('oficina_id', 'zona_id'):
-        if filtros.get(campo):
-            consulta[campo] = filtros[campo]
-    encontrados = []
-    for coleccion in ('activos', 'conjuntos'):
-        encontrados.extend(await db[coleccion].find(consulta, {'nombre': 1, 'nombre_equipo': 1}).limit(2).to_list(2))
-    if len(encontrados) != 1:
-        raise Validacion('No encontré un equipo único con ese nombre o código. Indica su código patrimonial o precisa la oficina.')
-    return encontrados[0]
 
 
 def _nombre_actor(nombre):
@@ -183,54 +156,35 @@ def _nombre_actor(nombre):
     return nombre[:160] or 'Cuenta no identificada'
 
 
-async def _auditoria(filtros, argumentos, usuario, *, responsables=False):
-    _autorizar(usuario, 'auditoria.ver', solo_admin=True)
-    argumentos = _argumentos(argumentos, {'equipo'} if responsables else set())
-    _sin_filtros(filtros, ('categoria', 'tecnico_id', 'tipo_activo'),
-                 'La auditoría no admite filtros de categoría de ticket, técnico asignado ni tipo de equipo.')
-    if not responsables:
-        _sin_filtros(filtros, ('oficina_id', 'zona_id', 'equipo_id'),
-                     'La auditoría general no tiene ubicación de todos los eventos. Para un equipo, pide sus cambios de responsable indicando el nombre exacto.')
-    desde, hasta, _, _ = analitica_service.resolver_periodo(filtros)
-    consulta = consulta_movimientos(desde=desde, hasta=hasta)
-    equipo = await _equipo_auditoria(filtros, argumentos) if responsables else None
-    if equipo:
-        consulta.update({'accion': 'activo.responsable', 'entidad_id': str(equipo['_id'])})
-    inicio = consulta['fecha']['$gte'].astimezone(business_tz())
-    fin = consulta['fecha'].get('$lt')
-    fuera_retencion = bool(fin and fin <= consulta['fecha']['$gte'])
-    db = get_db()
-    total = await db['auditoria'].count_documents(consulta)
-    # Proyección positiva. No se leen resumen, antes/después, contexto, IP o UA.
-    documentos = await db['auditoria'].find(consulta, {
-        'fecha': 1, 'accion': 1, 'entidad': 1, 'usuario_nombre': 1,
-    }).sort([('fecha', -1), ('_id', -1)]).limit(20).to_list(20)
-    entidades = {'activo': 'Equipo', 'activos': 'Equipo', 'conjunto': 'Conjunto', 'conjuntos': 'Conjunto',
-                 'ticket': 'Ticket', 'usuario': 'Cuenta', 'oficina': 'Oficina', 'zona': 'Zona',
-                 'articulo': 'Guía', 'configuracion': 'Configuración', 'importacion': 'Importación',
-                 'campana': 'Campaña', 'inventario': 'Inventario', 'permiso': 'Permisos'}
-    filas = [{'fecha': f['fecha'].astimezone(business_tz()).strftime('%d/%m/%Y %H:%M') if f.get('fecha') else 'Sin fecha',
-              'persona': _nombre_actor(f.get('usuario_nombre')),
-              'accion': accion_legible(f.get('accion', ''), f.get('entidad', '')) if f.get('accion') in ACCIONES else 'Otro cambio registrado',
-              'entidad': entidades.get(f.get('entidad'), 'Registro del sistema')} for f in documentos]
-    rango = f"del {desde.strftime('%d/%m/%Y')} al {hasta.strftime('%d/%m/%Y')}"
-    texto = (f'El periodo solicitado ({rango}) queda fuera de los 15 días de auditoría conservados. No puedo reconstruir esos cambios.' if fuera_retencion else
-             f'Hay {total} movimientos relevantes conservados para la consulta ({rango}). Muestro hasta 20, del más reciente al más antiguo.')
-    texto += f"\n\nLa auditoría conserva 15 días; la lectura disponible empieza el {inicio.strftime('%d/%m/%Y %H:%M')} (hora de Lima) o la fecha inicial solicitada si es posterior. No se muestran valores privados de los cambios."
-    if responsables:
-        texto += '\n\nSolo se incluyen eventos registrados como cambio de responsable de este equipo; no se infieren cambios de otros flujos sin ese registro.'
-    return {'texto': texto, 'tabla': _tabla([('fecha', 'Fecha (Lima)'), ('persona', 'Quién realizó el cambio'), ('accion', 'Acción'), ('entidad', 'Registro afectado')], filas),
-            'enlaces': [{'texto': 'Abrir auditoría', 'href': '/panel/auditoria'}],
-            'alcance': ('Cambios del equipo identificado' if equipo else 'Movimientos relevantes de administradores y técnicos'),
-            'periodo_label': 'Auditoría conservada (máximo 15 días)', 'suficiente_datos': not fuera_retencion}
 
 
 async def auditoria_cambios(filtros, argumentos, *, usuario=None):
-    return await _auditoria(filtros, argumentos, usuario)
+    _autorizar(usuario, 'auditoria.ver', solo_admin=True)
+    _argumentos(argumentos, {'pagina'})
+    _sin_filtros(filtros, ('categoria', 'tecnico_id', 'tipo_activo', 'oficina_id', 'zona_id', 'equipo_id'), 'La auditoría general no admite filtros de tickets ni ubicaciones no registradas en sus eventos.')
+    from app.services.analisis_exploracion import auditoria
+    datos = await auditoria(filtros, argumentos or {})
+    datos['texto'] += '\n\nIntervalo realmente cubierto: ' + datos['cobertura'] + '. Auditoría conservada: 15 días.'
+    datos['suficiente_datos'] = not datos['cobertura'].startswith('Fuera')
+    if not datos['suficiente_datos']:
+        datos['texto'] += ' No puedo reconstruir movimientos fuera de los 15 días conservados.'
+    datos['periodo_label'] = 'Auditoría conservada (máximo 15 días)'
+    return datos
 
 
 async def auditoria_responsables(filtros, argumentos, *, usuario=None):
-    return await _auditoria(filtros, argumentos, usuario, responsables=True)
+    _autorizar(usuario, 'auditoria.ver', solo_admin=True)
+    argumentos = _argumentos(argumentos, {'equipo', 'pagina'})
+    from app.services.analisis_exploracion import auditoria
+    opciones = {'texto': argumentos.get('equipo'), 'pagina': argumentos.get('pagina', 1), '_usuario': usuario}
+    if filtros.get('equipo_id'): opciones['equipo_id'] = str(filtros['equipo_id'])
+    datos = await auditoria(filtros, opciones, historial=True)
+    if datos.get('vista') == 'buscar_equipo' and datos['total'] == 1:
+        opciones['equipo_id'] = datos['tabla']['filas'][0]['id']
+        datos = await auditoria(filtros, opciones, historial=True)
+        datos['equipo_consulta'] = opciones['equipo_id']
+    datos['periodo_label'] = 'Historial registrado de inventario' if opciones.get('equipo_id') else 'Buscar equipo para consultar historial'
+    return datos
 
 
 def detectar(pregunta):
@@ -287,3 +241,8 @@ CONSULTAS = {
         'preguntas': ['¿Quién cambió el responsable de un equipo?'], 'grupo': 'Entender', 'ambito': 'periodo',
     },
 }
+
+
+for _nombre in ('auditoria_cambios', 'auditoria_responsables', 'guias_consultadas', 'guias_valoradas', 'brechas_guias'):
+    CONSULTAS[_nombre]['esquema']['properties']['pagina'] = {'type': 'integer', 'minimum': 1, 'maximum': 500}
+CONSULTAS['auditoria_responsables']['lectura'] = ('Permite buscar un equipo por nombre parcial, patrimonio, serie u oficina y consultar el historial registrado.', 'Selecciona una coincidencia para revisar sus responsables.', 'El historial persistente es distinto de la auditoría de quince días; no se inventan ubicaciones históricas ausentes.')

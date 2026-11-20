@@ -18,7 +18,7 @@ from app.domain.permissions import tiene_permiso
 from app.services import analitica_service, horario_service, ticket_service
 
 
-LIMITE = 10
+LIMITE = 20
 MAXIMO = 20
 MODOS = {'vencidos', 'antiguos', 'sin_asignar', 'sin_equipo', 'reabiertos'}
 FILTROS = {'periodo', 'desde', 'hasta', 'oficina_id', 'zona_id', 'tecnico_id', 'equipo_id', 'categoria', 'tipo_activo'}
@@ -35,6 +35,8 @@ def _argumentos(argumentos, admitidos):
     limite = argumentos.get('limite', LIMITE)
     if type(limite) is not int or not 1 <= limite <= MAXIMO:
         raise Validacion(f'Puedes consultar entre 1 y {MAXIMO} resultados a la vez.')
+    if type(argumentos.get('pagina', 1)) is not int or not 1 <= argumentos.get('pagina', 1) <= 500:
+        raise Validacion('La página debe estar entre 1 y 500.')
     return limite
 
 
@@ -80,7 +82,7 @@ def _texto(valor, alternativa='Sin registrar'):
 
 async def tickets_pendientes(filtros, argumentos, *, usuario=None):
     _autorizar(usuario, 'tickets.ver_propios')
-    limite = _argumentos(argumentos, {'modo', 'limite', 'historial_completo'})
+    limite = _argumentos(argumentos, {'modo', 'limite', 'historial_completo', 'pagina'})
     modo = argumentos.get('modo', 'vencidos')
     if not isinstance(modo, str) or modo not in MODOS:
         raise Validacion('Elige vencidos, antiguos, sin asignar, sin equipo o reabiertos.')
@@ -119,12 +121,13 @@ async def tickets_pendientes(filtros, argumentos, *, usuario=None):
         'codigo': 1, 'asunto': 1, 'estado': 1, 'prioridad': 1, 'creado_en': 1,
         'oficina_nombre': 1, 'tecnico_nombre': 1, 'sla_resolver_en': 1,
         'veces_reabierto': 1, 'reportante_id': 1, 'afectado_id': 1,
-    }).sort(orden).limit(limite).to_list(limite)
+    }).sort(orden).skip((argumentos.get('pagina', 1) - 1) * limite).limit(limite).to_list(limite)
     filas, enlaces = [], []
     for documento in documentos:
         ticket_service._verificar_acceso(documento, usuario)
         creado = documento.get('creado_en')
         filas.append({
+            'ticket_id': str(documento['_id']),
             'codigo': _texto(documento.get('codigo'), 'Sin código'),
             'asunto': _texto(documento.get('asunto')),
             'estado': 'cerrado' if documento.get('estado') in ESTADOS_CERRADOS else _texto(documento.get('estado')),
@@ -155,7 +158,7 @@ async def tickets_pendientes(filtros, argumentos, *, usuario=None):
 
 async def resumen_equipo(filtros, argumentos, *, usuario=None):
     _autorizar(usuario, 'equipo_ti.ver')
-    limite = _argumentos(argumentos, {'limite'})
+    limite = _argumentos(argumentos, {'limite', 'pagina'})
     seguros = _filtros(filtros)
     desde, hasta, _, _ = analitica_service.resolver_periodo(seguros)
     consulta = analitica_service._match(seguros, desde, hasta)
@@ -181,7 +184,9 @@ async def resumen_equipo(filtros, argumentos, *, usuario=None):
     consulta_usuarios = {'rol': {'$in': ['administrador', 'tecnico']}, '$or': [{'activo': True}, {'_id': {'$in': list(ids)}}]}
     if seguros.get('tecnico_id'):
         consulta_usuarios['_id'] = seguros['tecnico_id']
-    personas = await get_db()['usuarios'].find(consulta_usuarios, {'nombre': 1, 'activo': 1}).to_list(None)
+    consulta_usuarios = {'$or': [{'rol': {'$in': ['administrador', 'tecnico']}, 'activo': True}, {'_id': {'$in': list(ids)}}]}
+    if seguros.get('tecnico_id'): consulta_usuarios['_id'] = seguros['tecnico_id']
+    personas = await get_db()['usuarios'].find(consulta_usuarios, {'nombre': 1, 'activo': 1, 'archivado': 1, 'rol': 1, 'oficina_nombre': 1}).to_list(None)
     por_periodo = {fila['_id']: fila for fila in grupos}
     por_actual = {fila['_id']: fila['total'] for fila in pendientes}
     # Los casos ligados a una identidad técnica que ya no existe siguen contados.
@@ -189,14 +194,19 @@ async def resumen_equipo(filtros, argumentos, *, usuario=None):
     personas.extend({'_id': identificador, 'nombre': 'Cuenta técnica no disponible'} for identificador in ids - conocidos)
     personas.sort(key=lambda p: (-por_actual.get(p['_id'], 0), -por_periodo.get(p['_id'], {}).get('asignados', 0), p.get('nombre') or ''))
     filas, enlaces = [], [{'texto': 'Ver equipo TI', 'href': '/panel/equipo-ti'}]
-    for persona in personas[:limite]:
+    numero = argumentos.get('pagina', 1)
+    for persona in personas[(numero - 1) * limite:numero * limite]:
         identificador = persona['_id']
         dato = por_periodo.get(identificador, {})
         muestras_t = dato.get('muestras_tiempo', 0)
         muestras_v = dato.get('muestras_valoracion', 0)
         horas = await horario_service.horas_laborables(identificador, desde, hasta)
+        vencidos = await get_db().tickets.count_documents({**actual, 'tecnico_id': identificador, 'sla_resolver_en': {'$lt': utcnow()}})
+        ausencias = await horario_service.ausencias_de(identificador, desde=desde, hasta=hasta)
+        estado = 'Cuenta no disponible' if not persona.get('rol') else 'Archivado' if persona.get('archivado') else 'Inactivo' if not persona.get('activo') else 'Sin rol TI' if persona.get('rol') not in {'administrador', 'tecnico'} else 'Activo'
         filas.append({
-            'tecnico': _texto(persona.get('nombre')), 'pendientes_actuales': por_actual.get(identificador, 0),
+            'id': str(identificador), 'tecnico': _texto(persona.get('nombre')), 'estado_cuenta': estado, 'oficina': persona.get('oficina_nombre') or 'Sin oficina registrada', 'pendientes_actuales': por_actual.get(identificador, 0),
+            'vencidos_actuales': vencidos, 'ausencias_periodo': len(ausencias),
             'asignados_periodo': dato.get('asignados', 0), 'cerrados': dato.get('cerrados', 0),
             'tiempo_medio_min': round(dato.get('suma_tiempo', 0) / muestras_t, 1) if muestras_t else None,
             'registros_tiempo': muestras_t,
@@ -204,46 +214,57 @@ async def resumen_equipo(filtros, argumentos, *, usuario=None):
             'valoraciones': muestras_v, 'reaperturas': dato.get('reaperturas', 0),
             'horas_programadas': horas, 'muestra': 'Pocos registros' if muestras_t < 3 or muestras_v < 3 else 'Ver muestras',
         })
-    texto = f"Resumen de {len(personas)} identidades técnicas; muestro {len(filas)}. Los casos del periodo fueron creados del {_fecha(desde)} al {_fecha(hasta)}."
-    texto += '\n\nLos pendientes actuales abarcan todo el historial y respetan los mismos filtros de ubicación, categoría y equipo. Las horas son jornadas programadas descontando ausencias y feriados; no miden trabajo real dedicado a tickets. Sin tiempos o valoraciones se muestra «Sin datos».'
-    texto += ' Pocas muestras o casos de distinta complejidad no permiten calificar automáticamente a una persona.'
+    texto = f"Mostrando {len(filas)} de {len(personas)} identidades técnicas. Periodo de creación: {_fecha(desde)}–{_fecha(hasta)}."
     return {'texto': texto, 'tabla': _tabla([
-        ('tecnico', 'Técnico'), ('pendientes_actuales', 'Pendientes actuales'), ('asignados_periodo', 'Creados en periodo · asignación actual'),
+        ('tecnico', 'Técnico'), ('estado_cuenta', 'Estado de la identidad'), ('oficina', 'Oficina actual'), ('pendientes_actuales', 'Pendientes · historial completo'), ('vencidos_actuales', 'Vencidos · historial completo'), ('asignados_periodo', 'Creados en periodo · asignación actual'),
         ('cerrados', 'De ellos, cerrados ahora'), ('tiempo_medio_min', 'Tiempo medio registrado (min)'), ('registros_tiempo', 'Tiempos usados'),
         ('satisfaccion', 'Valoración media /5'), ('valoraciones', 'Valoraciones usadas'), ('reaperturas', 'Reaperturas acumuladas'),
-        ('horas_programadas', 'Horas programadas del periodo'), ('muestra', 'Interpretación'),
+        ('horas_programadas', 'Horas programadas del periodo'), ('ausencias_periodo', 'Ausencias registradas del periodo'), ('muestra', 'Interpretación'),
     ], filas), 'enlaces': enlaces, 'total': len(personas), 'mostrados': len(filas),
+        'informacion_adicional': 'Los pendientes actuales abarcan todo el historial con los mismos filtros. Las horas programadas no miden trabajo real. La asignación es la actual de los tickets creados en el periodo; revisa las muestras antes de interpretar tiempos y valoraciones.',
         'seguimientos': ['¿Qué técnico está disponible ahora?', '¿Qué técnicos tienen horario mañana?']}
 
 
 async def horarios_manana(filtros, argumentos, *, usuario=None):
     _autorizar(usuario, 'horarios.ver_todos')
-    limite = _argumentos(argumentos, {'limite'})
+    limite = _argumentos(argumentos, {'limite', 'pagina', 'fecha'})
     seguros = _filtros(filtros)
-    if any(seguros.get(campo) for campo in ('oficina_id', 'zona_id', 'categoria', 'tipo_activo', 'equipo_id', 'desde', 'hasta')):
+    if any(seguros.get(campo) for campo in ('oficina_id', 'zona_id', 'categoria', 'tipo_activo', 'equipo_id')):
         raise Validacion('La programación de mañana no admite filtros de tickets, oficinas ni otras fechas. Puedes seleccionar un técnico.')
-    manana = local_date() + timedelta(days=1)
+    try:
+        manana = date.fromisoformat(argumentos['fecha']) if argumentos.get('fecha') else local_date() + timedelta(days=1)
+    except (ValueError, TypeError):
+        raise Validacion('La fecha de programación no es válida.')
+    if not 2000 <= manana.year <= 2100:
+        raise Validacion('Selecciona una fecha de programación entre 2000 y 2100.')
+    if any(seguros.get(c) for c in ('desde', 'hasta')) and not argumentos.get('fecha'):
+        raise Validacion('La programación no admite filtros de fechas de tickets. Selecciona la fecha en el calendario del resultado.')
     calendario = await horario_service.calendario_equipo(manana, manana)
     if seguros.get('tecnico_id'):
         calendario = [fila for fila in calendario if fila['tecnico_id'] == seguros['tecnico_id']]
     calendario.sort(key=lambda fila: (-float(fila.get('horas_disponibles') or 0), fila.get('tecnico_nombre') or ''))
     filas = []
-    for fila in calendario[:limite]:
+    numero = argumentos.get('pagina', 1)
+    for fila in calendario[(numero - 1) * limite:numero * limite]:
         tramos = fila.get('tramos') or []
         horario = ', '.join(f"{tramo.get('entrada', '?')}–{tramo.get('salida', '?')}" for tramo in tramos)
         estado = 'Ausencia registrada' if fila.get('ausencia') else 'Feriado' if fila.get('feriado') else 'Sin jornada programada' if not tramos else 'Jornada programada'
-        filas.append({'tecnico': _texto(fila.get('tecnico_nombre')), 'fecha': _fecha(manana),
+        filas.append({'id': str(fila['tecnico_id']), 'tecnico': _texto(fila.get('tecnico_nombre')), 'oficina': fila.get('oficina_nombre') or 'Sin oficina registrada', 'fecha': _fecha(manana),
                       'horario': horario or 'Sin jornada programada', 'estado': estado,
                       'horas_programadas': round(float(fila.get('horas_disponibles') or 0), 2),
-                      'pendientes_hoy': fila.get('carga_pendiente', 0), 'vencimientos': fila.get('vencimientos', 0)})
-    texto = f"Programación registrada para mañana, {_fecha(manana)}. Muestro {len(filas)} de {len(calendario)} técnicos."
-    texto += '\n\nEs el horario previsto, con ausencias y feriados registrados. No garantiza que el técnico esté libre mañana. Los pendientes son los de hoy; los vencimientos son fechas límite ya registradas. El periodo de tickets seleccionado no cambia esta fecha.'
-    return {'texto': texto, 'tabla': _tabla([
-        ('tecnico', 'Técnico'), ('fecha', 'Fecha'), ('horario', 'Horario programado'), ('estado', 'Programación'),
-        ('horas_programadas', 'Horas programadas'), ('pendientes_hoy', 'Pendientes actuales'), ('vencimientos', 'Vencimientos registrados'),
+                      'pendientes_hoy': fila.get('carga_pendiente', 0), 'vencimientos': fila.get('vencimientos', 0),
+                      'disponibilidad': 'No estimable: faltan duración de casos pendientes, tareas no registradas y confirmación del técnico.' if tramos else 'Sin jornada disponible según programación',
+                      'ausencia': 'Ausencia registrada' if fila.get('ausencia') else 'Sin ausencia registrada'})
+    texto = f"Programación del {_fecha(manana)}. Mostrando {len(filas)} de {len(calendario)} técnicos."
+    resultado = {'texto': texto, 'tabla': _tabla([
+        ('tecnico', 'Técnico'), ('oficina', 'Oficina actual'), ('fecha', 'Fecha'), ('horario', 'Horario programado'), ('estado', 'Programación'), ('ausencia', 'Ausencias / permisos'),
+        ('horas_programadas', 'Horas programadas'), ('pendientes_hoy', 'Pendientes actuales'), ('vencimientos', 'Vencimientos en la fecha'), ('disponibilidad', 'Disponibilidad estimada'),
     ], filas), 'enlaces': [{'texto': 'Ver equipo TI', 'href': '/panel/equipo-ti'}], 'total': len(calendario), 'mostrados': len(filas),
         'periodo_label': f'Programación del {_fecha(manana)}',
         'seguimientos': ['¿Qué técnico está disponible ahora?', '¿Cómo está la carga del equipo TI?']}
+    resultado['tabla']['fecha_consulta'] = manana.isoformat()
+    resultado['informacion_adicional'] = 'No garantiza disponibilidad confirmada. Los pendientes son los de hoy; los vencimientos son fechas límite registradas. Para estimar tiempo libre faltan duración de casos, otras tareas y confirmación de TI.'
+    return resultado
 
 
 CONSULTAS = {
@@ -276,6 +297,14 @@ CONSULTAS = {
 
 def detectar(pregunta):
     texto = clave(pregunta).lower()
+    if re.search(r'tecnic|equipo ti', texto) and re.search(r'horario|program|jornada|turno', texto):
+        encontrado = re.search(r'\b(\d{4}-\d{2}-\d{2}|\d{1,2}/\d{1,2}/\d{4})\b', pregunta)
+        if encontrado:
+            try:
+                fecha = date.fromisoformat(encontrado[1]) if '-' in encontrado[1] else datetime.strptime(encontrado[1], '%d/%m/%Y').date()
+            except ValueError:
+                raise Validacion('La fecha de programación no es válida.')
+            return 'horarios_manana', {'fecha': fecha.isoformat()}
     if re.search(r'\bmanana\b', texto) and re.search(r'tecnic|equipo ti|horario|jornada|turno|disponib', texto):
         return 'horarios_manana', {}
     if re.search(r'tecnic|equipo ti', texto) and re.search(r'carga|reapertur|valoraciones|tiempos.*cada|mas pendientes|rendimiento detallado', texto):
@@ -295,3 +324,9 @@ def detectar(pregunta):
     elif re.search(r'muestr|lista|listar|dame|ver ', texto) and re.search(r'vencid|atrasad|fuera de plazo', texto):
         modo = 'vencidos'
     return ('tickets_pendientes_detalle', {'modo': modo, **opciones}) if modo else None
+
+
+for _nombre in ('resumen_equipo_ti', 'horarios_manana'):
+    CONSULTAS[_nombre]['esquema']['properties']['pagina'] = {'type': 'integer', 'minimum': 1, 'maximum': 500}
+CONSULTAS['horarios_manana']['esquema']['properties']['fecha'] = {'type': 'string', 'pattern': r'\d{4}-\d{2}-\d{2}'}
+CONSULTAS['tickets_pendientes_detalle']['esquema']['properties']['pagina'] = {'type': 'integer', 'minimum': 1, 'maximum': 500}

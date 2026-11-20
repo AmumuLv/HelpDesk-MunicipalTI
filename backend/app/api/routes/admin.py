@@ -36,6 +36,7 @@ from app.schemas.admin import (
     RenombrarConversacionIA,
     RegenerarRespuestaIA,
     ExportarSolicitud,
+    ExplorarConsultaIA,
     Feriado,
     HorarioSemanal,
     ImportarCampana,
@@ -659,6 +660,18 @@ async def preguntar(datos: PreguntaIA, sesion: DependeUsuarioCsrf, _: DependeAna
     analitica_service.resolver_periodo(filtros)
     return await analitica_chat.procesar_turno(datos.pregunta, usuario=sesion.usuario,
         filtros=filtros, conversacion_id=datos.conversacion_id, version=datos.version, solicitud_id=datos.solicitud_id)
+
+
+
+
+@ia_router.post('/ia/asistente/explorar')
+async def explorar_consulta(datos: ExplorarConsultaIA, sesion: DependeUsuarioCsrf, _: DependeAnalitica):
+    from app.services import analisis_exploracion
+    sesion.exigir_tecnico()
+    cuerpo = datos.model_dump(exclude_none=True)
+    if cuerpo.get('fecha'):
+        cuerpo['fecha'] = cuerpo['fecha'].isoformat()
+    return await analisis_exploracion.explorar(cuerpo, sesion.usuario)
 
 
 @ia_router.get("/ia/asistente/conversaciones")

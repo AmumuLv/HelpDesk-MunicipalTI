@@ -13,6 +13,40 @@ como casos nuevos.
 
 ## Seguimiento técnico e institucional
 
+`CAM-2026-006` (10/11/2026): correcciones funcionales de Consultas de datos.
+Gráficos compactos e interactivos, veinte categorías desplazables y tablas de
+veinte registros con paginación real; búsqueda y desgloses por oficina, tipo,
+campo pendiente y responsabilidad. Se separan dispositivos y conjuntos, cuatro
+estados de vinculación/uso y denominadores aplicables. Equipo TI distingue
+cohorte del periodo y pendientes actuales; horarios admite fecha de Lima.
+Auditoría declara cobertura efectiva y oculta datos privados; el historial de
+responsables admite búsqueda parcial y utiliza su fuente persistente cuando
+existe, sin inventar ubicaciones anteriores. Cada lectura vuelve a comprobar
+permisos y no modifica registros operativos ni consume tokens externos.
+
+Validación: 205 casos de servidor aprobados para consultas, permisos, contratos,
+conversaciones, fechas y paginación. Se probaron páginas 20/20/7 de 47 registros,
+21 oficinas, 23 guías y un historial persistente anterior a la retención general.
+El recorrido de navegador con API real verificó 23 dispositivos ficticios,
+páginas 20/3, desglose y recuperación del historial. Seis escenarios nuevos
+comprueban temas claro/oscuro, móvil/escritorio, teclado, tooltips, tamaño de
+icono/gráfico y cambio de fecha sin una nueva consulta al chat. Contrato OpenAPI
+actualizado: 161 llamadas verificadas contra 154 rutas. No se alteraron los
+registros operativos para hacer coincidir cifras.
+
+Regresiones adicionales: 51 casos de permisos, asignaciones, horarios y chatbot,
+con quince subpruebas, aprobados; total de esta revisión: **256 casos distintos
+de servidor**. La suite nueva de catorce casos se repitió tras el ajuste de
+indicadores; el cruce de búsqueda de tres dispositivos y veinticuatro conjuntos
+aprobó una comprobación final de páginas 20/7, sin duplicados. Estas repeticiones
+no se suman. **38 escenarios distintos de Chromium** aprobados, incluyendo los
+siete nuevos; **21 pruebas de herramientas**, TypeScript, ESLint, controles
+nativos y construcción de API, worker y web aprobados. Manual Word regenerado.
+
+Esta entrada documenta una validación local; no certifica ausencia de errores,
+seguridad integral ni despliegue definitivo. Los límites institucionales de
+publicación y retención siguen indicados en las entradas correspondientes.
+
 `CAM-2026-005` (10/11/2026): corrección de la columna Equipo de tickets abiertos
 y cerrados. Una PC completa conserva `conjunto_id` y `conjunto_nombre`; la
 bandeja solo comprobaba `activo_nombre` y mostraba «Sin equipo». Ahora reconoce

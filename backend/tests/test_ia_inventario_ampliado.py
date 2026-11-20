@@ -158,7 +158,7 @@ async def test_responsables_distingue_compartido_uso_incierto_y_cuenta_archivada
     assert 'Propio actual' not in filas
     assert filas['Impresora compartida'] == 'Compartido de oficina'
     assert filas['Pendiente anterior'] == filas['Nuevo perfil pendiente'] == 'Responsable pendiente de vincular'
-    assert filas['No identificado'] == 'Sin persona vinculada; uso por confirmar'
+    assert filas['No identificado'] == 'Uso por confirmar'
     assert '2 tienen responsable pendiente' in respuesta['texto']
     assert await db['activos'].find({}).sort('_id').to_list(None) == antes
 

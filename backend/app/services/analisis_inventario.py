@@ -36,7 +36,7 @@ def _nombre(activo):
 
 def _consulta(filtros):
     if any(filtros.get(c) for c in ('categoria', 'tecnico_id')):
-        raise Validacion('Esta consulta de inventario no admite categoría de ticket ni técnico. Puedes filtrar por oficina, zona, tipo o equipo.')
+        raise Validacion('Esta consulta de inventario no admite filtros por categoría de ticket ni técnico. Puedes filtrar por oficina, zona, tipo o equipo.')
     consulta: dict[str, Any] = {'activo': {'$ne': False}}
     for campo in ('oficina_id', 'zona_id'):
         if filtros.get(campo):
@@ -94,65 +94,48 @@ async def calidad_inventario(filtros, argumentos, *, usuario=None):
     texto += (f"\n\nFaltan {info['faltantes']} de {info['esperados']} datos aplicables ({porcentaje}%)." if porcentaje is not None
               else '\n\nNo hay datos aplicables para calcular un porcentaje; no lo presento como 0%.')
     texto += '\n\nLos datos marcados como No aplica o No disponible se excluyen. Un equipo puede tener varios datos pendientes; esto no indica una avería.'
-    filas = [{'campo': ETIQUETAS.get(c, c.replace('_', ' ')), 'total': n,
+    filas = [{'campo_id': c, 'campo': ETIQUETAS.get(c, c.replace('_', ' ')), 'total': n,
               'porcentaje': round(100 * n / info['total'], 1)} for c, n in sorted(info['por_campo'].items(), key=lambda p: (-p[1], p[0]))]
     return {'texto': texto, 'tabla': _tabla([('campo', 'Dato pendiente'), ('total', 'Equipos'), ('porcentaje', '% de equipos revisados')], filas),
             'enlaces': [{'texto': 'Revisar calidad del inventario', 'href': '/panel/equipos/calidad'}], 'periodo_label': 'Inventario actual'}
 
 
 async def equipos_datos_pendientes(filtros, argumentos, *, usuario=None):
+    from app.services.analisis_exploracion import inventario
+    datos = await inventario('equipos_datos_pendientes', filtros, argumentos or {})
     campo = (argumentos or {}).get('campo')
-    if campo is not None and (not isinstance(campo, str) or campo not in ETIQUETAS):
-        raise Validacion('Selecciona un dato de inventario admitido para consultar sus pendientes.')
-    info = await _calidad(filtros, campo)
     asunto = ' con ' + ETIQUETAS[campo].lower() + ' pendiente' if campo else ' con datos por completar'
-    texto = f"Hay {info['pendientes_total']} equipos{asunto} entre los {info['total']} dispositivos activos revisados."
-    texto += f"\n\nMuestro hasta {LIMITE}, empezando por los que tienen más datos pendientes. No aplica y No disponible no cuentan como pendientes."
-    return {'texto': texto, 'tabla': _tabla([('nombre', 'Equipo'), ('tipo', 'Tipo'), ('oficina', 'Oficina'), ('faltantes', 'Datos pendientes'), ('campos', 'Qué completar')], info['pendientes']),
-            'enlaces': _enlaces(info['pendientes']), 'periodo_label': 'Inventario actual'}
+    datos['texto'] = f"Hay {datos['total']} equipos{asunto} entre los {datos['indicadores']['dispositivos']} dispositivos activos revisados. " + datos['texto']
+    datos['periodo_label'] = 'Inventario actual'
+    datos['enlaces'] = _enlaces(datos['tabla']['filas'])
+    return datos
 
 
 async def oficinas_datos_pendientes(filtros, argumentos, *, usuario=None):
-    info = await _calidad(filtros)
-    filas = sorted(info['oficinas'], key=lambda f: (-f['faltantes'], f['oficina']))
-    for fila in filas:
-        fila['porcentaje'] = round(100 * fila['faltantes'] / fila['esperados'], 1) if fila['esperados'] else None
-    texto = f"Revisé {info['total']} dispositivos activos de {len(filas)} ubicaciones de inventario."
-    texto += f"\n\nMuestro hasta {LIMITE} oficinas, ordenadas por cantidad de datos pendientes. El porcentaje usa solo los datos aplicables de esa oficina."
-    texto += '\n\nUna oficina con más equipos puede tener más pendientes; el recuento por sí solo no mide su calidad.'
-    return {'texto': texto, 'tabla': _tabla([('oficina', 'Oficina'), ('total', 'Equipos'), ('incompletos', 'Equipos incompletos'), ('faltantes', 'Datos pendientes'), ('porcentaje', '% de datos faltantes')], filas[:LIMITE]),
-            'enlaces': [{'texto': f['oficina'], 'href': '/panel/oficinas/' + f['id']} for f in filas[:LIMITE] if f['id']], 'periodo_label': 'Inventario actual'}
+    from app.services.analisis_exploracion import inventario, tabla
+    datos = await inventario('oficinas_datos_pendientes', filtros, argumentos or {})
+    filas = datos['oficinas']
+    orden = (argumentos or {}).get('orden', 'cantidad')
+    filas.sort(key=lambda f: (-(f['incompletos'] / f['total'] if orden == 'porcentaje' and f['total'] else f['faltantes']), f['oficina'], f['id']))
+    numero = (argumentos or {}).get('pagina', 1)
+    visibles = filas[(numero - 1) * 20:numero * 20]
+    return {'texto': f"Revisé {datos['indicadores']['dispositivos']} dispositivos activos de {len(filas)} ubicaciones de inventario. Mostrando {len(visibles)} de {len(filas)} oficinas.",
+        'tabla': tabla([('oficina', 'Oficina'), ('total', 'Equipos'), ('completos', 'Equipos completos'), ('incompletos', 'Equipos incompletos'),
+            ('faltantes', 'Datos pendientes'), ('numerador_completos', 'Datos completos'), ('esperados', 'Datos aplicables'), ('porcentaje_completo', '% de datos completos'),
+            ('porcentaje', '% de datos faltantes'), ('responsables_pendientes', 'Responsables pendientes de vincular'), ('principales_pendientes', 'Principales datos pendientes')], visibles),
+        'total_filas': len(filas), 'indicadores': datos['indicadores'], 'periodo_label': 'Inventario actual',
+        'enlaces': [{'texto': f['oficina'], 'href': '/panel/oficinas/' + f['id']} for f in visibles if f['id']]}
 
 
 async def responsables_inventario(filtros, argumentos, *, usuario=None):
-    consulta = _consulta(filtros)
-    db = get_db()
-    activos = {u['_id'] async for u in db['usuarios'].find({'activo': True}, {'_id': 1})}
-    categorias: Counter = Counter()
-    filas = []
-    total = 0
-    proyeccion = {c: 1 for c in ('nombre_equipo', 'tipo', 'oficina_nombre', 'responsable_id', 'responsable_nombre', 'uso_comun')}
-    async for equipo in db['activos'].find(consulta, proyeccion).sort('_id', 1):
-        total += 1
-        if equipo.get('responsable_id') in activos:
-            categorias['Vinculado a una cuenta activa'] += 1
-            continue
-        if equipo.get('responsable_nombre') or equipo.get('responsable_id'):
-            estado = 'Responsable pendiente de vincular'
-        elif equipo.get('uso_comun') is True:
-            estado = 'Compartido de oficina'
-        else:
-            estado = 'Sin persona vinculada; uso por confirmar'
-        categorias[estado] += 1
-        if len(filas) < LIMITE:
-            filas.append({'id': str(equipo['_id']), 'nombre': _nombre(equipo), 'tipo': equipo.get('tipo') or 'Sin tipo',
-                'oficina': equipo.get('oficina_nombre') or 'Sin oficina registrada', 'relacion': estado,
-                'responsable': equipo.get('responsable_nombre') or 'Sin nombre registrado'})
-    texto = f"Revisé {total} equipos activos: {categorias['Vinculado a una cuenta activa']} están vinculados a una cuenta activa."
-    texto += f"\n\n{categorias['Responsable pendiente de vincular']} tienen responsable pendiente de vincular; {categorias['Compartido de oficina']} están marcados como compartidos y {categorias['Sin persona vinculada; uso por confirmar']} requieren confirmar su uso."
-    texto += f"\n\nMuestro hasta {LIMITE} sin vínculo activo. No tener una persona asignada no significa abandono: puede ser uso común. No reasigno equipos ni cambio historiales."
-    return {'texto': texto, 'tabla': _tabla([('nombre', 'Equipo'), ('tipo', 'Tipo'), ('oficina', 'Oficina'), ('relacion', 'Situación'), ('responsable', 'Responsable registrado')], filas),
-            'enlaces': _enlaces(filas), 'periodo_label': 'Inventario actual'}
+    from app.services.analisis_exploracion import inventario
+    opciones = {'grupo': 'sin_cuenta', **(argumentos or {})}
+    datos = await inventario('responsables_inventario', filtros, opciones)
+    i = datos['indicadores']
+    datos['texto'] = f"Revisé {i['dispositivos']} equipos activos: {i.get('vinculado', 0)} están vinculados a una cuenta activa. " + f"{i.get('pendiente', 0)} tienen responsable pendiente de vincular; {i.get('compartido', 0)} están marcados como compartidos y {i.get('confirmar', 0)} requieren confirmar su uso.\n\n" + datos['texto']
+    datos['periodo_label'] = 'Inventario actual'
+    datos['enlaces'] = _enlaces(datos['tabla']['filas'])
+    return datos
 
 
 async def conjuntos_incompletos(filtros, argumentos, *, usuario=None):
@@ -179,8 +162,10 @@ async def conjuntos_incompletos(filtros, argumentos, *, usuario=None):
             filas.append({'nombre': conjunto.get('nombre') or 'PC de escritorio', 'oficina': conjunto.get('oficina_nombre') or 'Sin oficina registrada',
                 'responsable': conjunto.get('responsable_nombre') or 'Sin responsable vinculado', 'faltantes': ', '.join(faltan)})
     texto = f"De {len(conjuntos)} PC de escritorio registradas, {len(filas)} no tienen registrados todos los componentes básicos activos."
-    texto += f"\n\nMuestro hasta {LIMITE}. Compruebo CPU, monitor, teclado y mouse; las laptops e impresoras son dispositivos independientes. Un componente sin registrar no demuestra que falte físicamente."
-    return {'texto': texto, 'tabla': _tabla([('nombre', 'PC de escritorio'), ('oficina', 'Oficina'), ('responsable', 'Responsable actual'), ('faltantes', 'Componentes no registrados')], filas[:LIMITE]),
+    numero = (argumentos or {}).get('pagina', 1)
+    visibles = filas[(numero - 1) * 20:numero * 20]
+    texto += f"\n\nMostrando {len(visibles)} de {len(filas)}. Compruebo CPU, monitor, teclado y mouse; las laptops e impresoras son dispositivos independientes. Un componente sin registrar no demuestra que falte físicamente."
+    return {'total': len(filas), 'texto': texto, 'tabla': _tabla([('nombre', 'PC de escritorio'), ('oficina', 'Oficina'), ('responsable', 'Responsable actual'), ('faltantes', 'Componentes no registrados')], visibles),
             'enlaces': [{'texto': 'Revisar computadoras e inventario', 'href': '/panel/equipos'}], 'periodo_label': 'Inventario actual'}
 
 
@@ -199,11 +184,13 @@ async def inventarios_disponibles(filtros, argumentos, *, usuario=None):
         fila = por_anio.setdefault(anio, {'anio': anio, 'versiones': 0})
         fila['versiones'] += 1
     filas = list(por_anio.values())
-    texto = f"Hay {len(filas)} años con inventarios guardados. Muestro hasta {LIMITE}; cada año puede tener varias versiones."
+    numero = (argumentos or {}).get('pagina', 1)
+    visibles = filas[(numero - 1) * 20:numero * 20]
+    texto = f"Hay {len(filas)} años con inventarios guardados. Mostrando {len(visibles)} de {len(filas)}; cada año puede tener varias versiones."
     texto += '\n\nLa comparación utiliza la versión anual de archivo más reciente y, si no existe, la última versión disponible de ese año. Necesitas dos años distintos.'
     anios = sorted(por_anio)
     seguimientos = [f'Compara los inventarios de {anios[-2]} y {anios[-1]}'] if len(anios) >= 2 else []
-    return {'texto': texto, 'tabla': _tabla([('anio', 'Año'), ('versiones', 'Versiones guardadas')], filas[:LIMITE]),
+    return {'total': len(filas), 'texto': texto, 'tabla': _tabla([('anio', 'Año'), ('versiones', 'Versiones guardadas')], visibles),
             'enlaces': [{'texto': 'Abrir inventario anual', 'href': '/panel/inventario-anual'}], 'periodo_label': 'Archivos anuales guardados', 'seguimientos': seguimientos}
 
 
@@ -278,3 +265,9 @@ CONSULTAS = {
         ('Compara instantáneas guardadas de dos años explícitos.', 'Revisa los archivos de origen y los identificadores antes de confirmar un traslado.', 'Una salida entre archivos no equivale a dar de baja un equipo operativo. Sin identificadores estables un traslado puede parecer salida y alta.'),
         permiso='equipos.campanas', ambito='anual', esquema={'type': 'object', 'properties': {'anio_a': {'type': 'integer', 'minimum': 2000, 'maximum': 2100}, 'anio_b': {'type': 'integer', 'minimum': 2000, 'maximum': 2100}}, 'additionalProperties': False}),
 }
+
+
+for _consulta_nombre in ('equipos_datos_pendientes', 'oficinas_datos_pendientes', 'responsables_inventario', 'conjuntos_incompletos', 'inventarios_disponibles'):
+    CONSULTAS[_consulta_nombre]['esquema']['properties']['pagina'] = {'type': 'integer', 'minimum': 1, 'maximum': 500}
+CONSULTAS['oficinas_datos_pendientes']['esquema']['properties']['orden'] = {'type': 'string', 'enum': ['cantidad', 'porcentaje']}
+CONSULTAS['responsables_inventario']['esquema']['properties']['grupo'] = {'type': 'string', 'enum': ['todos', 'sin_cuenta', 'vinculado', 'pendiente', 'compartido', 'confirmar']}

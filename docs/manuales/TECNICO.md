@@ -112,4 +112,13 @@ consulta: valida los datos, el periodo y el diagnóstico antes de actuar. No peg
 credenciales ni consideres una respuesta de IA una autorización para cambiar algo.
 
 La referencia de límites está en [ROLES_Y_PERMISOS.md](../ROLES_Y_PERMISOS.md).
+
+En **Consultas de datos**, selecciona una barra para abrir sus registros. Usa
+**Anterior / Siguiente** para recorrer las páginas de veinte filas; los filtros
+permiten precisar oficina, tipo o responsable cuando la consulta los admite.
+Las cifras de inventario separan equipos físicos y PC de escritorio. En horarios
+puedes elegir otra fecha. Consultar estos desgloses no modifica los equipos ni
+consume tokens del chatbot. La fecha de actualización distingue una lectura
+actual de la respuesta que quedó guardada en el chat.
+
 Las precauciones operativas están en [Ciberseguridad](../CIBERSEGURIDAD.md).

@@ -13941,6 +13941,84 @@
         }
       }
     },
+    "/api/ia/asistente/explorar": {
+      "post": {
+        "tags": [
+          "ia"
+        ],
+        "summary": "Explorar Consulta",
+        "operationId": "explorar_consulta_api_ia_asistente_explorar_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          },
+          {
+            "name": "ma_csrf",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ma Csrf"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExplorarConsultaIA"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/ia/asistente/conversaciones": {
       "get": {
         "tags": [
@@ -17467,6 +17545,194 @@
         },
         "type": "object",
         "title": "EstadoCampo"
+      },
+      "ExplorarConsultaIA": {
+        "properties": {
+          "herramienta": {
+            "type": "string",
+            "enum": [
+              "resumen_inventario",
+              "calidad_inventario",
+              "equipos_datos_pendientes",
+              "oficinas_datos_pendientes",
+              "responsables_inventario",
+              "auditoria_cambios",
+              "auditoria_responsables",
+              "resumen_equipo_ti",
+              "horarios_manana",
+              "tickets_pendientes_detalle",
+              "guias_consultadas",
+              "guias_valoradas",
+              "brechas_guias",
+              "conjuntos_incompletos",
+              "inventarios_disponibles"
+            ],
+            "title": "Herramienta"
+          },
+          "filtros": {
+            "$ref": "#/components/schemas/FiltrosAnalitica"
+          },
+          "argumentos": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Argumentos"
+          },
+          "pagina": {
+            "type": "integer",
+            "maximum": 500.0,
+            "minimum": 1.0,
+            "title": "Pagina",
+            "default": 1
+          },
+          "texto": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 160
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Texto"
+          },
+          "tipo": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tipo"
+          },
+          "oficina": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 160
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oficina"
+          },
+          "responsable": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 160
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Responsable"
+          },
+          "oficina_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oficina Id"
+          },
+          "responsable_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Responsable Id"
+          },
+          "equipo_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Equipo Id"
+          },
+          "campo": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Campo"
+          },
+          "grupo": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "todos",
+                  "sin_cuenta",
+                  "vinculado",
+                  "pendiente",
+                  "compartido",
+                  "confirmar"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grupo"
+          },
+          "vista": {
+            "type": "string",
+            "enum": [
+              "resumen",
+              "detalle"
+            ],
+            "title": "Vista",
+            "default": "resumen"
+          },
+          "fecha": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha"
+          },
+          "orden": {
+            "type": "string",
+            "enum": [
+              "cantidad",
+              "porcentaje"
+            ],
+            "title": "Orden",
+            "default": "cantidad"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "herramienta"
+        ],
+        "title": "ExplorarConsultaIA"
       },
       "ExportarSolicitud": {
         "properties": {

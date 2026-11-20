@@ -11,6 +11,7 @@ from app.api.deps import (
     SesionActual,
     exigir_csrf,
     limite_estricto,
+    limite_instalacion,
     obtener_sesion,
 )
 from app.core.config import settings
@@ -52,7 +53,7 @@ async def instalacion() -> dict[str, Any]:
     return await estado_instalacion()
 
 
-@router.post("/instalacion/administrador", response_model=UsuarioSesion)
+@router.post("/instalacion/administrador", response_model=UsuarioSesion, dependencies=[Depends(limite_instalacion)])
 async def crear_administrador(
     datos: AdministradorInicial, request: Request, response: Response
 ):

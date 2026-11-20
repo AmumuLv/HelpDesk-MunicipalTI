@@ -391,14 +391,11 @@ async def descargar_adjunto(adjunto_id: str, sesion: DependeUsuario):
     from fastapi.responses import FileResponse
 
     documento = await adjuntos_service.obtener(id_requerido(adjunto_id, "adjunto"))
-    if documento.get("ambito") == "ticket" and not documento.get("ticket_id") and documento.get("subido_por") != sesion.usuario.get("_id"):
-        raise Prohibido("No tienes acceso a este archivo.")
-    if documento.get("nota_id") and sesion.rol == "usuario":
-        raise Prohibido("Las notas internas son del equipo de soporte.")
-    if sesion.rol == "usuario" and documento.get("ticket_id"):
-        await ticket_service.obtener(documento["ticket_id"], usuario=sesion.usuario)
-    if documento.get("ambito") == "ticket" and documento.get("ticket_id"):
-        await ticket_service.obtener(documento["ticket_id"], usuario=sesion.usuario)
+    # La regla por ambito vive en el servicio (y la comparte con la vinculacion
+    # de adjuntos): antes solo se miraba `ambito == "ticket"` y se comprobaba
+    # dos veces lo mismo, de modo que un adjunto de otro ambito se servia a
+    # cualquier sesion con solo conocer su id.
+    await adjuntos_service.exigir_descarga(documento, usuario=sesion.usuario)
     ruta = documento.get("ruta")
     if not ruta:
         raise Validacion("El archivo no esta disponible.")

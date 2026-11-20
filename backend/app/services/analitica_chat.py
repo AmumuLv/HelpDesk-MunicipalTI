@@ -752,6 +752,21 @@ async def responder(
         respuesta['seguimientos'] = [p for p in respuesta['seguimientos'] if not analisis_catalogo.detectar(p)
             or _permitida(analisis_catalogo.detectar(p)[0], usuario)]
     respuesta['filtros_consulta'] = respuesta['contexto_consulta']['filtros']
+    if datos.get('informacion_adicional') and respuesta.get('analisis'):
+        respuesta['analisis'] = {**respuesta['analisis'], 'limite': datos['informacion_adicional']}
+    from app.services.analisis_exploracion import HERRAMIENTAS as EXPLORABLES
+    if herramienta in EXPLORABLES and respuesta.get('tabla') is not None:
+        respuesta['tabla']['exploracion'] = {'herramienta': herramienta,
+            'filtros': respuesta['filtros_consulta'], 'argumentos': {**argumentos, **({'fecha': respuesta['tabla']['fecha_consulta']} if herramienta == 'horarios_manana' and respuesta['tabla'].get('fecha_consulta') else {})}}
+        respuesta['tabla']['indicadores'] = datos.get('indicadores', {})
+        if datos.get('equipo_consulta'):
+            respuesta['tabla']['exploracion']['equipo_id'] = datos['equipo_consulta']
+        filas = respuesta['tabla'].get('filas', [])
+        respuesta['tabla']['total'] = datos.get('total_filas', len(filas) if herramienta == 'resumen_inventario' else datos.get('total', len(filas)))
+        respuesta['tabla']['filas'] = filas[:20]
+        if herramienta in {'responsables_inventario', 'equipos_datos_pendientes'}:
+            from app.services.analisis_exploracion import grafico_inventario
+            grafico_inventario(herramienta, {**datos, 'tabla': respuesta['tabla']})
     if not suficiente and isinstance(datos, dict):
         # Honestidad: si no hay datos, dice cuantos necesita en vez de inventar
         respuesta["minimo_requerido"] = datos.get("minimo_requerido")

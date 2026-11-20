@@ -28,7 +28,8 @@ async def test_todas_las_preguntas_nuevas_llegan_a_datos_o_piden_precision_sin_m
         assert contenido['texto'].strip()
         assert 'Necesito una pregunta más concreta' not in contenido['texto']
         if nombre == 'auditoria_responsables':
-            assert 'nombre exacto' in contenido['texto']
+            assert 'Selecciona un dispositivo' in contenido['texto']
+            assert contenido['tabla']['exploracion']['herramienta'] == nombre
         else:
             assert contenido['fuentes'] == [nombre], (pregunta, contenido)
         guardada = await api.get('/api/ia/asistente/conversaciones/' + contenido['conversacion_id'], headers=mundo['admin'])

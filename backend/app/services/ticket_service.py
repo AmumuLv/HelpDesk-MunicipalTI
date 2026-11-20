@@ -289,6 +289,26 @@ def _escribir_estados(fragmento: str, *, conservar_retirado: bool = False) -> st
 
 
 # ── Creacion ─────────────────────────────────────────────────
+async def _verificar_adjuntos_propios(adjuntos: list[str] | None, usuario: dict[str, Any]) -> None:
+    """Los adjuntos iniciales deben ser de quien crea el ticket y estar libres.
+
+    Se comprueba antes de crear el ticket para que un id ajeno —o ya vinculado—
+    se rechace sin dejar un ticket a medias. El `update_many` posterior repite
+    el filtro: entre la comprobacion y el vinculo no puede colarse otro dueño.
+    """
+    ids = [a_id(a) for a in adjuntos or [] if a_id(a)]
+    if not ids:
+        return
+    disponibles = {
+        "_id": {"$in": ids},
+        "ticket_id": None,
+        "mensaje_id": None,
+        "subido_por": usuario.get("_id"),
+    }
+    if await get_db()["adjuntos"].count_documents(disponibles) != len(ids):
+        raise Prohibido("Algún adjunto no te pertenece o ya está vinculado a otro ticket.")
+
+
 async def crear_desde_usuario(
     datos: dict[str, Any], *, usuario: dict[str, Any], ip: str | None = None
 ) -> dict[str, Any]:
@@ -400,14 +420,21 @@ async def crear_desde_usuario(
     documento.update(await resolver(contexto, {**datos, 'categoria': documento.get('categoria')}, usuario, creacion=True))
     documento.update(await sla_service.calcular_deadlines(documento["prioridad"], ahora))
 
+    await _verificar_adjuntos_propios(datos.get("adjuntos"), usuario)
     documento, nuevo = await _insertar_solicitud(documento, solicitud_original, usuario, 'portal')
     if not nuevo:
         return documento
     documento["tiene_chat"] = True
 
     if datos.get("adjuntos"):
+        ids = [a_id(a) for a in datos["adjuntos"] if a_id(a)]
         await db["adjuntos"].update_many(
-            {"_id": {"$in": [a_id(a) for a in datos["adjuntos"] if a_id(a)]}, "ticket_id": None},
+            {
+                "_id": {"$in": ids},
+                "ticket_id": None,
+                "mensaje_id": None,
+                "subido_por": usuario.get("_id"),
+            },
             {"$set": {"ticket_id": documento["_id"]}},
         )
     if documento.get("activo_id"):
@@ -620,13 +647,20 @@ async def crear_manual(datos: dict[str, Any], *, usuario: dict[str, Any], ip: st
     contexto = {**documento, 'activo_id': None, 'conjunto_id': None}
     documento.update(await resolver(contexto, {**datos, 'categoria': documento.get('categoria')}, usuario, creacion=True))
     documento.update(await sla_service.calcular_deadlines(documento["prioridad"], ahora))
+    await _verificar_adjuntos_propios(datos.get("adjuntos"), usuario)
     documento, nuevo = await _insertar_solicitud(documento, solicitud_original, usuario, 'manual')
     if not nuevo:
         return documento
     documento["tiene_chat"] = False
     if datos.get("adjuntos"):
+        ids = [a_id(a) for a in datos["adjuntos"] if a_id(a)]
         await db["adjuntos"].update_many(
-            {"_id": {"$in": [a_id(a) for a in datos["adjuntos"] if a_id(a)]}, "ticket_id": None},
+            {
+                "_id": {"$in": ids},
+                "ticket_id": None,
+                "mensaje_id": None,
+                "subido_por": usuario.get("_id"),
+            },
             {"$set": {"ticket_id": documento["_id"]}},
         )
     await _registrar_evento(
@@ -1413,13 +1447,15 @@ async def enviar_mensaje(ticket_id: ObjectId, cuerpo: str, adjuntos: list[str], 
     ticket = await db["tickets"].find_one({"_id": ticket_id, "eliminado": {"$ne": True}})
     if ticket is None:
         raise NoEncontrado("Ticket no encontrado.")
+    # Primero el acceso y despues el estado del chat: al reves, un trabajador
+    # distinguia un ticket ajeno (que existe) de uno inventado por la respuesta.
+    _verificar_acceso(ticket, usuario)
     if not tiene_chat(ticket):
         raise Prohibido(
             "Este ticket fue registrado por el equipo de soporte, asi que no tiene chat. "
             "La comunicacion queda registrada en la linea de tiempo y las notas internas.",
             codigo="sin_chat",
         )
-    _verificar_acceso(ticket, usuario)
     texto = normalizar_texto(cuerpo)
     if not texto and not adjuntos:
         raise Validacion("Escribe un mensaje o adjunta un archivo.")
@@ -1509,9 +1545,11 @@ async def mensajes(ticket_id: ObjectId, *, usuario: dict[str, Any], desde: Any =
     ticket = await db["tickets"].find_one({"_id": ticket_id})
     if ticket is None:
         raise NoEncontrado("Ticket no encontrado.")
+    # El acceso se comprueba antes de decir si hay chat; si no, la respuesta
+    # vacia confirmaba la existencia de tickets ajenos.
+    _verificar_acceso(ticket, usuario)
     if not tiene_chat(ticket):
         return []
-    _verificar_acceso(ticket, usuario)
     consulta: dict[str, Any] = {"ticket_id": ticket_id}
     if desde:
         consulta["creado_en"] = {"$gt": desde}
@@ -1532,6 +1570,7 @@ async def crear_nota(ticket_id: ObjectId, cuerpo: str, adjuntos: list[str], *, u
     texto = normalizar_texto(cuerpo)
     if not texto and not adjuntos:
         raise Validacion("Escribe la nota o adjunta un archivo.")
+    await _verificar_adjuntos_propios(adjuntos, usuario)
     documento = {
         "ticket_id": ticket_id,
         "autor_id": usuario.get("_id"),
@@ -1545,7 +1584,13 @@ async def crear_nota(ticket_id: ObjectId, cuerpo: str, adjuntos: list[str], *, u
     if adjuntos:
         ids = [a_id(a) for a in adjuntos if a_id(a)]
         await db["adjuntos"].update_many(
-            {"_id": {"$in": ids}}, {"$set": {"ticket_id": ticket_id, "nota_id": resultado.inserted_id}}
+            {
+                "_id": {"$in": ids},
+                "ticket_id": None,
+                "mensaje_id": None,
+                "subido_por": usuario.get("_id"),
+            },
+            {"$set": {"ticket_id": ticket_id, "nota_id": resultado.inserted_id}},
         )
     await db["tickets"].update_one({"_id": ticket_id}, {"$set": {"actualizado_en": utcnow()}})
     await _registrar_evento(

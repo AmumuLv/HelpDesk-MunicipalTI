@@ -104,8 +104,8 @@ class TestOperacionSinServicios:
         assert respuesta['tabla']['filas'][0]['pendientes_hoy'] == 3
         assert respuesta['tabla']['filas'][1]['estado'] == 'Ausencia registrada'
         assert 'Tratamiento' not in str(respuesta)
-        assert 'No garantiza' in respuesta['texto']
-        assert 'Los pendientes son los de hoy' in respuesta['texto']
+        assert 'No garantiza' in respuesta['informacion_adicional']
+        assert 'Los pendientes son los de hoy' in respuesta['informacion_adicional']
         filtrada = await operaciones.horarios_manana({'tecnico_id': identificador}, {}, usuario=TECNICO)
         assert filtrada['total'] == 1
 
@@ -191,7 +191,7 @@ async def test_metricas_equipo_separan_periodo_pendientes_y_muestras(db, api, mo
     assert fila['reaperturas'] == 2
     assert fila['horas_programadas'] == 8
     assert fila['muestra'] == 'Pocos registros'
-    assert 'no miden trabajo real' in respuesta['texto']
+    assert 'no miden trabajo real' in respuesta['informacion_adicional']
     vacia = await operaciones.resumen_equipo({'desde': hoy - timedelta(days=2), 'hasta': hoy - timedelta(days=2), 'tecnico_id': tecnico}, {}, usuario=ADMIN)
     fila_vacia = vacia['tabla']['filas'][0]
     assert fila_vacia['asignados_periodo'] == 0

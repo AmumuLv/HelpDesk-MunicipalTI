@@ -268,6 +268,35 @@ async def obtener(adjunto_id: ObjectId) -> dict[str, Any]:
     return documento
 
 
+async def exigir_descarga(documento: dict[str, Any], *, usuario: dict[str, Any]) -> None:
+    """Quien puede descargar cada adjunto, segun su ambito.
+
+    - ``nota``: solo el equipo TI. Las notas internas no son del trabajador,
+      este vinculado o no el archivo a una nota.
+    - ``kb``: contenido de conocimiento, compartido con cualquier sesion. Los
+      articulos no guardan el id del adjunto, asi que no hay visibilidad de
+      articulo que aplicar aqui (ver hallazgos).
+    - ``ticket`` vinculado: manda la visibilidad del ticket — el equipo TI ve
+      todos y el trabajador solo los suyos.
+    - adjunto aun sin vincular: solo quien lo subio.
+    """
+    from app.services import ticket_service
+
+    es_ti = usuario.get("rol") in {"administrador", "tecnico"}
+    ambito = documento.get("ambito") or "ticket"
+    if ambito == "nota" or documento.get("nota_id"):
+        if not es_ti:
+            raise Prohibido("Las notas internas son del equipo de soporte.")
+        return
+    if ambito == "kb":
+        return
+    if documento.get("ticket_id"):
+        await ticket_service.obtener(documento["ticket_id"], usuario=usuario)
+        return
+    if documento.get("subido_por") != usuario.get("_id"):
+        raise Prohibido("No tienes acceso a este archivo.")
+
+
 async def listar_por_ticket(ticket_id: ObjectId) -> list[dict[str, Any]]:
     documentos = await (get_db()["adjuntos"].find({"ticket_id": ticket_id}).sort("creado_en", 1).to_list(None))
     for documento in documentos:

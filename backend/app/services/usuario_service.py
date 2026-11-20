@@ -413,8 +413,13 @@ async def buscar_para_afectado(
     if not incluir_inactivos:
         consulta["activo"] = True
     if texto:
+        # Lo tecleado se escapa: es texto, no una expresion regular. Sin esto,
+        # `PC (recepción)` con un parentesis sin cerrar revienta con 500 y con
+        # ambos parentesis buscaba «PC recepcion» en silencio. `nombre_busqueda`
+        # guarda solo alfanumericos, asi que ahi no hace falta.
+        termino = re.escape(normalizar_texto(texto))
         consulta["$or"] = [
-            {"nombre": {"$regex": normalizar_texto(texto), "$options": "i"}},
+            {"nombre": {"$regex": termino, "$options": "i"}},
             {"nombre_busqueda": {"$regex": clave_oscura(texto)}},
         ]
     documentos = await (
@@ -443,9 +448,13 @@ async def buscar_global(texto: str, *, limite: int = 20, solo_activos: bool = Tr
     if solo_activos:
         consulta["activo"] = True
     if texto:
+        # Mismo criterio que en `buscar_para_afectado`: el texto se escapa antes
+        # de entrar en `$regex` para que un parentesis o un corchete tecleado no
+        # rompa la busqueda global.
+        termino = re.escape(normalizar_texto(texto))
         consulta["$or"] = [
-            {"nombre": {"$regex": normalizar_texto(texto), "$options": "i"}},
-            {"email": {"$regex": normalizar_texto(texto), "$options": "i"}},
+            {"nombre": {"$regex": termino, "$options": "i"}},
+            {"email": {"$regex": termino, "$options": "i"}},
             {"nombre_busqueda": {"$regex": clave_oscura(texto)}},
         ]
     documentos = await (
@@ -736,8 +745,9 @@ async def companeros_de_oficina(
     if excluir_id:
         consulta["_id"] = {"$ne": excluir_id}
     if texto:
+        termino = re.escape(normalizar_texto(texto))
         consulta["$or"] = [
-            {"nombre": {"$regex": normalizar_texto(texto), "$options": "i"}},
+            {"nombre": {"$regex": termino, "$options": "i"}},
             {"nombre_busqueda": {"$regex": clave_oscura(texto)}},
         ]
     documentos = await (
