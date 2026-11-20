@@ -14,8 +14,9 @@ from typing import Any
 from bson import ObjectId
 
 from app.core.audit import registrar
+from app.core.config import settings
 from app.core.db import get_db
-from app.core.errors import Conflicto, Validacion
+from app.core.errors import Conflicto, Prohibido, Validacion
 from app.core.time import local_date, utcnow
 from app.domain.constants import (
     ESTADO_CERRADO,
@@ -36,6 +37,21 @@ from app.services import (
     ticket_service,
     usuario_service,
 )
+
+
+def _rechazar_en_produccion(ajustes: Any = None) -> None:
+    """La demostracion trae cuentas con contrasenas publicas (admin@demo.local).
+
+    Cargarla sobre una instalacion real mezclaria esas cuentas con los datos de
+    la institucion. El comando se niega en produccion; en desarrollo y prueba
+    sigue disponible como hasta ahora.
+    """
+    if (ajustes or settings).is_production:
+        raise Prohibido(
+            "Los datos de demostracion no se cargan con APP_ENV=production. "
+            "Usa una instalacion de desarrollo o de prueba."
+        )
+
 
 ZONAS_DEMO = [
     {
@@ -190,6 +206,7 @@ async def _limpiar_huerfanos() -> None:
 
 async def cargar() -> dict[str, Any]:
     """Crea zonas, oficinas, usuarios, inventario, tickets y articulos de ejemplo."""
+    _rechazar_en_produccion()
     if await hay_demo():
         raise Conflicto("Ya existen datos de demostracion. Eliminalos antes de volver a cargar.")
     await _limpiar_huerfanos()

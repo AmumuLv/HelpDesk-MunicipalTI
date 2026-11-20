@@ -51,19 +51,15 @@ class TestFiltrosSinServicios:
             analisis_consultas.exigir_ubicacion_explicita(pregunta)
 
     async def test_inventario_aplica_tipo_equipo_y_ubicacion_a_ambos_recuentos(self, monkeypatch):
+        from app.services import analisis_exploracion
         oficina, zona, equipo = ObjectId(), ObjectId(), ObjectId()
-        db = MagicMock()
-        contar = AsyncMock(return_value=1)
-        db.__getitem__.return_value.count_documents = contar
-        agregar = AsyncMock(return_value=[{'_id': 'Laptop', 'total': 1}])
-        monkeypatch.setattr(analisis_consultas, 'get_db', lambda: db)
-        monkeypatch.setattr(analisis_consultas, 'agregar', agregar)
-        resultado = await analisis_consultas.inventario({
-            'oficina_id': oficina, 'zona_id': zona, 'tipo_activo': 'Laptop', 'equipo_id': equipo,
-        }, {'tipo_activo': {'$ne': None}, 'equipo_id': {'$ne': None}})
+        filtros = {'oficina_id': oficina, 'zona_id': zona, 'tipo_activo': 'Laptop', 'equipo_id': equipo}
         esperado = {'activo': {'$ne': False}, 'oficina_id': oficina, 'zona_id': zona, 'tipo': 'Laptop', '_id': equipo}
-        assert agregar.call_args.args[1][0] == {'$match': esperado}
-        contar.assert_awaited_once_with({**esperado, 'responsable_id': None})
+        assert analisis_exploracion.consulta_activos(filtros, {}) == esperado
+        leer = AsyncMock(return_value={'total': 1, 'sin_responsable': 1})
+        monkeypatch.setattr(analisis_exploracion, 'resumen_inventario', leer)
+        resultado = await analisis_consultas.inventario(filtros, {'tipo_activo': {'$ne': None}})
+        leer.assert_awaited_once_with(filtros)
         assert resultado['total'] == resultado['sin_responsable'] == 1
 
     @pytest.mark.parametrize('filtros', [{'categoria': 'Impresora'}, {'tecnico_id': ObjectId()}])
@@ -99,9 +95,10 @@ async def test_consulta_natural_y_filtros_de_inventario_con_api_y_datos_aislados
     assert hoy_datos['tabla']['filas'][0]['total'] == 1
     assert hoy_datos['filtros_consulta']['desde'] == local_date().isoformat()
     solo_laptop = await preguntar('¿Cuántos equipos hay en el sistema?', {'tipo_activo': 'Laptop'})
-    assert solo_laptop['tabla']['filas'] == [{'tipo': 'Laptop', 'total': 1}]
+    assert [(f['tipo'], f['total']) for f in solo_laptop['tabla']['filas']] == [('Laptop', 1)]
+    assert solo_laptop['tabla']['filas'][0]['por_confirmar'] == 1
     solo_cpu = await preguntar('¿Cuántos equipos hay en el sistema?', {'equipo_id': str(cpu)})
-    assert solo_cpu['tabla']['filas'] == [{'tipo': 'CPU', 'total': 1}]
+    assert [(f['tipo'], f['total']) for f in solo_cpu['tabla']['filas']] == [('CPU', 1)]
     sin_coincidencia = await preguntar('¿Cuántos equipos hay en el sistema?', {'equipo_id': str(cpu), 'tipo_activo': 'Laptop'})
     assert sin_coincidencia['tabla']['filas'] == []
     assert '0 dispositivos' in sin_coincidencia['texto']

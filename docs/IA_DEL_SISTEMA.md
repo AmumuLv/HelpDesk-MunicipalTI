@@ -23,6 +23,14 @@ función de comunicación humana, independiente de ambos asistentes.
 
 ## Motor integrado: recorrido de una sugerencia
 
+En **Consultas de datos**, las cifras de inventario, calidad, oficinas, responsables,
+equipo TI, horarios, conocimiento y auditoría disponen de desgloses paginados de
+veinte registros. Las barras abren registros y muestran nombres completos; los
+filtros y fechas vuelven a consultar datos internos sin tokens externos. La
+auditoría general conserva quince días; el historial persistente de responsables
+del equipo es una fuente distinta. Se identifican sus límites sin inventar
+ubicaciones anteriores. Detalles en [Análisis IA](ANALISIS_IA.md).
+
 1. El sistema analiza el tipo de problema, texto, urgencia y equipo vinculado.
 2. Propone categoría/prioridad y artículos relacionados; la asignación considera
    disponibilidad, carga, horario, ausencias y especialidad de TI.

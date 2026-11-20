@@ -2587,6 +2587,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ia/asistente/explorar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Explorar Consulta */
+        post: operations["explorar_consulta_api_ia_asistente_explorar_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/ia/asistente/conversaciones": {
         parameters: {
             query?: never;
@@ -3511,6 +3528,56 @@ export interface components {
             usuario_nombre?: string | null;
             /** Fecha */
             fecha?: string | null;
+        };
+        /** ExplorarConsultaIA */
+        ExplorarConsultaIA: {
+            /**
+             * Herramienta
+             * @enum {string}
+             */
+            herramienta: "resumen_inventario" | "calidad_inventario" | "equipos_datos_pendientes" | "oficinas_datos_pendientes" | "responsables_inventario" | "auditoria_cambios" | "auditoria_responsables" | "resumen_equipo_ti" | "horarios_manana" | "tickets_pendientes_detalle" | "guias_consultadas" | "guias_valoradas" | "brechas_guias" | "conjuntos_incompletos" | "inventarios_disponibles";
+            filtros?: components["schemas"]["FiltrosAnalitica"];
+            /** Argumentos */
+            argumentos?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Pagina
+             * @default 1
+             */
+            pagina: number;
+            /** Texto */
+            texto?: string | null;
+            /** Tipo */
+            tipo?: string | null;
+            /** Oficina */
+            oficina?: string | null;
+            /** Responsable */
+            responsable?: string | null;
+            /** Oficina Id */
+            oficina_id?: string | null;
+            /** Responsable Id */
+            responsable_id?: string | null;
+            /** Equipo Id */
+            equipo_id?: string | null;
+            /** Campo */
+            campo?: string | null;
+            /** Grupo */
+            grupo?: ("todos" | "sin_cuenta" | "vinculado" | "pendiente" | "compartido" | "confirmar") | null;
+            /**
+             * Vista
+             * @default resumen
+             * @enum {string}
+             */
+            vista: "resumen" | "detalle";
+            /** Fecha */
+            fecha?: string | null;
+            /**
+             * Orden
+             * @default cantidad
+             * @enum {string}
+             */
+            orden: "cantidad" | "porcentaje";
         };
         /** ExportarSolicitud */
         ExportarSolicitud: {
@@ -10544,6 +10611,43 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["PreguntaIA"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    explorar_consulta_api_ia_asistente_explorar_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-CSRF-Token"?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                ma_csrf?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExplorarConsultaIA"];
             };
         };
         responses: {

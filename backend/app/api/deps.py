@@ -139,6 +139,16 @@ async def limite_estricto(request: Request) -> None:
     await ratelimit.comprobar_limite(f"estricto:{_ip(request)}", limite=max(20, settings.rate_limit_per_minute // 6))
 
 
+async def limite_instalacion(request: Request) -> None:
+    """El primer administrador se crea UNA vez; nadie necesita reintentar en bucle.
+
+    La comprobacion de que no existe otro administrador es atomica por el indice
+    unico parcial, pero aun asi esta ruta publica no puede quedar sin freno: es
+    la unica que crea una cuenta sin sesion.
+    """
+    await ratelimit.comprobar_limite(f"instalacion:{_ip(request)}", limite=5)
+
+
 def id_opcional(valor: Any, campo: str = "id") -> ObjectId | None:
     """
     Id que puede venir vacío. Un valor que **no** es un id se devuelve tal cual.

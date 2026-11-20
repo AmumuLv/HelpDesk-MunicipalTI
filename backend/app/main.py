@@ -129,16 +129,19 @@ app.include_router(api, prefix=settings.api_prefix)
 
 @app.get(f"{settings.api_prefix}/health", tags=["sistema"])
 async def health() -> dict[str, Any]:
+    """Sonda publica: solo si el proceso y sus dependencias responden.
+
+    Antes devolvia ademas el entorno, la zona horaria y los indicadores de IA y
+    ClamAV. Eso no lo necesita ni el healthcheck del contenedor ni el de Caddy,
+    y desde fuera de la red no hay por que saberlo: el detalle de configuracion
+    se consulta en GET /configuracion, que exige sesion de administrador.
+    """
     mongo_ok = await ping_mongo()
     redis_ok = await ping_redis()
-    estado = "ok" if mongo_ok and redis_ok else "degradado"
     return {
-        "estado": estado,
+        "estado": "ok" if mongo_ok and redis_ok else "degradado",
         "mongo": mongo_ok,
         "redis": redis_ok,
-        "version": "1.0.0",
-        "entorno": settings.app_env,
-        "detalle": settings.public_summary(),
     }
 
 

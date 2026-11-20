@@ -186,8 +186,9 @@ async def test_responsable_exige_equipo_unico_y_excluye_otros_equipos(db):
         {'fecha': ahora, 'rol': 'administrador', 'accion': 'activo.responsable', 'usuario_nombre': 'Actor del primero', 'entidad': 'activos', 'entidad_id': str(equipo)},
         {'fecha': ahora, 'rol': 'administrador', 'accion': 'activo.responsable', 'usuario_nombre': 'Actor del segundo', 'entidad': 'activos', 'entidad_id': str(segundo)},
     ])
-    with pytest.raises(Validacion, match='único'):
-        await consultas.auditoria_responsables({}, {'equipo': 'CPU-01'}, usuario=ADMIN)
+    coincidencias = await consultas.auditoria_responsables({}, {'equipo': 'CPU-01'}, usuario=ADMIN)
+    assert coincidencias['total'] == 2
+    assert {f['id'] for f in coincidencias['tabla']['filas']} == {str(equipo), str(segundo)}
     respuesta = await consultas.auditoria_responsables({'oficina_id': oficina}, {'equipo': 'CPU-01'}, usuario=ADMIN)
     assert [f['persona'] for f in respuesta['tabla']['filas']] == ['Actor del primero']
     por_codigo = await consultas.auditoria_responsables({}, {'equipo': '740000002'}, usuario=ADMIN)

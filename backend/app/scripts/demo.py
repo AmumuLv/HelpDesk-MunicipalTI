@@ -39,9 +39,16 @@ async def _estado() -> int:
 
 
 async def _principal(accion: str) -> int:
+    from app.core.errors import Prohibido
+
     acciones = {"cargar": _cargar, "eliminar": _eliminar, "estado": _estado}
     try:
         return await acciones[accion]()
+    except Prohibido as exc:
+        # P. ej. `cargar` con APP_ENV=production: se explica el motivo y se sale
+        # con codigo distinto de cero, sin traza ni datos internos.
+        print(f"Rechazado: {getattr(exc, 'detail', exc)}")
+        return 2
     finally:
         await close_connections()
 

@@ -326,7 +326,10 @@ async def sugerir_para_ticket(
     consulta: dict[str, Any] = {"activo": True, **_filtro_acceso(usuario)}
     or_: list[dict[str, Any]] = []
     if categoria:
-        or_.append({"categoria": {"$regex": categoria, "$options": "i"}})
+        # La categoria llega del ticket (texto libre del reportante) o de la IA:
+        # se busca literal, asi que tambien se escapa. Sin esto, una categoria
+        # como «PC (recepción» reventaba las sugerencias con 500.
+        or_.append({"categoria": {"$regex": re.escape(categoria), "$options": "i"}})
     palabras = [p for p in re.split(r"\W+", termino.lower()) if len(p) > 3]
     for palabra in ETIQUETAS_SUGERIDAS:
         if any(palabra in p for p in palabras) or any(p in palabra for p in palabras):

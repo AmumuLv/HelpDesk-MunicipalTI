@@ -10,9 +10,10 @@ import { ErrorState, Nota, SkeletonPanel } from '../base/Estructura'
 import { ConfirmDialog, DialogModal } from '../base/Sobreposiciones'
 import { TextoChat } from './TextoChat'
 import { useScrollChat } from './useScrollChat'
+import { ResultadosConsulta, type TablaConsulta } from './ResultadosConsulta'
 import './AsistenteAnalisis.css'
 
-type Tabla = { columnas: { clave: string; titulo: string }[]; filas: Record<string, unknown>[] }
+type Tabla = TablaConsulta
 type Mensaje = { rol: string; texto: string; fuentes?: string[]; tabla?: Tabla | null; enlaces?: { texto: string; href: string }[] | null; explicacion?: string | null; periodo?: string | null; analisis?: { significado: string; revision: string; limite: string } | null; seguimientos?: string[]; alcance_consulta?: string | null }
 type Conversacion = { id: string; titulo: string; mensajes: Mensaje[]; version?: number }
 type Respuesta = Omit<Mensaje, 'rol'> & { conversacion_id: string; mensajes?: Mensaje[]; version?: number }
@@ -116,21 +117,6 @@ function TextoProgresivo({ texto, animar, alProgresar, alTerminar }: { texto: st
   useEffect(() => { if (animar && longitud >= texto.length) alTerminar() }, [animar, longitud, texto.length, alTerminar])
   const escribiendo = animar && longitud < texto.length
   return <div className="datos-answer" aria-busy={escribiendo}><TextoChat texto={animar ? texto.slice(0, longitud) : texto} />{escribiendo ? <span className="datos-writing-cursor" aria-hidden="true">▍</span> : null}</div>
-}
-
-function VistaDatos({ tabla }: { tabla: Tabla }) {
-  if (tabla.columnas.some(c => c.clave === 'fecha') && tabla.columnas.some(c => c.clave === 'valor') && tabla.filas.length) {
-    const valores = tabla.filas.map(f => Math.max(0, Number(f.valor) || 0))
-    const maximo = Math.max(1, ...valores)
-    const puntos = valores.map((v, i) => `${15 + i / Math.max(1, valores.length - 1) * 570},${145 - v / maximo * 125}`).join(' ')
-    return <figure className="datos-ranking datos-timeline"><figcaption><Activity size={15} aria-hidden="true" />Tickets creados por día</figcaption><svg viewBox="0 0 600 165" role="img" aria-label={`Actividad de ${valores.length} días. Máximo: ${Math.max(...valores)} tickets por día.`}><line x1="15" x2="585" y1="145" y2="145" /><polyline points={puntos} fill="none" />{valores.length === 1 ? <circle cx="15" cy={145 - valores[0] / maximo * 125} r="4" /> : null}</svg><div className="datos-timeline-dates"><span>{textoVisible(String(tabla.filas[0].fecha))}</span><span>{textoVisible(String(tabla.filas[tabla.filas.length - 1].fecha))}</span></div><p>Escala: 0 a {Math.max(...valores)} tickets por día. Es actividad registrada, no una predicción.</p></figure>
-  }
-  const medida = ['faltantes', 'total', 'tickets_12m', 'resueltos', 'carga_asignados'].find(c => tabla.columnas.some(col => col.clave === c))
-  const etiqueta = ['nombre', 'campo', 'oficina', 'zona', 'tipo', 'tecnico', 'categoria', 'intervalo', 'estado', 'fecha'].find(c => tabla.columnas.some(col => col.clave === c))
-  if (!medida || !etiqueta) return null
-  const filas = tabla.filas.slice(0, 5)
-  const maximo = Math.max(1, ...filas.map(f => Number(f[medida]) || 0))
-  return <figure className="datos-ranking" aria-label="Comparación de resultados"><figcaption><BarChart3 size={14} />Comparación · {tabla.columnas.find(c => c.clave === medida)?.titulo}</figcaption>{filas.map((fila, i) => <div className="datos-ranking-row" key={i}><span className="datos-ranking-name">{String(fila[etiqueta] ?? 'Sin identificar')}</span><strong>{Number(fila[medida]).toLocaleString('es-PE')}</strong><span className="datos-ranking-track"><span style={{ width: `${Math.max(0, Number(fila[medida]) || 0) / maximo * 100}%` }} /></span></div>)}<p>La barra más larga muestra la cantidad más alta. Se muestran hasta 5 resultados.</p></figure>
 }
 
 export function AsistenteAnalisis({ periodo }: { periodo: string }) {
@@ -345,7 +331,7 @@ export function AsistenteAnalisis({ periodo }: { periodo: string }) {
             {edicion?.indice === indice ? <div className="datos-edit-question"><Textarea etiqueta="Editar tu pregunta" value={edicion.texto} maxLength={1000} filas={3} disabled={bloqueado} onChange={e => setEdicion({ ...edicion, texto: e.target.value })} /><small>Al enviar se reemplazan esta pregunta y las respuestas posteriores.</small><div><Button tamano="sm" disabled={bloqueado} onClick={() => setEdicion(null)}>Cancelar edición</Button><Button tamano="sm" variante="primario" disabled={bloqueado || edicion.texto.trim().length < 2} onClick={() => void ejecutar({ texto: edicion.texto, tipo: 'editar', indice })}>Guardar y enviar</Button></div></div> : <TextoProgresivo key={escribiendo ? 'escribiendo' : 'guardado'} texto={textoVisible(mensaje.texto)} animar={escribiendo} alProgresar={seguirEscritura} alTerminar={terminarEscritura} />}
             {mensaje.rol === 'assistant' ? !escribiendo ? <>
               {mensaje.analisis ? <details className="datos-reading"><summary><Sparkles size={14} aria-hidden="true" />Entender este resultado</summary><p>{mensaje.analisis.significado}</p><dl><div><dt>Qué revisar</dt><dd>{mensaje.analisis.revision}</dd></div><div><dt>Ten en cuenta</dt><dd>{mensaje.analisis.limite}</dd></div></dl></details> : null}
-              {mensaje.tabla?.filas.length ? <><VistaDatos tabla={mensaje.tabla} /><details className="datos-data"><summary>Ver datos de la respuesta</summary><div className="datos-table-scroll"><table><thead><tr>{mensaje.tabla.columnas.map(c => <th scope="col" key={c.clave}>{c.titulo}</th>)}</tr></thead><tbody>{mensaje.tabla.filas.map((fila, i) => <tr key={i}>{mensaje.tabla!.columnas.map(c => <td key={c.clave}>{fila[c.clave] == null ? 'Sin datos' : typeof fila[c.clave] === 'object' ? 'Ver detalle' : textoVisible(String(fila[c.clave]))}</td>)}</tr>)}</tbody></table></div></details></> : null}
+              {mensaje.tabla && (mensaje.tabla.filas.length > 0 || mensaje.tabla.exploracion) ? <><ResultadosConsulta key={`${indice}-${version ?? 0}`} tabla={mensaje.tabla} />{!mensaje.tabla.exploracion ? <details className="datos-data"><summary>Ver datos de la respuesta</summary><div className="datos-table-scroll"><table><thead><tr>{mensaje.tabla.columnas.map(c => <th scope="col" key={c.clave}>{c.titulo}</th>)}</tr></thead><tbody>{mensaje.tabla.filas.map((fila, i) => <tr key={i}>{mensaje.tabla!.columnas.map(c => <td key={c.clave}>{fila[c.clave] == null ? 'Sin datos' : typeof fila[c.clave] === 'object' ? 'Ver detalle' : textoVisible(String(fila[c.clave]))}</td>)}</tr>)}</tbody></table></div></details> : null}</> : null}
               {mensaje.enlaces?.length ? <div className="datos-links">{mensaje.enlaces.filter(e => enlaceDeDatosSeguro(e.href)).map(e => <Link key={e.href} to={e.href}>{e.texto} ↗</Link>)}</div> : null}
               {mensaje.fuentes?.length || mensaje.explicacion ? <details className="datos-proof"><summary>De dónde sale esta respuesta</summary><div className="datos-sources">{mensaje.fuentes?.map(f => <span key={f}><Database size={12} aria-hidden="true" />{FUENTES[f] || f}</span>)}</div>{mensaje.explicacion ? <p>{mensaje.explicacion}</p> : null}</details> : null}
               <div className="datos-message-actions"><button type="button" aria-label="Copiar respuesta" title={copiada === indice ? 'Copiada' : 'Copiar respuesta'} onClick={() => void copiar(mensaje, indice)}>{copiada === indice ? <Check size={15} aria-hidden="true" /> : <Copy size={15} aria-hidden="true" />}</button>{indice === mensajes.length - 1 && mensajes[indice - 1]?.rol === 'user' ? <button type="button" aria-label="Regenerar respuesta" title="Volver a consultar los datos" disabled={bloqueado} onClick={() => void ejecutar({ texto: mensajes[indice - 1].texto, tipo: 'regenerar' })}><RotateCcw size={15} aria-hidden="true" /></button> : null}</div>

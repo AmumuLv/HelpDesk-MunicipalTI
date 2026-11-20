@@ -46,25 +46,10 @@ async def evolucion(filtros, argumentos):
 
 
 async def inventario(filtros, argumentos):
-    if any(filtros.get(campo) for campo in ('categoria', 'tecnico_id')):
-        raise Validacion('El inventario actual no admite filtros por categoría de ticket ni por técnico. Puedes filtrar por oficina, zona, tipo de equipo o equipo específico.')
-    consulta = {'activo': {'$ne': False}}
-    for campo in ('oficina_id', 'zona_id'):
-        if filtros.get(campo):
-            consulta[campo] = filtros[campo]
-    if filtros.get('tipo_activo'):
-        consulta['tipo'] = filtros['tipo_activo']
-    if filtros.get('equipo_id'):
-        consulta['_id'] = filtros['equipo_id']
-    filas = await agregar('activos', [
-        {'$match': consulta},
-        {'$group': {'_id': '$tipo', 'total': {'$sum': 1}}},
-        {'$sort': {'total': -1, '_id': 1}},
-    ])
-    total = sum(f['total'] for f in filas)
-    sin_responsable = await get_db()['activos'].count_documents({**consulta, 'responsable_id': None})
-    return {'total': total, 'sin_responsable': sin_responsable,
-            'items': [{'tipo': f['_id'] or 'Sin tipo', 'total': f['total']} for f in filas]}
+    from app.services.analisis_exploracion import resumen_inventario
+    return await resumen_inventario(filtros)
+
+
 
 
 CONSULTAS = {
@@ -273,6 +258,8 @@ def formatear(nombre: str, datos: dict[str, Any]):
             texto += ' No hay actividad registrada para comparar días.'
         return texto, tabla([('fecha', 'Fecha'), ('valor', 'Tickets creados')], serie)
     if nombre == 'resumen_inventario':
+        if datos.get('tabla'):
+            return datos['texto'], datos['tabla']
         texto = f"El inventario actual tiene {datos['total']} dispositivos físicos activos registrados."
         texto += f"\n\n{datos['sin_responsable']} no tienen una persona responsable vinculada. Esto puede incluir equipos compartidos de oficina; no significa que estén sin uso o abandonados."
         texto += '\n\nUn conjunto de escritorio puede incluir varios dispositivos. Una laptop sigue siendo un equipo individual.'

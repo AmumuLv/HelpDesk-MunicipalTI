@@ -508,6 +508,27 @@ class PreguntaIA(Base):
         return valor.strip() if isinstance(valor, str) else valor
 
 
+class ExplorarConsultaIA(Base):
+    herramienta: Literal['resumen_inventario', 'calidad_inventario', 'equipos_datos_pendientes', 'oficinas_datos_pendientes', 'responsables_inventario', 'auditoria_cambios', 'auditoria_responsables', 'resumen_equipo_ti', 'horarios_manana', 'tickets_pendientes_detalle', 'guias_consultadas', 'guias_valoradas', 'brechas_guias', 'conjuntos_incompletos', 'inventarios_disponibles']
+    filtros: FiltrosAnalitica = Field(default_factory=FiltrosAnalitica)
+    argumentos: dict[str, Any] = Field(default_factory=dict)
+    pagina: int = Field(default=1, ge=1, le=500)
+    texto: str | None = Field(default=None, max_length=160)
+    tipo: str | None = Field(default=None, max_length=80)
+    oficina: str | None = Field(default=None, max_length=160)
+    responsable: str | None = Field(default=None, max_length=160)
+    oficina_id: Id | None = None
+    responsable_id: Id | None = None
+    equipo_id: Id | None = None
+    campo: str | None = Field(default=None, max_length=60)
+    grupo: Literal['todos', 'sin_cuenta', 'vinculado', 'pendiente', 'compartido', 'confirmar'] | None = None
+    vista: Literal['resumen', 'detalle'] = 'resumen'
+    fecha: date | None = None
+    orden: Literal['cantidad', 'porcentaje'] = 'cantidad'
+
+    model_config = {'extra': 'forbid'}
+
+
 class RenombrarConversacionIA(Base):
     titulo: str = Field(min_length=1, max_length=100)
     version: int | None = Field(default=None, ge=0)
